@@ -152,7 +152,7 @@ withTarget
                         check $"scaffold plan succeeds: {details}" false
                     | Ok plan ->
                         check "scaffold application bindings resolve" (plan.Components.Length = 4)
-                        check "scaffold plans seven project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 7)
+                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 12)
                         check "scaffold ends in strict Limen readiness" (plan.Actions |> List.exists (fun action -> action.Kind = ReadinessVerify))
 
                         let packageJson =
@@ -169,6 +169,42 @@ withTarget
                                 | EnsureFile("src/engine/App.Engine.fsproj", fileContent) -> Some fileContent
                                 | _ -> None)
 
+
+                        let foundations =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile(".echelon/foundations.json", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        let operational =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("src/engine/Operational.fs", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        let boundaries =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("aegis-boundaries.json", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        let screen =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("src/kernel/index.html", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        let printSurface =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("src/kernel/print.html", fileContent) -> Some fileContent
+                                | _ -> None)
+
                         check
                             "scaffold binds Limen Forma and Folio to npm target"
                             (packageJson
@@ -181,6 +217,50 @@ withTarget
                             "scaffold binds Aegis to F# target"
                             (projectFile
                              |> Option.exists (fun text -> text.Contains("EchelonFoundry.Aegis.Core")))
+
+
+                        check
+                            "Folio dependency is immutable"
+                            (packageJson
+                             |> Option.exists (fun text ->
+                                 text.Contains("github:kemiller2002/folio#273b18f5b23db15cddd173c05af5d1a8484fc4cf")))
+
+                        check
+                            "scaffold declares application foundations"
+                            (foundations
+                             |> Option.exists (fun text ->
+                                 text.Contains("\"aegis\"")
+                                 && text.Contains("\"forma\"")
+                                 && text.Contains("\"folio\"")
+                                 && text.Contains("273b18f5b23db15cddd173c05af5d1a8484fc4cf")))
+
+                        check
+                            "scaffold configures Aegis"
+                            (operational
+                             |> Option.exists (fun text ->
+                                 text.Contains("Aegis.configure")
+                                 && text.Contains("Bootstrap.validate")))
+
+                        check
+                            "scaffold declares Aegis boundaries"
+                            (boundaries
+                             |> Option.exists (fun text ->
+                                 text.Contains("aegis/boundaries/v1")
+                                 && text.Contains("Limen interop")))
+
+                        check
+                            "scaffold uses Forma presentation"
+                            (screen
+                             |> Option.exists (fun text ->
+                                 text.Contains("@echelon-foundry/design-system")
+                                 && text.Contains("<ef-button>")))
+
+                        check
+                            "scaffold uses Folio print presentation"
+                            (printSurface
+                             |> Option.exists (fun text ->
+                                 text.Contains("@echelon-foundry/print-components")
+                                 && text.Contains("<ef-print-document>")))
 
                         let readiness =
                             plan.Actions
