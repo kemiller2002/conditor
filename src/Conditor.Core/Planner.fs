@@ -28,14 +28,20 @@ module Planner =
         let actions = ResizeArray<PlanAction>()
         let mutable sequence = 1
 
-        let addAction request version definition phase args =
+        let addAction
+            (request: ComponentRequest)
+            (version: string)
+            (definition: ComponentDefinition)
+            (phase: string)
+            (arguments: string list)
+            =
             actions.Add
                 { Sequence = sequence
                   ComponentId = request.Id
                   ComponentVersion = version
                   Kind = actionKind operation phase
                   Executable = npxExecutable ()
-                  Arguments = lifecycleArguments target version definition args }
+                  Arguments = lifecycleArguments target version definition arguments }
 
             sequence <- sequence + 1
 
