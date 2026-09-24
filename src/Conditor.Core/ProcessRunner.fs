@@ -4,7 +4,7 @@ open System
 open System.Diagnostics
 
 module ProcessRunner =
-    let private runCommand workingDirectory executable arguments =
+    let runProcess workingDirectory executable arguments =
         try
             let info = ProcessStartInfo()
             info.FileName <- executable
@@ -39,7 +39,7 @@ module ProcessRunner =
     let run workingDirectory (action: PlanAction) =
         match action.Execution with
         | ExternalProcess(executable, arguments) ->
-            runCommand workingDirectory executable arguments
+            runProcess workingDirectory executable arguments
         | GitHubSourceProcess(source, arguments) ->
             match source.Entrypoint with
             | FileArtifact _ ->
@@ -59,7 +59,7 @@ module ProcessRunner =
                           StandardOutput = String.Empty
                           StandardError = String.Join(Environment.NewLine, errors) }
                     | Ok entrypoint ->
-                        runCommand workingDirectory "node" (entrypoint :: arguments)
+                        runProcess workingDirectory "node" (entrypoint :: arguments)
         | EnsureFile _ ->
             { ExitCode = -1
               StandardOutput = String.Empty
