@@ -6,32 +6,35 @@ open System.IO
 open System.Text.RegularExpressions
 
 module SourceCache =
-    let private nonEmpty value = not (String.IsNullOrWhiteSpace value)
+    let private isNonEmpty (value: string) =
+        not (String.IsNullOrWhiteSpace value)
+
+    let private environmentValue name =
+        match Environment.GetEnvironmentVariable name with
+        | null -> None
+        | value when String.IsNullOrWhiteSpace value -> None
+        | value -> Some value
 
     let private cacheRoot () =
-        let overridePath = Environment.GetEnvironmentVariable "CONDITOR_CACHE_DIR"
-
-        if nonEmpty overridePath then
-            Path.GetFullPath overridePath
-        elif OperatingSystem.IsWindows() then
+        match environmentValue "CONDITOR_CACHE_DIR" with
+        | Some overridePath -> Path.GetFullPath overridePath
+        | None when OperatingSystem.IsWindows() ->
             Path.Combine(
                 Environment.GetFolderPath Environment.SpecialFolder.LocalApplicationData,
                 "Conditor",
                 "Cache"
             )
-        elif OperatingSystem.IsMacOS() then
+        | None when OperatingSystem.IsMacOS() ->
             Path.Combine(
                 Environment.GetFolderPath Environment.SpecialFolder.UserProfile,
                 "Library",
                 "Caches",
                 "conditor"
             )
-        else
-            let xdg = Environment.GetEnvironmentVariable "XDG_CACHE_HOME"
-
-            if nonEmpty xdg then
-                Path.Combine(xdg, "conditor")
-            else
+        | None ->
+            match environmentValue "XDG_CACHE_HOME" with
+            | Some xdg -> Path.Combine(xdg, "conditor")
+            | None ->
                 Path.Combine(
                     Environment.GetFolderPath Environment.SpecialFolder.UserProfile,
                     ".cache",
@@ -42,8 +45,11 @@ module SourceCache =
         Regex.Replace(value, "[^A-Za-z0-9_.-]", "_")
 
     let private validateSource (source: GitHubSource) =
-        let repositoryOk = Regex.IsMatch(source.Repository, "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-        let commitOk = Regex.IsMatch(source.Commit, "^[0-9a-fA-F]{40}$")
+        let repositoryOk =
+            Regex.IsMatch(source.Repository, "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+        let commitOk =
+            Regex.IsMatch(source.Commit, "^[0-9a-fA-F]{40}$")
 
         let entrypoint =
             match source.Entrypoint with
@@ -53,7 +59,7 @@ module SourceCache =
             entrypoint.Replace('\\', '/').Split('/')
 
         let entrypointOk =
-            nonEmpty entrypoint
+            isNonEmpty entrypoint
             && not (Path.IsPathRooted entrypoint)
             && not (entrypointParts |> Array.exists ((=) ".."))
 
@@ -65,39 +71,42 @@ module SourceCache =
               yield $"GitHub source entrypoint '{entrypoint}' must be a safe relative path." ]
 
     let private run workingDirectory executable arguments =
-        let info = ProcessStartInfo()
-        info.FileName <- executable
-        info.WorkingDirectory <- workingDirectory
-        info.UseShellExecute <- false
-        info.RedirectStandardOutput <- true
-        info.RedirectStandardError <- true
+        try
+            let info = ProcessStartInfo()
+            info.FileName <- executable
+            info.WorkingDirectory <- workingDirectory
+            info.UseShellExecute <- false
+            info.RedirectStandardOutput <- true
+            info.RedirectStandardError <- true
 
-        for argument in arguments do
-            info.ArgumentList.Add argument
+            for argument in arguments do
+                info.ArgumentList.Add argument
 
-        use childProcess = new Process()
-        childProcess.StartInfo <- info
+            use childProcess = new Process()
+            childProcess.StartInfo <- info
 
-        if not (childProcess.Start()) then
-            Error [ $"Unable to start '{executable}'." ]
-        else
-            let outputTask = childProcess.StandardOutput.ReadToEndAsync()
-            let errorTask = childProcess.StandardError.ReadToEndAsync()
-            childProcess.WaitForExit()
-
-            let output = outputTask.GetAwaiter().GetResult().Trim()
-            let error = errorTask.GetAwaiter().GetResult().Trim()
-
-            if childProcess.ExitCode = 0 then
-                Ok output
+            if not (childProcess.Start()) then
+                Error [ $"Unable to start '{executable}'." ]
             else
-                let argumentText = String.Join(" ", arguments)
+                let outputTask = childProcess.StandardOutput.ReadToEndAsync()
+                let errorTask = childProcess.StandardError.ReadToEndAsync()
+                childProcess.WaitForExit()
 
-                Error
-                    [ $"Command failed with exit code {childProcess.ExitCode}: {executable} {argumentText}"
-                      output
-                      error ]
-                |> Result.mapError (List.filter nonEmpty)
+                let output = outputTask.GetAwaiter().GetResult().Trim()
+                let error = errorTask.GetAwaiter().GetResult().Trim()
+
+                if childProcess.ExitCode = 0 then
+                    Ok output
+                else
+                    let argumentText = String.Join(" ", arguments)
+
+                    Error
+                        [ $"Command failed with exit code {childProcess.ExitCode}: {executable} {argumentText}"
+                          output
+                          error ]
+                    |> Result.mapError (List.filter isNonEmpty)
+        with ex ->
+            Error [ $"Unable to execute '{executable}': {ex.Message}" ]
 
     let private currentHead checkout =
         match run checkout "git" [ "rev-parse"; "HEAD" ] with
@@ -111,9 +120,16 @@ module SourceCache =
 
         let root = Path.GetFullPath checkout
         let candidate = Path.GetFullPath(Path.Combine(root, relative))
-        let rootPrefix = root.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
+        let rootPrefix =
+            root.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
 
-        if candidate.StartsWith(rootPrefix, StringComparison.Ordinal)
+        let comparison =
+            if OperatingSystem.IsWindows() then
+                StringComparison.OrdinalIgnoreCase
+            else
+                StringComparison.Ordinal
+
+        if candidate.StartsWith(rootPrefix, comparison)
            && File.Exists candidate then
             Ok candidate
         else
@@ -129,41 +145,44 @@ module SourceCache =
             Error [ $"Unable to verify cached source at '{checkout}'." ]
 
     let private populate checkout source =
-        let parent = Directory.GetParent(checkout).FullName
-        Directory.CreateDirectory parent |> ignore
-        let temporary = $"{checkout}.tmp-{Guid.NewGuid():N}"
+        match Directory.GetParent checkout with
+        | null ->
+            Error [ $"Unable to determine parent directory for source cache '{checkout}'." ]
+        | parent ->
+            Directory.CreateDirectory parent.FullName |> ignore
+            let temporary = $"{checkout}.tmp-{Guid.NewGuid():N}"
 
-        try
-            Directory.CreateDirectory temporary |> ignore
+            try
+                Directory.CreateDirectory temporary |> ignore
 
-            match run temporary "git" [ "init" ] with
-            | Error errors -> Error errors
-            | Ok _ ->
-                let url = $"https://github.com/{source.Repository}.git"
-
-                match run temporary "git" [ "remote"; "add"; "origin"; url ] with
+                match run temporary "git" [ "init" ] with
                 | Error errors -> Error errors
                 | Ok _ ->
-                    match run temporary "git" [ "fetch"; "--depth"; "1"; "origin"; source.Commit ] with
+                    let url = $"https://github.com/{source.Repository}.git"
+
+                    match run temporary "git" [ "remote"; "add"; "origin"; url ] with
                     | Error errors -> Error errors
                     | Ok _ ->
-                        match run temporary "git" [ "checkout"; "--detach"; source.Commit ] with
+                        match run temporary "git" [ "fetch"; "--depth"; "1"; "origin"; source.Commit ] with
                         | Error errors -> Error errors
                         | Ok _ ->
-                            match verifyCheckout temporary source with
+                            match run temporary "git" [ "checkout"; "--detach"; source.Commit ] with
                             | Error errors -> Error errors
                             | Ok _ ->
-                                try
-                                    Directory.Move(temporary, checkout)
-                                    Ok checkout
-                                with :? IOException ->
-                                    if Directory.Exists checkout then
-                                        verifyCheckout checkout source
-                                    else
-                                        Error [ $"Unable to move prepared source into cache '{checkout}'." ]
-        finally
-            if Directory.Exists temporary then
-                Directory.Delete(temporary, true)
+                                match verifyCheckout temporary source with
+                                | Error errors -> Error errors
+                                | Ok _ ->
+                                    try
+                                        Directory.Move(temporary, checkout)
+                                        Ok checkout
+                                    with :? IOException ->
+                                        if Directory.Exists checkout then
+                                            verifyCheckout checkout source
+                                        else
+                                            Error [ $"Unable to move prepared source into cache '{checkout}'." ]
+            finally
+                if Directory.Exists temporary then
+                    Directory.Delete(temporary, true)
 
     let ensure componentId source =
         let validationErrors = validateSource source
