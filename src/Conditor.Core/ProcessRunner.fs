@@ -68,3 +68,7 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = "MaterializeSourceFile must be executed by the Conditor installer, not the process runner." }
+        | EnsurePraxisMission _ ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = "EnsurePraxisMission must be executed by the Conditor installer, not the process runner." }
