@@ -17,9 +17,13 @@ The current implementation is intentionally small and executable:
 5. verify each installed capability;
 6. write `.conditor/lock.json` only after the full plan succeeds.
 
-Supported lifecycle components in the first slice are Praxis/ROS, Ordo/SDE, Visual Engineering, Communication Engineering, and Limen.
+Supported lifecycle components in the proven clean-room slice are Praxis/ROS, Ordo/SDE, Visual Engineering, Communication Engineering, and Limen. Tutela is also registered in the lifecycle catalog. Communication Engineering demonstrates the immutable GitHub-commit transport when a capability is ahead of its package-registry publication.
 
 Forma, Folio, and Aegis are represented in the architecture but package binding is deliberately deferred until Conditor owns project scaffolding. Conditor must not guess which `package.json` or .NET project should receive an application dependency.
+
+## Native installation
+
+Tagged releases produce self-contained binaries for Linux, macOS, and Windows on x64 and ARM64. The installers verify the selected release artifact against its published SHA-256 before installation. See `docs/installation.md`.
 
 ## Build
 
