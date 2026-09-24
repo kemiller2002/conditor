@@ -80,8 +80,8 @@ module Manifest =
                 let components =
                     match tryProperty "components" root with
                     | Some value when value.ValueKind = JsonValueKind.Array ->
-                        [ for component in value.EnumerateArray() do
-                              match parseComponent component with
+                        [ for item in value.EnumerateArray() do
+                              match parseComponent item with
                               | Ok parsed -> yield parsed
                               | Error error -> errors.Add error ]
                     | _ ->
