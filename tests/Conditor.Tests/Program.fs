@@ -11,7 +11,7 @@ let check name condition =
         failures <- failures + 1
         Console.Error.WriteLine $"FAIL {name}"
 
-let withManifest json test =
+let withManifest (json: string) (test: string -> unit) =
     let path = Path.Combine(Path.GetTempPath(), $"conditor-{Guid.NewGuid():N}.json")
 
     try
@@ -45,25 +45,33 @@ withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis"},{"id":"praxis"}]}"""
     (fun path ->
         match Manifest.load path with
-        | Error errors -> check "duplicate component rejected" (errors |> List.exists (fun error -> error.Contains("more than once")))
-        | Ok _ -> check "duplicate component rejected" false)
+        | Error errors ->
+            check "duplicate component rejected" (errors |> List.exists (fun error -> error.Contains("more than once")))
+        | Ok _ ->
+            check "duplicate component rejected" false)
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"forma"}]}"""
     (fun path ->
         match Manifest.load path with
-        | Error _ -> check "forma manifest parses" false
+        | Error _ ->
+            check "forma manifest parses" false
         | Ok manifest ->
             match Planner.create "/tmp/demo" Init manifest with
             | Error errors ->
                 check
                     "application package binding is explicit"
                     (errors |> List.exists (fun error -> error.Contains("will not guess where to install it")))
-            | Ok _ -> check "application package binding is explicit" false)
+            | Ok _ ->
+                check "application package binding is explicit" false)
 
-if failures = 0 then
-    Console.WriteLine "All Conditor tests passed."
-    0
-else
-    Console.Error.WriteLine $"{failures} Conditor test(s) failed."
-    1
+let exitCode =
+    if failures = 0 then
+        Console.WriteLine "All Conditor tests passed."
+        0
+    else
+        Console.Error.WriteLine $"{failures} Conditor test(s) failed."
+        1
+
+[<EntryPoint>]
+let main _ = exitCode
