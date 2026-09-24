@@ -15,18 +15,18 @@ module ProcessRunner =
         for argument in action.Arguments do
             info.ArgumentList.Add argument
 
-        use process = new Process()
-        process.StartInfo <- info
+        use childProcess = new Process()
+        childProcess.StartInfo <- info
 
-        if not (process.Start()) then
+        if not (childProcess.Start()) then
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = $"Unable to start '{action.Executable}'." }
         else
-            let outputTask = process.StandardOutput.ReadToEndAsync()
-            let errorTask = process.StandardError.ReadToEndAsync()
-            process.WaitForExit()
+            let outputTask = childProcess.StandardOutput.ReadToEndAsync()
+            let errorTask = childProcess.StandardError.ReadToEndAsync()
+            childProcess.WaitForExit()
 
-            { ExitCode = process.ExitCode
+            { ExitCode = childProcess.ExitCode
               StandardOutput = outputTask.GetAwaiter().GetResult()
               StandardError = errorTask.GetAwaiter().GetResult() }
