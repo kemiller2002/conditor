@@ -76,10 +76,10 @@ module Mission =
                       result.StandardError.Trim() ]
                 |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
 
-    let private markReady target mission =
+    let private markReady target (mission: PraxisMission) =
         runRos target [ "work"; "ready"; mission.Id ]
 
-    let private create target mission =
+    let private create target (mission: PraxisMission) =
         runRos
             target
             [ "add"
@@ -101,7 +101,7 @@ module Mission =
               "--actor"
               "conditor" ]
 
-    let private validateExisting mission existing =
+    let private validateExisting (mission: PraxisMission) (existing: ExistingMission) =
         [ if existing.Title <> mission.Title then
               yield $"Praxis mission '{mission.Id}' has a different title; Conditor will not overwrite it."
           if existing.Description <> Some mission.Description then
@@ -111,7 +111,7 @@ module Mission =
           if existing.SourceReference <> Some mission.ContractPath then
               yield $"Praxis mission '{mission.Id}' references a different execution contract." ]
 
-    let ensure target mission =
+    let ensure target (mission: PraxisMission) =
         match readExisting target mission.Id with
         | Error errors -> Error errors
         | Ok None ->
