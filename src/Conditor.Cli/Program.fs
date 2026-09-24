@@ -15,8 +15,8 @@ let private optionValue name (args: string array) =
     |> Option.bind (fun index ->
         if index + 1 < args.Length then Some args[index + 1] else None)
 
-let private writeErrors errors =
-    errors |> List.iter (fun error -> Console.Error.WriteLine error)
+let private writeErrors (errors: string list) =
+    errors |> List.iter (fun (error: string) -> Console.Error.WriteLine error)
 
 let private run operation shouldExecute target manifestPath =
     match Manifest.load manifestPath with
@@ -30,7 +30,7 @@ let private run operation shouldExecute target manifestPath =
             3
         | Ok plan ->
             Console.WriteLine $"Conditor plan for '{plan.ProjectName}'"
-            Installer.describe plan |> List.iter (fun line -> Console.WriteLine line)
+            Installer.describe plan |> List.iter (fun (line: string) -> Console.WriteLine line)
 
             if not shouldExecute then
                 0
