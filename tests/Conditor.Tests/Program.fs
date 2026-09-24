@@ -25,13 +25,17 @@ withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis","version":"3.4.0"},{"id":"ordo"}]}"""
     (fun path ->
         match Manifest.load path with
-        | Error errors -> check $"valid manifest parses: {String.Join("; ", errors)}" false
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"valid manifest parses: {details}" false
         | Ok manifest ->
             check "manifest name" (manifest.Name = "demo")
             check "manifest component count" (manifest.Components.Length = 2)
 
             match Planner.create "/tmp/demo" Init manifest with
-            | Error errors -> check $"plan succeeds: {String.Join("; ", errors)}" false
+            | Error errors ->
+                let details = String.concat "; " errors
+                check $"plan succeeds: {details}" false
             | Ok plan ->
                 check "init emits install and verify per lifecycle component" (plan.Actions.Length = 4)
                 check "explicit version is preserved" (plan.Components[0].Version = "3.4.0")
