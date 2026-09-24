@@ -6,11 +6,22 @@ module Planner =
     let private npxExecutable () =
         if OperatingSystem.IsWindows() then "npx.cmd" else "npx"
 
-    let private lifecycleArguments target version (definition: ComponentDefinition) arguments =
-        let command = definition.Command |> Option.defaultWith (fun () -> invalidOp "Lifecycle component has no command.")
+    let private packageSpec version (definition: ComponentDefinition) =
+        match definition.LifecycleSource with
+        | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
+        | Some(FixedPackageSpec specification) when version = definition.DefaultVersion -> Ok specification
+        | Some(FixedPackageSpec _) ->
+            Error
+                $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
+        | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
+
+    let private lifecycleArguments target packageReference (definition: ComponentDefinition) arguments =
+        let command =
+            definition.Command
+            |> Option.defaultWith (fun () -> invalidOp "Lifecycle component has no command.")
 
         [ "--yes"
-          $"--package={definition.Package}@{version}"
+          $"--package={packageReference}"
           command ]
         @ (arguments |> List.map (fun argument -> if argument = "{target}" then target else argument))
 
@@ -31,6 +42,7 @@ module Planner =
         let addAction
             (request: ComponentRequest)
             (version: string)
+            (packageReference: string)
             (definition: ComponentDefinition)
             (phase: string)
             (arguments: string list)
@@ -41,7 +53,7 @@ module Planner =
                   ComponentVersion = version
                   Kind = actionKind operation phase
                   Executable = npxExecutable ()
-                  Arguments = lifecycleArguments target version definition arguments }
+                  Arguments = lifecycleArguments target packageReference definition arguments }
 
             sequence <- sequence + 1
 
@@ -53,22 +65,37 @@ module Planner =
             | Some definition ->
                 let version = request.Version |> Option.defaultValue definition.DefaultVersion
 
-                resolved.Add
-                    { Id = definition.Id
-                      Version = version
-                      Distribution = definition.Distribution
-                      Package = definition.Package }
-
                 match definition.Distribution with
                 | LifecycleNpm ->
-                    match operation with
-                    | Init ->
-                        addAction request version definition "install" definition.InitArguments
-                        addAction request version definition "verify" definition.VerifyArguments
-                    | Verify -> addAction request version definition "verify" definition.VerifyArguments
-                    | Doctor -> addAction request version definition "doctor" definition.DoctorArguments
+                    match packageSpec version definition with
+                    | Error error ->
+                        if request.Required then
+                            errors.Add error
+                    | Ok packageReference ->
+                        resolved.Add
+                            { Id = definition.Id
+                              Version = version
+                              Distribution = definition.Distribution
+                              Package = definition.Package
+                              SourceReference = Some packageReference }
+
+                        match operation with
+                        | Init ->
+                            addAction request version packageReference definition "install" definition.InitArguments
+                            addAction request version packageReference definition "verify" definition.VerifyArguments
+                        | Verify ->
+                            addAction request version packageReference definition "verify" definition.VerifyArguments
+                        | Doctor ->
+                            addAction request version packageReference definition "doctor" definition.DoctorArguments
                 | NpmPackage
                 | NugetPackage ->
+                    resolved.Add
+                        { Id = definition.Id
+                          Version = version
+                          Distribution = definition.Distribution
+                          Package = definition.Package
+                          SourceReference = None }
+
                     if request.Required then
                         errors.Add
                             $"Component '{request.Id}' is an application dependency. Project binding is not implemented yet, so Conditor will not guess where to install it."
