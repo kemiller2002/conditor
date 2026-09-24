@@ -19,3 +19,25 @@ jobs:
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
       - run: dotnet run --project tests/Conditor.Tests --configuration Release --no-build
+      - name: CLI plan smoke test
+        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target . --manifest examples/indy-init.conditor.json
+
+  empty-repository-smoke:
+    if: github.event_name == 'push'
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Create empty target
+        run: |
+          mkdir -p "$RUNNER_TEMP/conditor-empty"
+          cp examples/indy-init.conditor.json "$RUNNER_TEMP/conditor-empty/conditor.json"
+      - name: Initialize empty target
+        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
+      - name: Verify Conditor lock
+        run: test -f "$RUNNER_TEMP/conditor-empty/.conditor/lock.json"
