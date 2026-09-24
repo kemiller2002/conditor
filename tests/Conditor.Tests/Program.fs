@@ -290,7 +290,7 @@ withManifest
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"contract-demo","components":[],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
+            """{"schemaVersion":1,"name":"contract-demo","components":[],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"package.json"},"targetPath":".echelon/kickoff/project.json"}],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
