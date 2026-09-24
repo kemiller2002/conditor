@@ -7,6 +7,7 @@ module Registry =
           Distribution = LifecycleNpm
           Package = package
           LifecycleSource = Some source
+          ApplicationBinding = None
           Command = Some command
           DefaultVersion = version
           InitArguments = initArgs
@@ -36,6 +37,7 @@ module Registry =
           Distribution = NpmPackage
           Package = package
           LifecycleSource = None
+          ApplicationBinding = Some NpmDependency
           Command = None
           DefaultVersion = version
           InitArguments = []
@@ -48,6 +50,7 @@ module Registry =
           Distribution = NugetPackage
           Package = package
           LifecycleSource = None
+          ApplicationBinding = Some NugetReference
           Command = None
           DefaultVersion = version
           InitArguments = []
@@ -90,15 +93,16 @@ module Registry =
               "communication-engineering"
               "1.0.0"
               [ "init" ]
-          lifecycleWithVerification
-              "limen"
-              "Limen"
-              "@echelon-foundry/typescript-wasm-kernel"
-              RegistryPackage
-              "limen"
-              "0.6.1"
-              [ "init" ]
-              [ "verify" ]
+          { lifecycleWithVerification
+                "limen"
+                "Limen"
+                "@echelon-foundry/typescript-wasm-kernel"
+                RegistryPackage
+                "limen"
+                "0.6.1"
+                [ "init" ]
+                [ "verify" ] with
+                ApplicationBinding = Some NpmDependency }
           npmPackage "forma" "Forma" "@echelon-foundry/design-system" "0.2.0"
           npmPackage "folio" "Folio" "@echelon-foundry/print-components" "0.3.0"
           nugetPackage "aegis" "Aegis" "EchelonFoundry.Aegis.Core" "1.0.0"
