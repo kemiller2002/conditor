@@ -56,3 +56,7 @@ module ProcessRunner =
                     match source.Entrypoint with
                     | NodeScript _ ->
                         runCommand workingDirectory "node" (entrypoint :: arguments)
+        | EnsureFile _ ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = "EnsureFile must be executed by the Conditor installer, not the process runner." }
