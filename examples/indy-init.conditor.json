@@ -3,13 +3,44 @@
   "schemaVersion": 1,
   "name": "indy-init-demo",
   "components": [
-    { "id": "praxis", "version": "3.1.4" },
-    { "id": "ordo", "version": "1.3.0" },
-    { "id": "visual-engineering", "version": "1.0.0" },
-    { "id": "communication-engineering", "version": "1.0.0" },
-    { "id": "limen", "version": "0.6.1" }
+    {
+      "id": "praxis",
+      "version": "3.1.4"
+    },
+    {
+      "id": "ordo",
+      "version": "1.3.0"
+    },
+    {
+      "id": "visual-engineering",
+      "version": "1.0.0"
+    },
+    {
+      "id": "communication-engineering",
+      "version": "1.0.0"
+    },
+    {
+      "id": "limen",
+      "version": "0.6.1"
+    },
+    {
+      "id": "forma",
+      "version": "0.2.0"
+    },
+    {
+      "id": "folio",
+      "version": "0.3.0"
+    },
+    {
+      "id": "aegis",
+      "version": "1.0.0"
+    }
   ],
   "execution": {
     "enabled": false
+  },
+  "scaffold": {
+    "kind": "fsharp-limen-web",
+    "name": "indy-init-demo"
   }
 }
