@@ -36,6 +36,206 @@
       "version": "1.0.0"
     }
   ],
+  "requirements": [
+    {
+      "id": "kickoff",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "kickoff/indy-init.kickoff.json"
+      },
+      "targetPath": ".echelon/kickoff/indy-init.kickoff.json"
+    },
+    {
+      "id": "kickoff-schema",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "kickoff/kickoff-manifest.schema.json"
+      },
+      "targetPath": ".echelon/kickoff/kickoff-manifest.schema.json"
+    },
+    {
+      "id": "boundary",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/HACKATHON-BOUNDARIES.md"
+      },
+      "targetPath": "docs/HACKATHON-BOUNDARIES.md"
+    },
+    {
+      "id": "product",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/PRODUCT-REQUIREMENTS.md"
+      },
+      "targetPath": "docs/PRODUCT-REQUIREMENTS.md"
+    },
+    {
+      "id": "release",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/REQUIREMENTS.md"
+      },
+      "targetPath": "docs/REQUIREMENTS.md"
+    },
+    {
+      "id": "semantics",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/INVESTIGATION-SEMANTICS.md"
+      },
+      "targetPath": "docs/INVESTIGATION-SEMANTICS.md"
+    },
+    {
+      "id": "evolution",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/SEMANTIC-EVOLUTION.md"
+      },
+      "targetPath": "docs/SEMANTIC-EVOLUTION.md"
+    },
+    {
+      "id": "decisions",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/DESIGN-DECISION-BOUNDARIES.md"
+      },
+      "targetPath": "docs/DESIGN-DECISION-BOUNDARIES.md"
+    },
+    {
+      "id": "core",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/CORE-DOMAIN-MODEL.md"
+      },
+      "targetPath": "docs/CORE-DOMAIN-MODEL.md"
+    },
+    {
+      "id": "commands",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/COMMAND-EVENT-CATALOG.md"
+      },
+      "targetPath": "docs/COMMAND-EVENT-CATALOG.md"
+    },
+    {
+      "id": "transitions",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/STATE-TRANSITION-TABLES.md"
+      },
+      "targetPath": "docs/STATE-TRANSITION-TABLES.md"
+    },
+    {
+      "id": "fsharp",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/FSHARP-TYPE-SHAPES.md"
+      },
+      "targetPath": "docs/FSHARP-TYPE-SHAPES.md"
+    },
+    {
+      "id": "policy",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/POLICY-ENGINE.md"
+      },
+      "targetPath": "docs/POLICY-ENGINE.md"
+    },
+    {
+      "id": "persistence",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/PERSISTENCE-CONTRACT.md"
+      },
+      "targetPath": "docs/PERSISTENCE-CONTRACT.md"
+    },
+    {
+      "id": "ai",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/AI-ORCHESTRATION.md"
+      },
+      "targetPath": "docs/AI-ORCHESTRATION.md"
+    },
+    {
+      "id": "workspace",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/INVESTIGATION-WORKSPACE.md"
+      },
+      "targetPath": "docs/INVESTIGATION-WORKSPACE.md"
+    },
+    {
+      "id": "screens",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/SCREEN-CONTRACTS.md"
+      },
+      "targetPath": "docs/SCREEN-CONTRACTS.md"
+    },
+    {
+      "id": "tests",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/DOMAIN-TEST-MATRIX.md"
+      },
+      "targetPath": "docs/DOMAIN-TEST-MATRIX.md"
+    },
+    {
+      "id": "security",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/SECURITY-THREAT-MODEL.md"
+      },
+      "targetPath": "docs/SECURITY-THREAT-MODEL.md"
+    },
+    {
+      "id": "slices",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/IMPLEMENTATION-SLICES.md"
+      },
+      "targetPath": "docs/IMPLEMENTATION-SLICES.md"
+    },
+    {
+      "id": "competition",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/COMPETITION-ALIGNMENT.md"
+      },
+      "targetPath": "docs/COMPETITION-ALIGNMENT.md"
+    },
+    {
+      "id": "build-day",
+      "source": {
+        "repository": "kemiller2002/Indy-init",
+        "commit": "555e887b9bed259eaa68a14dd1c2302e2d3eab86",
+        "path": "docs/BUILD-DAY-EXECUTION.md"
+      },
+      "targetPath": "docs/BUILD-DAY-EXECUTION.md"
+    }
+  ],
   "execution": {
     "enabled": false
   },
