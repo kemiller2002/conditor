@@ -309,7 +309,7 @@ withTarget
                 | Ok manifest ->
                     check
                         "execution contract path parsed"
-                        (manifest.Execution |> Option.bind _.ContractPath = Some ".echelon/kickoff/project.json")
+                        (manifest.Execution |> Option.bind (fun execution -> execution.ContractPath) = Some ".echelon/kickoff/project.json")
 
                     match Planner.create target Init manifest with
                     | Error errors ->
