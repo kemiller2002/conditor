@@ -44,7 +44,7 @@ module SourceCache =
     let private safeSegment (value: string) =
         Regex.Replace(value, "[^A-Za-z0-9_.-]", "_")
 
-    let private validateSource (source: GitHubSource) =
+    let validate (source: GitHubSource) =
         let repositoryOk =
             Regex.IsMatch(source.Repository, "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
@@ -187,7 +187,7 @@ module SourceCache =
                     Directory.Delete(temporary, true)
 
     let ensure componentId source =
-        let validationErrors = validateSource source
+        let validationErrors = validate source
 
         if not validationErrors.IsEmpty then
             Error validationErrors
