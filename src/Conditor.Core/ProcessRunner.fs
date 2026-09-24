@@ -4,29 +4,55 @@ open System
 open System.Diagnostics
 
 module ProcessRunner =
-    let run workingDirectory (action: PlanAction) =
-        let info = ProcessStartInfo()
-        info.FileName <- action.Executable
-        info.WorkingDirectory <- workingDirectory
-        info.UseShellExecute <- false
-        info.RedirectStandardOutput <- true
-        info.RedirectStandardError <- true
+    let private runCommand workingDirectory executable arguments =
+        try
+            let info = ProcessStartInfo()
+            info.FileName <- executable
+            info.WorkingDirectory <- workingDirectory
+            info.UseShellExecute <- false
+            info.RedirectStandardOutput <- true
+            info.RedirectStandardError <- true
 
-        for argument in action.Arguments do
-            info.ArgumentList.Add argument
+            for argument in arguments do
+                info.ArgumentList.Add argument
 
-        use childProcess = new Process()
-        childProcess.StartInfo <- info
+            use childProcess = new Process()
+            childProcess.StartInfo <- info
 
-        if not (childProcess.Start()) then
+            if not (childProcess.Start()) then
+                { ExitCode = -1
+                  StandardOutput = String.Empty
+                  StandardError = $"Unable to start '{executable}'." }
+            else
+                let outputTask = childProcess.StandardOutput.ReadToEndAsync()
+                let errorTask = childProcess.StandardError.ReadToEndAsync()
+                childProcess.WaitForExit()
+
+                { ExitCode = childProcess.ExitCode
+                  StandardOutput = outputTask.GetAwaiter().GetResult()
+                  StandardError = errorTask.GetAwaiter().GetResult() }
+        with ex ->
             { ExitCode = -1
               StandardOutput = String.Empty
-              StandardError = $"Unable to start '{action.Executable}'." }
-        else
-            let outputTask = childProcess.StandardOutput.ReadToEndAsync()
-            let errorTask = childProcess.StandardError.ReadToEndAsync()
-            childProcess.WaitForExit()
+              StandardError = $"Unable to execute '{executable}': {ex.Message}" }
 
-            { ExitCode = childProcess.ExitCode
-              StandardOutput = outputTask.GetAwaiter().GetResult()
-              StandardError = errorTask.GetAwaiter().GetResult() }
+    let run workingDirectory (action: PlanAction) =
+        match action.Execution with
+        | ExternalProcess(executable, arguments) ->
+            runCommand workingDirectory executable arguments
+        | GitHubSourceProcess(source, arguments) ->
+            match SourceCache.ensure action.ComponentId source with
+            | Error errors ->
+                { ExitCode = -1
+                  StandardOutput = String.Empty
+                  StandardError = String.Join(Environment.NewLine, errors) }
+            | Ok checkout ->
+                match SourceCache.resolveEntrypoint checkout source with
+                | Error errors ->
+                    { ExitCode = -1
+                      StandardOutput = String.Empty
+                      StandardError = String.Join(Environment.NewLine, errors) }
+                | Ok entrypoint ->
+                    match source.Entrypoint with
+                    | NodeScript _ ->
+                        runCommand workingDirectory "node" (entrypoint :: arguments)
