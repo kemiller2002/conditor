@@ -5,7 +5,7 @@ open System.IO
 open System.Text.Json
 
 module Manifest =
-    let private tryProperty name (element: JsonElement) =
+    let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
         if element.TryGetProperty(name, &value) then Some value else None
 
