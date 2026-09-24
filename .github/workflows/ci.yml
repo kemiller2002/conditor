@@ -77,3 +77,24 @@ jobs:
           mkdir -p "$RUNNER_TEMP/conditor-native-target"
           chmod +x "$RUNNER_TEMP/conditor-native/conditor"
           "$RUNNER_TEMP/conditor-native/conditor" plan --target "$RUNNER_TEMP/conditor-native-target" --manifest examples/clean-room.conditor.json
+
+
+  factory-rehearsal-smoke:
+    if: github.event_name == 'push'
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Run sacrificial factory rehearsal
+        run: bash scripts/rehearse-clean-room.sh "$RUNNER_TEMP/evidence-triage-rehearsal"
+      - name: Inspect rehearsal output
+        run: |
+          test -f "$RUNNER_TEMP/evidence-triage-rehearsal/AGENTS.md"
+          test -f "$RUNNER_TEMP/evidence-triage-rehearsal/kickoff/evidence-triage.kickoff.json"
+          test -f "$RUNNER_TEMP/evidence-triage-rehearsal/.conditor/lock.json"
+          grep -F "canonical execution contract" "$RUNNER_TEMP/evidence-triage-rehearsal/AGENTS.md"
