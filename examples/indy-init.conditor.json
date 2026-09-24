@@ -237,7 +237,9 @@
     }
   ],
   "execution": {
-    "enabled": false
+    "enabled": false,
+    "mission": "Build the governed Indy Init root-cause investigation application from the pinned kickoff contract and normative requirements. Prove completion through repository evidence and deterministic verification.",
+    "contractPath": ".echelon/kickoff/indy-init.kickoff.json"
   },
   "scaffold": {
     "kind": "fsharp-limen-web",
