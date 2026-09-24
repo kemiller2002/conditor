@@ -4,6 +4,9 @@ open System
 open System.IO
 
 module Installer =
+    let private normalize (value: string) =
+        value.Replace("\r\n", "\n")
+
     let private commandText action =
         match action.Execution with
         | ExternalProcess(executable, arguments) ->
@@ -20,6 +23,52 @@ module Installer =
                     " " + String.Join(" ", arguments)
 
             $"github:{source.Repository}#{source.Commit} -> node {entrypoint}{suffix}"
+        | EnsureFile(relativePath, _) ->
+            $"ensure {relativePath}"
+
+    let private safePath target relativePath =
+        let root = Path.GetFullPath target
+        let full = Path.GetFullPath(Path.Combine(root, relativePath))
+        let rootPrefix =
+            root.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
+
+        let comparison =
+            if OperatingSystem.IsWindows() then
+                StringComparison.OrdinalIgnoreCase
+            else
+                StringComparison.Ordinal
+
+        if full.StartsWith(rootPrefix, comparison) then Some full else None
+
+    let private ensureFile target relativePath content =
+        match safePath target relativePath with
+        | None ->
+            Error $"Scaffold path escapes the target repository: {relativePath}"
+        | Some fullPath ->
+            if File.Exists fullPath then
+                let existing = File.ReadAllText fullPath
+
+                if normalize existing = normalize content then
+                    Ok()
+                else
+                    Error $"Scaffold file '{relativePath}' changed after planning; Conditor will not overwrite it."
+            else
+                let parent = Path.GetDirectoryName fullPath
+
+                if not (String.IsNullOrWhiteSpace parent) then
+                    Directory.CreateDirectory parent |> ignore
+
+                let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
+
+                try
+                    File.WriteAllText(temporary, content)
+                    File.Move(temporary, fullPath)
+                    Ok()
+                with ex ->
+                    Error $"Unable to create scaffold file '{relativePath}': {ex.Message}"
+                finally
+                    if File.Exists temporary then
+                        File.Delete temporary
 
     let describe (plan: InstallationPlan) =
         plan.Actions
@@ -37,17 +86,28 @@ module Installer =
                 else
                     Ok None
             | action :: remaining ->
-                let result = ProcessRunner.run target action
+                match action.Execution with
+                | EnsureFile(relativePath, content) ->
+                    match ensureFile target relativePath content with
+                    | Ok() -> loop remaining
+                    | Error error ->
+                        Error
+                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                              $"Command: {commandText action}"
+                              error ]
+                | ExternalProcess _
+                | GitHubSourceProcess _ ->
+                    let result = ProcessRunner.run target action
 
-                if result.ExitCode = 0 then
-                    loop remaining
-                else
-                    Error
-                        [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
-                          $"Command: {commandText action}"
-                          $"Exit code: {result.ExitCode}"
-                          result.StandardOutput.Trim()
-                          result.StandardError.Trim() ]
-                    |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
+                    if result.ExitCode = 0 then
+                        loop remaining
+                    else
+                        Error
+                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                              $"Command: {commandText action}"
+                              $"Exit code: {result.ExitCode}"
+                              result.StandardOutput.Trim()
+                              result.StandardError.Trim() ]
+                        |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
 
         loop plan.Actions
