@@ -10,6 +10,7 @@
     <Compile Include="Scaffolding.fs" />
     <Compile Include="Planner.fs" />
     <Compile Include="ProcessRunner.fs" />
+    <Compile Include="Mission.fs" />
     <Compile Include="LockFile.fs" />
     <Compile Include="Installer.fs" />
   </ItemGroup>
