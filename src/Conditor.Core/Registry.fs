@@ -45,7 +45,7 @@ module Registry =
               RegistryPackage
               "ros"
               "3.1.4"
-              [ "init"; "--target"; "{target}" ]
+              [ "init" ]
           lifecycle
               "ordo"
               "Ordo / State-Directed Engineering"
