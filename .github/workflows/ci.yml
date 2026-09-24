@@ -58,6 +58,36 @@ jobs:
           grep -F "requirements/contract.md" "$RUNNER_TEMP/conditor-empty/AGENTS.md"
           grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
           grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
+      - name: Install fake Codex adapter
+        run: |
+          mkdir -p "$RUNNER_TEMP/fake-bin"
+          cat > "$RUNNER_TEMP/fake-bin/codex" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ "${1:-}" == "--version" ]]; then
+            echo "codex-test 1.0"
+            exit 0
+          fi
+          if [[ "${1:-}" == "login" && "${2:-}" == "status" ]]; then
+            echo "Logged in for Conditor CI"
+            exit 0
+          fi
+          if [[ "${1:-}" == "exec" && "${2:-}" == "--full-auto" ]]; then
+            echo "fake Codex execution accepted"
+            exit 0
+          fi
+          echo "unexpected fake codex invocation: $*" >&2
+          exit 2
+          EOF
+          chmod +x "$RUNNER_TEMP/fake-bin/codex"
+      - name: Check execution readiness
+        run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
+      - name: Start through fake Codex adapter
+        run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
+      - name: Verify execution handoff remains Praxis-owned
+        run: |
+          grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
+          grep -F '"status": "active"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
 
   native-cli-smoke:
     needs: build-test
