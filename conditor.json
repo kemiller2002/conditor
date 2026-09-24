@@ -1,0 +1,14 @@
+{
+  "$schema": "./schemas/conditor.schema.json",
+  "schemaVersion": 1,
+  "name": "conditor",
+  "components": [
+    { "id": "praxis", "version": "3.4.0" },
+    { "id": "ordo", "version": "1.4.0" },
+    { "id": "visual-engineering", "version": "1.0.0" },
+    { "id": "communication-engineering", "version": "1.0.0" }
+  ],
+  "execution": {
+    "enabled": false
+  }
+}
