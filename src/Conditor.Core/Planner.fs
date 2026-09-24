@@ -215,12 +215,18 @@ module Planner =
                     |> Option.defaultValue "scaffold"
 
                 for relativePath, fileContent in scaffoldFiles do
+                    let execution =
+                        if relativePath = "AGENTS.md" then
+                            EnsureManagedRegion(relativePath, "agent-entry", fileContent)
+                        else
+                            EnsureFile(relativePath, fileContent)
+
                     actions.Add
                         { Sequence = sequence
                           ComponentId = scaffoldId
                           ComponentVersion = "1"
                           Kind = ScaffoldFile
-                          Execution = EnsureFile(relativePath, fileContent) }
+                          Execution = execution }
 
                     sequence <- sequence + 1
 
