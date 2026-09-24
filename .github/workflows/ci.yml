@@ -22,7 +22,7 @@ jobs:
       - name: CLI plan smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-plan"
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target "$RUNNER_TEMP/conditor-plan" --manifest examples/indy-init.conditor.json
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target "$RUNNER_TEMP/conditor-plan" --manifest examples/clean-room.conditor.json
 
   empty-repository-smoke:
     if: github.event_name == 'push'
@@ -38,7 +38,7 @@ jobs:
       - name: Create empty target
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-empty"
-          cp examples/indy-init.conditor.json "$RUNNER_TEMP/conditor-empty/conditor.json"
+          cp examples/clean-room.conditor.json "$RUNNER_TEMP/conditor-empty/conditor.json"
       - name: Initialize empty target
         run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
       - name: Verify established project
@@ -76,4 +76,4 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-native-target"
           chmod +x "$RUNNER_TEMP/conditor-native/conditor"
-          "$RUNNER_TEMP/conditor-native/conditor" plan --target "$RUNNER_TEMP/conditor-native-target" --manifest examples/indy-init.conditor.json
+          "$RUNNER_TEMP/conditor-native/conditor" plan --target "$RUNNER_TEMP/conditor-native-target" --manifest examples/clean-room.conditor.json
