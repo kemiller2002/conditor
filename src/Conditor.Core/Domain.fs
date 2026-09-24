@@ -22,6 +22,10 @@ type ComponentRequest =
       Version: string option
       Required: bool }
 
+type ScaffoldRequest =
+    { Kind: string
+      Name: string option }
+
 type ExecutionRequest =
     { Enabled: bool
       Launcher: string option
@@ -31,6 +35,7 @@ type ProjectManifest =
     { SchemaVersion: int
       Name: string
       Components: ComponentRequest list
+      Scaffold: ScaffoldRequest option
       Execution: ExecutionRequest option }
 
 type ComponentDefinition =
@@ -54,10 +59,13 @@ type PlanActionKind =
     | InstallLifecycle
     | VerifyLifecycle
     | DiagnoseLifecycle
+    | ScaffoldFile
+    | ReadinessVerify
 
 type ActionExecution =
     | ExternalProcess of executable: string * arguments: string list
     | GitHubSourceProcess of source: GitHubSource * arguments: string list
+    | EnsureFile of relativePath: string * content: string
 
 type PlanAction =
     { Sequence: int
