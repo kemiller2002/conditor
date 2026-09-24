@@ -56,9 +56,17 @@ withManifest
                 check "fixed source resolves" false
             | Ok plan ->
                 let expectedSource =
-                    Some "github:kemiller2002/communication-engineering#4590d2fe6f7e80b339117d3fbee5803f2dd39122"
+                    Some
+                        "github:kemiller2002/communication-engineering#4590d2fe6f7e80b339117d3fbee5803f2dd39122|node:bin/communication-engineering.mjs"
 
-                check "fixed source resolves to commit" (plan.Components[0].SourceReference = expectedSource))
+                check "fixed source resolves to commit and entrypoint" (plan.Components[0].SourceReference = expectedSource)
+
+                match plan.Actions[0].Execution with
+                | GitHubSourceProcess(source, arguments) ->
+                    check "fixed source uses direct GitHub execution" (source.Repository = "kemiller2002/communication-engineering")
+                    check "fixed source carries lifecycle arguments" (arguments = [ "init" ])
+                | _ ->
+                    check "fixed source uses direct GitHub execution" false)
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"communication-engineering","version":"9.9.9"}]}"""
@@ -70,7 +78,7 @@ withManifest
             match Planner.create "/tmp/demo" Init manifest with
             | Error errors ->
                 check
-                    "unmapped fixed-source version rejected"
+                    "unmapped GitHub-source version rejected"
                     (errors |> List.exists (fun error -> error.Contains("no immutable distribution mapping")))
             | Ok _ ->
                 check "unmapped fixed-source version rejected" false)
