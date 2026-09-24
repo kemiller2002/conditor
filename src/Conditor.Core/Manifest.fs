@@ -146,7 +146,8 @@ module Manifest =
                 Some
                     { Enabled = optionalBool false "enabled" value
                       Launcher = optionalString "launcher" value
-                      Mission = optionalString "mission" value }
+                      Mission = optionalString "mission" value
+                      ContractPath = optionalString "contractPath" value }
             )
         | Some _ -> Error "'execution' must be an object."
 
