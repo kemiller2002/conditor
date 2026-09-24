@@ -29,6 +29,10 @@ Conditor must transform an uninitialized Git repository into a reproducible, gov
 - **CON-023** Conditor shall not guess which npm project, .NET project, or other package target receives a dependency when more than one target is plausible.
 - **CON-024** Compatibility constraints shall be evaluated before mutation.
 - **CON-025** Component descriptors shall eventually be release-bound and integrity-verifiable rather than relying permanently on a hard-coded central registry.
+- **CON-026** Capability version and distribution identity shall be separate concepts.
+- **CON-027** A lifecycle capability may resolve through an exact package release or an immutable GitHub commit plus declared entrypoint.
+- **CON-028** GitHub source acquisition shall use an exact full commit SHA and shall never use a moving branch for a reproducible installation.
+- **CON-029** Source cache contents shall be non-authoritative tooling state and shall not substitute for repository lock or installation evidence.
 
 ## Empty-repository bootstrap
 
@@ -39,6 +43,8 @@ Conditor must transform an uninitialized Git repository into a reproducible, gov
 - **CON-034** Conditor shall create the selected project scaffold before binding application dependencies.
 - **CON-035** Project scaffolding shall be deterministic and versioned.
 - **CON-036** Conditor shall be able to prove that a second initialization produces no unintended drift.
+- **CON-037** Capability installation verification and project execution-readiness verification shall be distinct gates when a capability supports adopting an empty repository before application code exists.
+- **CON-038** Strict boundary verification shall run before agent execution once the project scaffold and configured source paths exist.
 
 ## Requirements and mission
 
