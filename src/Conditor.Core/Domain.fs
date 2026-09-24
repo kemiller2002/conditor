@@ -87,6 +87,7 @@ type ActionExecution =
     | ExternalProcess of executable: string * arguments: string list
     | GitHubSourceProcess of source: GitHubSource * arguments: string list
     | EnsureFile of relativePath: string * content: string
+    | EnsureManagedRegion of relativePath: string * regionId: string * content: string
     | MaterializeSourceFile of source: GitHubSource * relativePath: string
     | EnsurePraxisMission of mission: PraxisMission
 
