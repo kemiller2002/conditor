@@ -99,6 +99,21 @@ withManifest
             | Ok _ ->
                 check "application package binding is explicit" false)
 
+withManifest
+    """{"schemaVersion":1,"name":"secure-demo","components":[{"id":"tutela"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ -> check "tutela manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/secure-demo" Init manifest with
+            | Error _ -> check "tutela lifecycle plan succeeds" false
+            | Ok plan ->
+                check "tutela default version resolves" (plan.Components[0].Version = "0.1.0")
+                check "tutela init plus verify planned" (plan.Actions.Length = 2)
+                check
+                    "tutela package source is immutable"
+                    (plan.Components[0].SourceReference = Some "@echelon-foundry/tutela@0.1.0"))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
