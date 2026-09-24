@@ -37,9 +37,10 @@
     }
   ],
   "execution": {
-    "enabled": false,
+    "enabled": true,
     "mission": "Build the clean-room governed application and prove completion through repository evidence.",
-    "contractPath": "requirements/contract.md"
+    "contractPath": "requirements/contract.md",
+    "launcher": "codex"
   },
   "scaffold": {
     "kind": "fsharp-limen-web",
