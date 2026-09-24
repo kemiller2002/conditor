@@ -3,7 +3,7 @@ namespace Conditor.Core
 open System
 
 module Launcher =
-    let private successOrErrors name (result: ProcessResult) =
+    let private successOrErrors (name: string) (result: ProcessResult) =
         if result.ExitCode = 0 then
             Ok()
         else
@@ -13,7 +13,7 @@ module Launcher =
                   result.StandardError.Trim() ]
             |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
 
-    let private probeCommand target executable arguments name =
+    let private probeCommand (target: string) (executable: string) (arguments: string list) (name: string) =
         ProcessRunner.runProcess target executable arguments
         |> successOrErrors name
 
