@@ -22,7 +22,7 @@ let withManifest (json: string) (test: string -> unit) =
             File.Delete path
 
 withManifest
-    """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis","version":"3.4.0"},{"id":"ordo"}]}"""
+    """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis","version":"3.1.4"},{"id":"ordo"}]}"""
     (fun path ->
         match Manifest.load path with
         | Error errors ->
@@ -38,8 +38,42 @@ withManifest
                 check $"plan succeeds: {details}" false
             | Ok plan ->
                 check "init emits install and verify per lifecycle component" (plan.Actions.Length = 4)
-                check "explicit version is preserved" (plan.Components[0].Version = "3.4.0")
-                check "default version resolves" (plan.Components[1].Version = "1.4.0"))
+                check "explicit version is preserved" (plan.Components[0].Version = "3.1.4")
+                check "default version resolves" (plan.Components[1].Version = "1.3.0")
+                check
+                    "registry package source is immutable"
+                    (plan.Components[0].SourceReference = Some "@echelon-foundry/repository-operating-system@3.1.4"))
+
+withManifest
+    """{"schemaVersion":1,"name":"demo","components":[{"id":"communication-engineering","version":"1.0.0"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "communication manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/demo" Init manifest with
+            | Error _ ->
+                check "fixed source resolves" false
+            | Ok plan ->
+                check
+                    "fixed source resolves to commit"
+                    (plan.Components[0].SourceReference
+                     = Some "github:kemiller2002/communication-engineering#4590d2fe6f7e80b339117d3fbee5803f2dd39122"))
+
+withManifest
+    """{"schemaVersion":1,"name":"demo","components":[{"id":"communication-engineering","version":"9.9.9"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "unmapped version manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/demo" Init manifest with
+            | Error errors ->
+                check
+                    "unmapped fixed-source version rejected"
+                    (errors |> List.exists (fun error -> error.Contains("no immutable distribution mapping")))
+            | Ok _ ->
+                check "unmapped fixed-source version rejected" false)
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis"},{"id":"praxis"}]}"""
