@@ -42,6 +42,12 @@ type ExecutionRequest =
       Mission: string option
       ContractPath: string option }
 
+type PraxisMission =
+    { Id: string
+      Title: string
+      Description: string
+      ContractPath: string }
+
 type ProjectManifest =
     { SchemaVersion: int
       Name: string
@@ -75,12 +81,14 @@ type PlanActionKind =
     | ScaffoldFile
     | ReadinessVerify
     | RequirementFile
+    | MissionWorkItem
 
 type ActionExecution =
     | ExternalProcess of executable: string * arguments: string list
     | GitHubSourceProcess of source: GitHubSource * arguments: string list
     | EnsureFile of relativePath: string * content: string
     | MaterializeSourceFile of source: GitHubSource * relativePath: string
+    | EnsurePraxisMission of mission: PraxisMission
 
 type PlanAction =
     { Sequence: int
