@@ -13,6 +13,12 @@ module Registry =
           VerifyArguments = [ "verify"; "--strict" ]
           DoctorArguments = [ "doctor" ] }
 
+    let private githubSource repository commit entrypoint =
+        GitHubSource
+            { Repository = repository
+              Commit = commit
+              Entrypoint = NodeScript entrypoint }
+
     let private npmPackage id displayName package version =
         { Id = id
           DisplayName = displayName
@@ -66,7 +72,10 @@ module Registry =
               "communication-engineering"
               "Communication Engineering"
               "@echelon-foundry/communication-engineering"
-              (FixedPackageSpec "github:kemiller2002/communication-engineering#4590d2fe6f7e80b339117d3fbee5803f2dd39122")
+              (githubSource
+                  "kemiller2002/communication-engineering"
+                  "4590d2fe6f7e80b339117d3fbee5803f2dd39122"
+                  "bin/communication-engineering.mjs")
               "communication-engineering"
               "1.0.0"
               [ "init" ]
