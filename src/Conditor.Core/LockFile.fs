@@ -12,6 +12,37 @@ module LockFile =
         |> Convert.ToHexString
         |> fun value -> value.ToLowerInvariant()
 
+
+    let verifyManifest target manifestPath =
+        let path = Path.Combine(target, ".conditor", "lock.json")
+
+        if not (File.Exists path) then
+            Error [ $"Conditor lock is missing: {path}. Run 'conditor init' first." ]
+        elif not (File.Exists manifestPath) then
+            Error [ $"Conditor manifest is missing: {manifestPath}." ]
+        else
+            try
+                use document = JsonDocument.Parse(File.ReadAllText path)
+                let root = document.RootElement
+                let mutable hashElement = Unchecked.defaultof<JsonElement>
+
+                if not (root.TryGetProperty("manifestSha256", &hashElement))
+                   || hashElement.ValueKind <> JsonValueKind.String then
+                    Error [ "Conditor lock does not contain a valid manifestSha256." ]
+                else
+                    let recorded = hashElement.GetString() |> Option.ofObj |> Option.defaultValue String.Empty
+                    let current = manifestHash manifestPath
+
+                    if String.Equals(recorded, current, StringComparison.OrdinalIgnoreCase) then
+                        Ok()
+                    else
+                        Error
+                            [ "Conditor manifest has changed since the environment was established."
+                              "Run 'conditor plan' and 'conditor init' to reconcile the repository before execution." ]
+            with
+            | :? JsonException as ex -> Error [ $"Conditor lock is not valid JSON: {ex.Message}" ]
+            | ex -> Error [ $"Unable to verify Conditor lock: {ex.Message}" ]
+
     let write target manifestPath (plan: InstallationPlan) =
         let directory = Path.Combine(target, ".conditor")
         Directory.CreateDirectory directory |> ignore
