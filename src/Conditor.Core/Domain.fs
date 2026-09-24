@@ -39,7 +39,8 @@ type RequirementSource =
 type ExecutionRequest =
     { Enabled: bool
       Launcher: string option
-      Mission: string option }
+      Mission: string option
+      ContractPath: string option }
 
 type ProjectManifest =
     { SchemaVersion: int
