@@ -107,6 +107,26 @@ withManifest
             | Ok _ ->
                 check "application package binding is explicit" false)
 
+
+withManifest
+    """{"schemaVersion":1,"name":"limen-bootstrap","components":[{"id":"limen","version":"0.6.1"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "limen bootstrap manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/limen-bootstrap" Init manifest with
+            | Error _ ->
+                check "limen bootstrap plan succeeds" false
+            | Ok plan ->
+                check "limen init plus verify planned" (plan.Actions.Length = 2)
+
+                match plan.Actions[1].Execution with
+                | ExternalProcess(_, arguments) ->
+                    check "limen bootstrap verification is non-strict" (arguments |> List.contains "--strict" |> not)
+                | _ ->
+                    check "limen bootstrap verification is non-strict" false)
+
 withManifest
     """{"schemaVersion":1,"name":"secure-demo","components":[{"id":"tutela"}]}"""
     (fun path ->
