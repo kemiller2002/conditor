@@ -102,6 +102,25 @@ module Planner =
         for requirement in manifest.Requirements do
             validateRequirement target requirement |> List.iter errors.Add
 
+        match manifest.Execution |> Option.bind (fun execution -> execution.ContractPath) with
+        | Some contractPath ->
+            match validateRelativeTarget target contractPath with
+            | Error error -> errors.Add $"Execution contractPath: {error}"
+            | Ok() ->
+                let materializedByManifest =
+                    manifest.Requirements
+                    |> List.exists (fun requirement -> requirement.TargetPath = contractPath)
+
+                let alreadyExists =
+                    Path.Combine(Path.GetFullPath target, contractPath)
+                    |> Path.GetFullPath
+                    |> File.Exists
+
+                if not materializedByManifest && not alreadyExists then
+                    errors.Add
+                        $"Execution contractPath '{contractPath}' must already exist or match a requirements[].targetPath so agents are never handed a missing canonical contract."
+        | None -> ()
+
         let addLifecycleAction
             (request: ComponentRequest)
             (version: string)
