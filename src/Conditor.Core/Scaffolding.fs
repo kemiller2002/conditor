@@ -125,7 +125,7 @@ module Scaffolding =
 
         match scaffold.Kind with
         | "fsharp-limen-web" ->
-            Ok
+            let files =
                 [ "Directory.Build.props",
                   "<Project>\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <LangVersion>latest</LangVersion>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n"
                   "App.slnx",
@@ -138,10 +138,10 @@ module Scaffolding =
                   "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ES2022\",\n    \"moduleResolution\": \"Bundler\",\n    \"strict\": true,\n    \"noEmit\": true,\n    \"lib\": [\"ES2022\", \"DOM\"]\n  },\n  \"include\": [\"**/*.ts\"]\n}\n"
                   "src/kernel/bootstrap.ts",
                   "export const scaffoldReady = true as const;\n" ]
-                |> fun files ->
-                    match agentEntryFile manifest with
-                    | Some agentFile -> agentFile :: files
-                    | None -> files
+
+            match agentEntryFile manifest with
+            | Some agentFile -> Ok(agentFile :: files)
+            | None -> Ok files
         | unknown ->
             Error [ $"Unsupported scaffold kind '{unknown}'." ]
 
