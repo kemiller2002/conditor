@@ -68,8 +68,10 @@ module Mission =
             if result.ExitCode = 0 then
                 Ok()
             else
+                let argumentText = String.Join(" ", arguments)
+
                 Error
-                    [ $"Praxis command failed with exit code {result.ExitCode}: ros {String.Join(" ", arguments)}"
+                    [ $"Praxis command failed with exit code {result.ExitCode}: ros {argumentText}"
                       result.StandardOutput.Trim()
                       result.StandardError.Trim() ]
                 |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
