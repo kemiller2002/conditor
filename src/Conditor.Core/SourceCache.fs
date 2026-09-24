@@ -91,8 +91,10 @@ module SourceCache =
             if childProcess.ExitCode = 0 then
                 Ok output
             else
+                let argumentText = String.Join(" ", arguments)
+
                 Error
-                    [ $"Command failed with exit code {childProcess.ExitCode}: {executable} {String.Join(" ", arguments)}"
+                    [ $"Command failed with exit code {childProcess.ExitCode}: {executable} {argumentText}"
                       output
                       error ]
                 |> Result.mapError (List.filter nonEmpty)
