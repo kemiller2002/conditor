@@ -262,6 +262,10 @@ module Scaffolding =
                     match safeFullPath target relativePath with
                     | None ->
                         errors.Add $"Scaffold path escapes the target repository: {relativePath}"
+                    | Some fullPath when relativePath = "AGENTS.md" ->
+                        // AGENTS.md is a shared integration surface. The installer owns only
+                        // the bounded Conditor region and resolves current file contents at execution time.
+                        changes.Add(relativePath, content)
                     | Some fullPath ->
                         if File.Exists fullPath then
                             let existing = File.ReadAllText fullPath
