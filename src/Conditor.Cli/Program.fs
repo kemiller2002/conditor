@@ -8,12 +8,16 @@ let private usage () =
     Console.WriteLine "  conditor init   [--target PATH] [--manifest PATH]"
     Console.WriteLine "  conditor verify [--target PATH] [--manifest PATH]"
     Console.WriteLine "  conditor doctor [--target PATH] [--manifest PATH]"
+    Console.WriteLine "  conditor start  [--check] [--target PATH] [--manifest PATH]"
 
 let private optionValue name (args: string array) =
     args
     |> Array.tryFindIndex ((=) name)
     |> Option.bind (fun index ->
         if index + 1 < args.Length then Some args[index + 1] else None)
+
+let private hasFlag name (args: string array) =
+    args |> Array.contains name
 
 let private writeErrors (errors: string list) =
     errors |> List.iter (fun (error: string) -> Console.Error.WriteLine error)
@@ -46,6 +50,31 @@ let private run operation shouldExecute target manifestPath =
                     writeErrors errors
                     4
 
+let private runStart checkOnly target manifestPath =
+    match Manifest.load manifestPath with
+    | Error errors ->
+        writeErrors errors
+        2
+    | Ok manifest when checkOnly ->
+        match Execution.check target manifestPath manifest with
+        | Error errors ->
+            writeErrors errors
+            5
+        | Ok ready ->
+            Console.WriteLine $"Execution ready: launcher={ready.Launcher}; mission={ready.Mission.Id}; state={ready.MissionState}; contract={ready.ContractPath}"
+            0
+    | Ok manifest ->
+        match Execution.start target manifestPath manifest with
+        | Error errors ->
+            writeErrors errors
+            6
+        | Ok result ->
+            if not (String.IsNullOrWhiteSpace result.StandardOutput) then
+                Console.WriteLine(result.StandardOutput.Trim())
+
+            Console.WriteLine "Launcher exited successfully. Praxis remains authoritative for mission completion."
+            0
+
 [<EntryPoint>]
 let main (args: string array) =
     if args.Length = 0 then
@@ -67,6 +96,7 @@ let main (args: string array) =
         | "init" -> run Init true target manifestPath
         | "verify" -> run Verify true target manifestPath
         | "doctor" -> run Doctor true target manifestPath
+        | "start" -> runStart (hasFlag "--check" args) target manifestPath
         | _ ->
             usage ()
             1
