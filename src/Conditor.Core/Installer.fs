@@ -5,26 +5,31 @@ open System.IO
 
 module Installer =
     let private normalize (value: string) =
-        value.Replace("\r\n", "\n")
+        value.Replace("
+", "
+")
+
+    let private sourceEntrypointText source =
+        match source.Entrypoint with
+        | NodeScript path -> $"node {path}"
+        | FileArtifact path -> $"file {path}"
 
     let private commandText action =
         match action.Execution with
         | ExternalProcess(executable, arguments) ->
             String.Join(" ", executable :: arguments)
         | GitHubSourceProcess(source, arguments) ->
-            let entrypoint =
-                match source.Entrypoint with
-                | NodeScript path -> path
-
             let suffix =
                 if arguments.IsEmpty then
                     String.Empty
                 else
                     " " + String.Join(" ", arguments)
 
-            $"github:{source.Repository}#{source.Commit} -> node {entrypoint}{suffix}"
+            $"github:{source.Repository}#{source.Commit} -> {sourceEntrypointText source}{suffix}"
         | EnsureFile(relativePath, _) ->
             $"ensure {relativePath}"
+        | MaterializeSourceFile(source, relativePath) ->
+            $"materialize github:{source.Repository}#{source.Commit} -> {relativePath}"
 
     let private safePath target relativePath =
         let root = Path.GetFullPath target
@@ -40,6 +45,12 @@ module Installer =
 
         if full.StartsWith(rootPrefix, comparison) then Some full else None
 
+    let private ensureParent fullPath =
+        match Path.GetDirectoryName fullPath |> Option.ofObj with
+        | Some parent when not (String.IsNullOrWhiteSpace parent) ->
+            Directory.CreateDirectory parent |> ignore
+        | _ -> ()
+
     let private ensureFile target relativePath content =
         match safePath target relativePath with
         | None ->
@@ -53,11 +64,7 @@ module Installer =
                 else
                     Error $"Scaffold file '{relativePath}' changed after planning; Conditor will not overwrite it."
             else
-                match Path.GetDirectoryName fullPath |> Option.ofObj with
-                | Some parent when not (String.IsNullOrWhiteSpace parent) ->
-                    Directory.CreateDirectory parent |> ignore
-                | _ -> ()
-
+                ensureParent fullPath
                 let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
 
                 try
@@ -70,6 +77,71 @@ module Installer =
                 finally
                     if File.Exists temporary then
                         File.Delete temporary
+
+    let private filesEqual left right =
+        let leftInfo = FileInfo left
+        let rightInfo = FileInfo right
+
+        if leftInfo.Length <> rightInfo.Length then
+            false
+        else
+            use leftStream = File.OpenRead left
+            use rightStream = File.OpenRead right
+            let leftBuffer = Array.zeroCreate<byte> 81920
+            let rightBuffer = Array.zeroCreate<byte> 81920
+
+            let rec compare () =
+                let leftCount = leftStream.Read(leftBuffer, 0, leftBuffer.Length)
+                let rightCount = rightStream.Read(rightBuffer, 0, rightBuffer.Length)
+
+                if leftCount <> rightCount then
+                    false
+                elif leftCount = 0 then
+                    true
+                else
+                    let mutable same = true
+                    let mutable index = 0
+
+                    while same && index < leftCount do
+                        if leftBuffer[index] <> rightBuffer[index] then
+                            same <- false
+
+                        index <- index + 1
+
+                    same && compare ()
+
+            compare ()
+
+    let private materializeSourceFile target componentId source relativePath =
+        match safePath target relativePath with
+        | None ->
+            Error $"Requirement target path escapes the target repository: {relativePath}"
+        | Some fullPath ->
+            match SourceCache.ensure componentId source with
+            | Error errors -> Error(String.Join(Environment.NewLine, errors))
+            | Ok checkout ->
+                match SourceCache.resolveEntrypoint checkout source with
+                | Error errors -> Error(String.Join(Environment.NewLine, errors))
+                | Ok sourcePath ->
+                    if File.Exists fullPath then
+                        if filesEqual sourcePath fullPath then
+                            Ok()
+                        else
+                            Error $"Requirement file '{relativePath}' already exists with different content; Conditor will not overwrite it."
+                    else
+                        ensureParent fullPath
+                        let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
+
+                        try
+                            try
+                                File.Copy(sourcePath, temporary, false)
+                                File.Move(temporary, fullPath)
+                                Ok()
+                            with ex ->
+                                Error $"Unable to materialize requirement file '{relativePath}': {ex.Message}"
+                        finally
+                            if File.Exists temporary then
+                                File.Delete temporary
 
     let describe (plan: InstallationPlan) =
         plan.Actions
@@ -90,6 +162,14 @@ module Installer =
                 match action.Execution with
                 | EnsureFile(relativePath, content) ->
                     match ensureFile target relativePath content with
+                    | Ok() -> loop remaining
+                    | Error error ->
+                        Error
+                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                              $"Command: {commandText action}"
+                              error ]
+                | MaterializeSourceFile(source, relativePath) ->
+                    match materializeSourceFile target action.ComponentId source relativePath with
                     | Ok() -> loop remaining
                     | Error error ->
                         Error
