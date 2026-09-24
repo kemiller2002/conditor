@@ -15,5 +15,7 @@
     <Compile Include="LockFile.fs" />
     <Compile Include="Installer.fs" />
     <Compile Include="Readiness.fs" />
+    <Compile Include="Launcher.fs" />
+    <Compile Include="Execution.fs" />
   </ItemGroup>
 </Project>
