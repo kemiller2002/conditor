@@ -7,6 +7,7 @@ type Distribution =
 
 type SourceEntrypoint =
     | NodeScript of string
+    | FileArtifact of string
 
 type GitHubSource =
     { Repository: string
@@ -30,6 +31,11 @@ type ScaffoldRequest =
     { Kind: string
       Name: string option }
 
+type RequirementSource =
+    { Id: string
+      Source: GitHubSource
+      TargetPath: string }
+
 type ExecutionRequest =
     { Enabled: bool
       Launcher: string option
@@ -40,6 +46,7 @@ type ProjectManifest =
       Name: string
       Components: ComponentRequest list
       Scaffold: ScaffoldRequest option
+      Requirements: RequirementSource list
       Execution: ExecutionRequest option }
 
 type ComponentDefinition =
@@ -66,11 +73,13 @@ type PlanActionKind =
     | DiagnoseLifecycle
     | ScaffoldFile
     | ReadinessVerify
+    | RequirementFile
 
 type ActionExecution =
     | ExternalProcess of executable: string * arguments: string list
     | GitHubSourceProcess of source: GitHubSource * arguments: string list
     | EnsureFile of relativePath: string * content: string
+    | MaterializeSourceFile of source: GitHubSource * relativePath: string
 
 type PlanAction =
     { Sequence: int
