@@ -14,7 +14,7 @@ module Installer =
         | NodeScript path -> $"node {path}"
         | FileArtifact path -> $"file {path}"
 
-    let private commandText action =
+    let private commandText (action: PlanAction) =
         match action.Execution with
         | ExternalProcess(executable, arguments) ->
             String.Join(" ", executable :: arguments)
