@@ -16,16 +16,17 @@ module Planner =
                 $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
         | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
 
+    let private bindingReference version (definition: ComponentDefinition) =
+        match definition.ApplicationBinding with
+        | Some NpmDependency -> Some $"npm:{definition.Package}@{version}"
+        | Some NugetReference -> Some $"nuget:{definition.Package}@{version}"
+        | None -> None
+
     let private replaceTarget target arguments =
         arguments
         |> List.map (fun argument -> if argument = "{target}" then target else argument)
 
-    let private lifecycleExecution
-        target
-        version
-        (definition: ComponentDefinition)
-        arguments
-        =
+    let private lifecycleExecution target version (definition: ComponentDefinition) arguments =
         let command =
             definition.Command
             |> Option.defaultWith (fun () -> invalidOp "Lifecycle component has no command.")
@@ -60,7 +61,7 @@ module Planner =
         let actions = ResizeArray<PlanAction>()
         let mutable sequence = 1
 
-        let addAction
+        let addLifecycleAction
             (request: ComponentRequest)
             (version: string)
             (definition: ComponentDefinition)
@@ -75,6 +76,8 @@ module Planner =
                   Execution = lifecycleExecution target version definition arguments }
 
             sequence <- sequence + 1
+
+        let mutable limenReadiness: (string * ComponentDefinition) option = None
 
         for request in manifest.Components do
             match Registry.tryFind request.Id with
@@ -96,16 +99,22 @@ module Planner =
                               Version = version
                               Distribution = definition.Distribution
                               Package = definition.Package
-                              SourceReference = Some resolvedSource }
+                              SourceReference =
+                                match bindingReference version definition with
+                                | Some binding -> Some $"{resolvedSource};{binding}"
+                                | None -> Some resolvedSource }
 
                         match operation with
                         | Init ->
-                            addAction request version definition "install" definition.InitArguments
-                            addAction request version definition "verify" definition.VerifyArguments
+                            addLifecycleAction request version definition "install" definition.InitArguments
+                            addLifecycleAction request version definition "verify" definition.VerifyArguments
                         | Verify ->
-                            addAction request version definition "verify" definition.VerifyArguments
+                            addLifecycleAction request version definition "verify" definition.VerifyArguments
                         | Doctor ->
-                            addAction request version definition "doctor" definition.DoctorArguments
+                            addLifecycleAction request version definition "doctor" definition.DoctorArguments
+
+                        if definition.Id = "limen" && manifest.Scaffold.IsSome then
+                            limenReadiness <- Some(version, definition)
                 | NpmPackage
                 | NugetPackage ->
                     resolved.Add
@@ -113,11 +122,44 @@ module Planner =
                           Version = version
                           Distribution = definition.Distribution
                           Package = definition.Package
-                          SourceReference = None }
+                          SourceReference = bindingReference version definition }
 
-                    if request.Required then
+                    if request.Required && manifest.Scaffold.IsNone then
                         errors.Add
-                            $"Component '{request.Id}' is an application dependency. Project binding is not implemented yet, so Conditor will not guess where to install it."
+                            $"Component '{request.Id}' is an application dependency. A scaffold is required so Conditor knows exactly where to bind it."
+
+        if errors.Count = 0 && operation = Init then
+            match Scaffolding.plan target manifest with
+            | Error scaffoldErrors ->
+                scaffoldErrors |> List.iter errors.Add
+            | Ok scaffoldFiles ->
+                let scaffoldId =
+                    manifest.Scaffold
+                    |> Option.map (fun scaffold -> $"scaffold:{scaffold.Kind}")
+                    |> Option.defaultValue "scaffold"
+
+                for relativePath, fileContent in scaffoldFiles do
+                    actions.Add
+                        { Sequence = sequence
+                          ComponentId = scaffoldId
+                          ComponentVersion = "1"
+                          Kind = ScaffoldFile
+                          Execution = EnsureFile(relativePath, fileContent) }
+
+                    sequence <- sequence + 1
+
+        if errors.Count = 0 then
+            match limenReadiness, operation with
+            | Some(version, definition), (Init | Verify) ->
+                actions.Add
+                    { Sequence = sequence
+                      ComponentId = "limen"
+                      ComponentVersion = version
+                      Kind = ReadinessVerify
+                      Execution = lifecycleExecution target version definition [ "verify"; "--strict" ] }
+
+                sequence <- sequence + 1
+            | _ -> ()
 
         if errors.Count > 0 then
             Error(List.ofSeq errors)
