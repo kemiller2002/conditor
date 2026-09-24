@@ -270,7 +270,7 @@
       "id": "percepta-application",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/application.json"
       },
       "targetPath": ".percepta/application.json"
@@ -279,7 +279,7 @@
       "id": "percepta-s01-investigation-start",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s01-investigation-start.json"
       },
       "targetPath": ".percepta/contracts/s01-investigation-start.json"
@@ -288,7 +288,7 @@
       "id": "percepta-s02-investigation-workspace",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s02-investigation-workspace.json"
       },
       "targetPath": ".percepta/contracts/s02-investigation-workspace.json"
@@ -297,7 +297,7 @@
       "id": "percepta-s03-hypothesis-battlefield",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s03-hypothesis-battlefield.json"
       },
       "targetPath": ".percepta/contracts/s03-hypothesis-battlefield.json"
@@ -306,7 +306,7 @@
       "id": "percepta-s04-hypothesis-detail",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s04-hypothesis-detail.json"
       },
       "targetPath": ".percepta/contracts/s04-hypothesis-detail.json"
@@ -315,7 +315,7 @@
       "id": "percepta-s05-evidence-capture",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s05-evidence-capture.json"
       },
       "targetPath": ".percepta/contracts/s05-evidence-capture.json"
@@ -324,7 +324,7 @@
       "id": "percepta-s06-evidence-detail",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s06-evidence-detail.json"
       },
       "targetPath": ".percepta/contracts/s06-evidence-detail.json"
@@ -333,7 +333,7 @@
       "id": "percepta-s07-evidence-dependency",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s07-evidence-dependency.json"
       },
       "targetPath": ".percepta/contracts/s07-evidence-dependency.json"
@@ -342,7 +342,7 @@
       "id": "percepta-s08-epistemic-blocker-detail",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s08-epistemic-blocker-detail.json"
       },
       "targetPath": ".percepta/contracts/s08-epistemic-blocker-detail.json"
@@ -351,7 +351,7 @@
       "id": "percepta-s09-action-experiment-designer",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s09-action-experiment-designer.json"
       },
       "targetPath": ".percepta/contracts/s09-action-experiment-designer.json"
@@ -360,7 +360,7 @@
       "id": "percepta-s10-finding-result-capture",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s10-finding-result-capture.json"
       },
       "targetPath": ".percepta/contracts/s10-finding-result-capture.json"
@@ -369,7 +369,7 @@
       "id": "percepta-s11-cause-review",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s11-cause-review.json"
       },
       "targetPath": ".percepta/contracts/s11-cause-review.json"
@@ -378,7 +378,7 @@
       "id": "percepta-s12-corrective-action",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s12-corrective-action.json"
       },
       "targetPath": ".percepta/contracts/s12-corrective-action.json"
@@ -387,7 +387,7 @@
       "id": "percepta-s13-verification",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s13-verification.json"
       },
       "targetPath": ".percepta/contracts/s13-verification.json"
@@ -396,7 +396,7 @@
       "id": "percepta-s14-history-time-travel",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s14-history-time-travel.json"
       },
       "targetPath": ".percepta/contracts/s14-history-time-travel.json"
@@ -405,7 +405,7 @@
       "id": "percepta-s15-semantic-diff",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s15-semantic-diff.json"
       },
       "targetPath": ".percepta/contracts/s15-semantic-diff.json"
@@ -414,7 +414,7 @@
       "id": "percepta-s16-counterfactual-sandbox",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s16-counterfactual-sandbox.json"
       },
       "targetPath": ".percepta/contracts/s16-counterfactual-sandbox.json"
@@ -423,7 +423,7 @@
       "id": "percepta-s17-multi-agent-panel",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s17-multi-agent-panel.json"
       },
       "targetPath": ".percepta/contracts/s17-multi-agent-panel.json"
@@ -432,7 +432,7 @@
       "id": "percepta-s18-research-tournament",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s18-research-tournament.json"
       },
       "targetPath": ".percepta/contracts/s18-research-tournament.json"
@@ -441,7 +441,7 @@
       "id": "percepta-s19-replay-spectator",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s19-replay-spectator.json"
       },
       "targetPath": ".percepta/contracts/s19-replay-spectator.json"
@@ -450,7 +450,7 @@
       "id": "percepta-s20-factory-view",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s20-factory-view.json"
       },
       "targetPath": ".percepta/contracts/s20-factory-view.json"
@@ -459,7 +459,7 @@
       "id": "percepta-s21-requirements-proof",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s21-requirements-proof.json"
       },
       "targetPath": ".percepta/contracts/s21-requirements-proof.json"
@@ -468,7 +468,7 @@
       "id": "percepta-s22-report-preview",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s22-report-preview.json"
       },
       "targetPath": ".percepta/contracts/s22-report-preview.json"
@@ -477,7 +477,7 @@
       "id": "percepta-s23-persistence-conflict-recovery",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s23-persistence-conflict-recovery.json"
       },
       "targetPath": ".percepta/contracts/s23-persistence-conflict-recovery.json"
@@ -486,7 +486,7 @@
       "id": "percepta-s24-settings-semantic-manifest",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s24-settings-semantic-manifest.json"
       },
       "targetPath": ".percepta/contracts/s24-settings-semantic-manifest.json"
@@ -495,7 +495,7 @@
       "id": "percepta-s25-demo-health",
       "source": {
         "repository": "kemiller2002/percepta",
-        "commit": "ac22554f9d102ccfa3d4d5cb10f7db7b2a8a775a",
+        "commit": "9e6307734f5ae03f98155bdd0588fee13d701b50",
         "path": "examples/indy-init/screens/s25-demo-health.json"
       },
       "targetPath": ".percepta/contracts/s25-demo-health.json"
