@@ -102,6 +102,22 @@ module Planner =
         for requirement in manifest.Requirements do
             validateRequirement target requirement |> List.iter errors.Add
 
+        let plannedMission =
+            manifest.Execution
+            |> Option.bind (fun execution ->
+                execution.ContractPath
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                |> Option.map (fun contractPath ->
+                    let description =
+                        execution.Mission
+                        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                        |> Option.defaultValue "Execute the canonical Conditor contract and prove completion through repository evidence."
+
+                    { Id = "COND-MISSION-001"
+                      Title = $"Build {manifest.Name} from the Conditor execution contract"
+                      Description = description
+                      ContractPath = contractPath }))
+
         match manifest.Execution |> Option.bind (fun execution -> execution.ContractPath) with
         | Some contractPath ->
             match validateRelativeTarget target contractPath with
@@ -231,6 +247,23 @@ module Planner =
 
                 sequence <- sequence + 1
             | _ -> ()
+
+        if errors.Count = 0 && operation = Init then
+            match plannedMission with
+            | None -> ()
+            | Some mission ->
+                match resolved |> Seq.tryFind (fun component -> component.Id = "praxis") with
+                | None ->
+                    errors.Add "An execution contract requires the Praxis component so Conditor can establish attributable initial work."
+                | Some praxis ->
+                    actions.Add
+                        { Sequence = sequence
+                          ComponentId = "praxis:mission"
+                          ComponentVersion = praxis.Version
+                          Kind = MissionWorkItem
+                          Execution = EnsurePraxisMission mission }
+
+                    sequence <- sequence + 1
 
         if errors.Count > 0 then
             Error(List.ofSeq errors)
