@@ -47,6 +47,19 @@ module LockFile =
             writer.WriteEndObject()
 
         writer.WriteEndArray()
+        writer.WriteStartArray("requirements")
+
+        for action in plan.Actions do
+            match action.Kind, action.Execution with
+            | RequirementFile, MaterializeSourceFile(source, targetPath) ->
+                writer.WriteStartObject()
+                writer.WriteString("id", action.ComponentId.Replace("requirements:", String.Empty))
+                writer.WriteString("sourceReference", SourceCache.sourceReference source)
+                writer.WriteString("targetPath", targetPath)
+                writer.WriteEndObject()
+            | _ -> ()
+
+        writer.WriteEndArray()
         writer.WriteEndObject()
         writer.Flush()
         path
