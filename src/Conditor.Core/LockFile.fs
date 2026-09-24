@@ -39,6 +39,11 @@ module LockFile =
                 | NugetPackage -> "nuget"
             )
             writer.WriteString("package", resolved.Package)
+
+            match resolved.SourceReference with
+            | Some source -> writer.WriteString("sourceReference", source)
+            | None -> ()
+
             writer.WriteEndObject()
 
         writer.WriteEndArray()
