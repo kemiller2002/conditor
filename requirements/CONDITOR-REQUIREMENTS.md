@@ -65,6 +65,14 @@ Conditor must transform an uninitialized Git repository into a reproducible, gov
 - **CON-054** Completion shall be determined by project requirements and deterministic verification, not solely by an agent completion statement.
 - **CON-055** Execution shall be resumable from durable repository state.
 - **CON-056** Multiple supported agents shall be able to consume the same initialized repository contract.
+- **CON-057** A manifest may designate one canonical execution contract path for agent handoff.
+- **CON-058** A designated execution contract shall already exist or be materialized from an immutable requirement source in the same initialization plan; Conditor shall not generate a handoff to a missing contract.
+- **CON-059** When a canonical execution contract is configured, supported scaffolds shall generate a generic agent entry file that points to that contract without embedding application implementation.
+- **CON-060** Agent handoff instructions shall distinguish normative contracts from implementation freedom and shall prohibit treating an agent completion statement as project completion.
+- **CON-061** Conditor shall support a clean-room rehearsal that starts from an empty Git repository and proves deterministic bootstrap without application-specific source implementation.
+- **CON-062** The clean-room rehearsal shall fail when expected contract, lock, scaffold, or framework-binding artifacts are missing.
+- **CON-063** A competition/project preset may materialize application UI contracts as pinned requirement artifacts without Conditor understanding their domain semantics.
+- **CON-064** Preset requirement artifacts from Percepta or another contract system shall be pinned to an immutable commit that has passed that contract system's validation before being promoted into the competition preset.
 
 ## Indy Init acceptance
 
