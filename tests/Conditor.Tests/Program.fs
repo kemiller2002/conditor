@@ -245,6 +245,47 @@ withManifest
                     "tutela package source is immutable"
                     (plan.Components[0].SourceReference = Some "@echelon-foundry/tutela@0.1.0"))
 
+withManifest
+    """{"schemaVersion":1,"name":"requirements-demo","components":[],"requirements":[{"id":"spec","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/SPEC.md"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "requirements manifest parses" false
+        | Ok manifest ->
+            check "requirements source count" (manifest.Requirements.Length = 1)
+
+            match Planner.create "/tmp/requirements-demo" Init manifest with
+            | Error _ ->
+                check "requirements plan succeeds" false
+            | Ok plan ->
+                let requirementActions =
+                    plan.Actions
+                    |> List.filter (fun action -> action.Kind = RequirementFile)
+
+                check "requirement materialization planned" (requirementActions.Length = 1)
+
+                match requirementActions[0].Execution with
+                | MaterializeSourceFile(source, targetPath) ->
+                    check "requirement source commit is pinned" (source.Commit = "4590d2fe6f7e80b339117d3fbee5803f2dd39122")
+                    check "requirement target path preserved" (targetPath = "requirements/SPEC.md")
+                | _ ->
+                    check "requirement materialization planned" false)
+
+withManifest
+    """{"schemaVersion":1,"name":"bad-requirements","components":[],"requirements":[{"id":"spec","source":{"repository":"kemiller2002/communication-engineering","commit":"main","path":"README.md"},"targetPath":"../SPEC.md"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "invalid requirement manifest still parses structurally" false
+        | Ok manifest ->
+            match Planner.create "/tmp/requirements-demo" Init manifest with
+            | Error errors ->
+                check "unpinned requirement source rejected" (errors |> List.exists (fun error -> error.Contains("40-character commit SHA")))
+                check "escaping requirement target rejected" (errors |> List.exists (fun error -> error.Contains("escapes the target repository")))
+            | Ok _ ->
+                check "invalid requirements rejected before mutation" false)
+
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
