@@ -5,7 +5,21 @@ open System.IO
 
 module Installer =
     let private commandText action =
-        String.Join(" ", action.Executable :: action.Arguments)
+        match action.Execution with
+        | ExternalProcess(executable, arguments) ->
+            String.Join(" ", executable :: arguments)
+        | GitHubSourceProcess(source, arguments) ->
+            let entrypoint =
+                match source.Entrypoint with
+                | NodeScript path -> path
+
+            let suffix =
+                if arguments.IsEmpty then
+                    String.Empty
+                else
+                    " " + String.Join(" ", arguments)
+
+            $"github:{source.Repository}#{source.Commit} -> node {entrypoint}{suffix}"
 
     let describe (plan: InstallationPlan) =
         plan.Actions
