@@ -7,6 +7,7 @@
     <Compile Include="Manifest.fs" />
     <Compile Include="Registry.fs" />
     <Compile Include="SourceCache.fs" />
+    <Compile Include="Requirements.fs" />
     <Compile Include="Scaffolding.fs" />
     <Compile Include="Planner.fs" />
     <Compile Include="ProcessRunner.fs" />
