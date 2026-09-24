@@ -39,8 +39,17 @@ jobs:
           cp examples/indy-init.conditor.json "$RUNNER_TEMP/conditor-empty/conditor.json"
       - name: Initialize empty target
         run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
-      - name: Verify Conditor lock
-        run: test -f "$RUNNER_TEMP/conditor-empty/.conditor/lock.json"
+      - name: Verify established project
+        run: |
+          test -f "$RUNNER_TEMP/conditor-empty/.conditor/lock.json"
+          test -f "$RUNNER_TEMP/conditor-empty/src/engine/App.Engine.fsproj"
+          test -f "$RUNNER_TEMP/conditor-empty/src/engine/Domain.fs"
+          test -f "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          test -f "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"
+          grep -F "@echelon-foundry/design-system" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          grep -F "@echelon-foundry/print-components" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          grep -F "EchelonFoundry.Aegis.Core" "$RUNNER_TEMP/conditor-empty/src/engine/App.Engine.fsproj"
 
   native-cli-smoke:
     needs: build-test
