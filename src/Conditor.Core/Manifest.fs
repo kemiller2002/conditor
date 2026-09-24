@@ -34,6 +34,20 @@ module Manifest =
                   Version = optionalString "version" element
                   Required = optionalBool true "required" element }
 
+    let private parseScaffold (root: JsonElement) =
+        match tryProperty "scaffold" root with
+        | None -> Ok None
+        | Some value when value.ValueKind = JsonValueKind.Object ->
+            match requiredString "kind" value with
+            | Error error -> Error error
+            | Ok kind ->
+                Ok(
+                    Some
+                        { Kind = kind.Trim().ToLowerInvariant()
+                          Name = optionalString "name" value }
+                )
+        | Some _ -> Error "'scaffold' must be an object."
+
     let private parseExecution (root: JsonElement) =
         match tryProperty "execution" root with
         | None -> Ok None
@@ -96,6 +110,13 @@ module Manifest =
                 for duplicate in duplicates do
                     errors.Add $"Component '{duplicate}' is declared more than once."
 
+                let scaffold =
+                    match parseScaffold root with
+                    | Ok value -> value
+                    | Error error ->
+                        errors.Add error
+                        None
+
                 let execution =
                     match parseExecution root with
                     | Ok value -> value
@@ -110,6 +131,7 @@ module Manifest =
                         { SchemaVersion = schemaVersion
                           Name = name
                           Components = components
+                          Scaffold = scaffold
                           Execution = execution }
             with
             | :? JsonException as ex -> Error [ $"Manifest is not valid JSON: {ex.Message}" ]
