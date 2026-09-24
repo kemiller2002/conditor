@@ -3,6 +3,7 @@ namespace Conditor.Core
 open System
 open System.IO
 open System.Text.Json
+open System.Text.Json.Nodes
 open System.Text.RegularExpressions
 
 module Scaffolding =
@@ -49,6 +50,15 @@ module Scaffolding =
 
                     binding, definition.Package, version)))
 
+    [<Literal>]
+    let private Folio030Commit = "273b18f5b23db15cddd173c05af5d1a8484fc4cf"
+
+    let private dependencySpecifier package version =
+        if package = "@echelon-foundry/print-components" && version = "0.3.0" then
+            $"github:kemiller2002/folio#{Folio030Commit}"
+        else
+            version
+
     let private renderDependencies dependencies =
         match dependencies with
         | [] -> "  }"
@@ -57,7 +67,7 @@ module Scaffolding =
             |> List.mapi (fun index (package, version) ->
                 let comma = if index = values.Length - 1 then String.Empty else ","
                 let encodedPackage = jsonString package
-                let encodedVersion = jsonString version
+                let encodedVersion = dependencySpecifier package version |> jsonString
                 $"    {encodedPackage}: {encodedVersion}{comma}")
             |> fun lines -> String.concat "\n" lines + "\n  }"
 
@@ -98,8 +108,80 @@ module Scaffolding =
 
         let assembly = identifier projectName + ".Engine"
 
-        $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
+        $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Operational.fs\" />\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
 
+
+    let private requestedComponent id (manifest: ProjectManifest) =
+        manifest.Components |> List.tryFind (fun component -> component.Id = id)
+
+    let private resolvedVersion id (manifest: ProjectManifest) =
+        requestedComponent id manifest
+        |> Option.bind (fun request ->
+            Registry.tryFind id
+            |> Option.map (fun definition -> request.Version |> Option.defaultValue definition.DefaultVersion))
+
+    let private foundationManifest projectName (manifest: ProjectManifest) =
+        let capabilities = JsonObject()
+
+        let addCapability id configure =
+            let node = JsonObject()
+            let request = requestedComponent id manifest
+            node["required"] <- JsonValue.Create(request |> Option.exists _.Required)
+
+            resolvedVersion id manifest
+            |> Option.iter (fun version -> node["version"] <- JsonValue.Create version)
+
+            configure node
+            capabilities[id] <- node
+
+        addCapability "aegis" (fun node -> node["boundaryManifest"] <- JsonValue.Create "aegis-boundaries.json")
+        addCapability "forma" ignore
+
+        addCapability "folio" (fun node ->
+            match resolvedVersion "folio" manifest with
+            | Some "0.3.0" -> node["sourceCommit"] <- JsonValue.Create Folio030Commit
+            | _ -> ())
+
+        addCapability "limen" ignore
+        addCapability "ordo" ignore
+        addCapability "praxis" ignore
+
+        let root = JsonObject()
+        root["schemaVersion"] <- JsonValue.Create 1
+        root["application"] <- JsonValue.Create projectName
+        root["capabilities"] <- capabilities
+        root.ToJsonString(JsonSerializerOptions(WriteIndented = true, IndentSize = 2)) + "\n"
+
+    let private aegisBoundaryManifest projectName =
+        let root = JsonObject()
+        root["schema"] <- JsonValue.Create "aegis/boundaries/v1"
+        root["application"] <- JsonValue.Create projectName
+
+        let boundaries = JsonArray()
+
+        let startup = JsonObject()
+        startup["name"] <- JsonValue.Create "Configuration and startup"
+        startup["kind"] <- JsonValue.Create "startup"
+        startup["owner"] <- JsonValue.Create "application"
+        startup["codes"] <- JsonArray(JsonValue.Create "AEGIS.CONFIG.INVALID_CONFIGURATION")
+        startup["guarded"] <- JsonValue.Create true
+        boundaries.Add startup
+
+        let limen = JsonObject()
+        limen["name"] <- JsonValue.Create "Limen interop"
+        limen["kind"] <- JsonValue.Create "ui-interop"
+        limen["owner"] <- JsonValue.Create "application"
+        limen["codes"] <- JsonArray(JsonValue.Create "AEGIS.LIMEN.INTEROP_FAILED")
+        limen["guarded"] <- JsonValue.Create false
+        boundaries.Add limen
+
+        root["boundaries"] <- boundaries
+        root.ToJsonString(JsonSerializerOptions(WriteIndented = true, IndentSize = 2)) + "\n"
+
+    let private operationalFile projectName =
+        let ns = identifier projectName
+
+        $"namespace {ns}.Engine\n\nopen Aegis\n\nmodule Operational =\n    let aegis = Aegis.configure {jsonString projectName} None [ Sinks.standardError ]\n\n    let validateConfiguration () =\n        Bootstrap.validate None aegis\n"
 
     let private agentEntryFile (manifest: ProjectManifest) =
         manifest.Execution
@@ -131,13 +213,20 @@ module Scaffolding =
                   "App.slnx",
                   "<Solution>\n  <Folder Name=\"/src/\">\n    <Project Path=\"src/engine/App.Engine.fsproj\" />\n  </Folder>\n</Solution>\n"
                   "src/engine/App.Engine.fsproj", projectFile projectName manifest
+                  ".echelon/foundations.json", foundationManifest projectName manifest
+                  "aegis-boundaries.json", aegisBoundaryManifest projectName
+                  "src/engine/Operational.fs", operationalFile projectName
                   "src/engine/Domain.fs",
                   $"namespace {ns}.Engine\n\ntype State =\n    | Uninitialized\n\nmodule State =\n    let initial = Uninitialized\n"
                   "src/kernel/package.json", packageJson projectName manifest
                   "src/kernel/tsconfig.json",
                   "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ES2022\",\n    \"moduleResolution\": \"Bundler\",\n    \"strict\": true,\n    \"noEmit\": true,\n    \"lib\": [\"ES2022\", \"DOM\"]\n  },\n  \"include\": [\"**/*.ts\"]\n}\n"
                   "src/kernel/bootstrap.ts",
-                  "export const scaffoldReady = true as const;\n" ]
+                  "import type { ViewState } from \"@echelon-foundry/typescript-wasm-kernel/protocol\";\n\nexport const scaffoldReady = true as const;\nexport type ScaffoldView = ViewState;\n"
+                  "src/kernel/index.html",
+                  "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"./node_modules/@echelon-foundry/design-system/dist/all.css\">\n  <title>Application</title>\n</head>\n<body>\n  <main>\n    <ef-button><button type=\"button\">Ready</button></ef-button>\n  </main>\n</body>\n</html>\n"
+                  "src/kernel/print.html",
+                  "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <link rel=\"stylesheet\" href=\"./node_modules/@echelon-foundry/print-components/src/styles/print.css\">\n  <script type=\"module\" src=\"./node_modules/@echelon-foundry/print-components/src/components/register.js\"></script>\n  <title>Printable document</title>\n</head>\n<body>\n  <ef-print-document><main><h1>Printable document</h1></main></ef-print-document>\n</body>\n</html>\n" ]
 
             match agentEntryFile manifest with
             | Some agentFile -> Ok(agentFile :: files)
