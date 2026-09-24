@@ -1,6 +1,7 @@
 namespace Conditor.Core
 
 open System
+open System.IO
 
 module Planner =
     let private npxExecutable () =
@@ -55,11 +56,51 @@ module Planner =
         | Doctor, "doctor" -> DiagnoseLifecycle
         | _ -> invalidArg (nameof phase) $"Unsupported plan phase '{phase}'."
 
+    let private validateRelativeTarget target relativePath =
+        if String.IsNullOrWhiteSpace relativePath || Path.IsPathRooted relativePath then
+            Error $"Requirement targetPath '{relativePath}' must be a repository-relative file path."
+        else
+            let root = Path.GetFullPath target
+            let full = Path.GetFullPath(Path.Combine(root, relativePath))
+            let rootPrefix =
+                root.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
+
+            let comparison =
+                if OperatingSystem.IsWindows() then
+                    StringComparison.OrdinalIgnoreCase
+                else
+                    StringComparison.Ordinal
+
+            if full.StartsWith(rootPrefix, comparison) then
+                Ok()
+            else
+                Error $"Requirement targetPath '{relativePath}' escapes the target repository."
+
+    let private validateRequirement target (requirement: RequirementSource) =
+        let errors = ResizeArray<string>()
+
+        SourceCache.validate requirement.Source
+        |> List.iter (fun error -> errors.Add $"Requirement '{requirement.Id}': {error}")
+
+        match requirement.Source.Entrypoint with
+        | FileArtifact _ -> ()
+        | NodeScript _ ->
+            errors.Add $"Requirement '{requirement.Id}' must reference a file artifact."
+
+        match validateRelativeTarget target requirement.TargetPath with
+        | Ok() -> ()
+        | Error error -> errors.Add error
+
+        List.ofSeq errors
+
     let create target operation (manifest: ProjectManifest) : Result<InstallationPlan, string list> =
         let errors = ResizeArray<string>()
         let resolved = ResizeArray<ResolvedComponent>()
         let actions = ResizeArray<PlanAction>()
         let mutable sequence = 1
+
+        for requirement in manifest.Requirements do
+            validateRequirement target requirement |> List.iter errors.Add
 
         let addLifecycleAction
             (request: ComponentRequest)
@@ -147,6 +188,17 @@ module Planner =
                           Execution = EnsureFile(relativePath, fileContent) }
 
                     sequence <- sequence + 1
+
+        if errors.Count = 0 && operation = Init then
+            for requirement in manifest.Requirements do
+                actions.Add
+                    { Sequence = sequence
+                      ComponentId = $"requirements:{requirement.Id}"
+                      ComponentVersion = requirement.Source.Commit
+                      Kind = RequirementFile
+                      Execution = MaterializeSourceFile(requirement.Source, requirement.TargetPath) }
+
+                sequence <- sequence + 1
 
         if errors.Count = 0 then
             match limenReadiness, operation with
