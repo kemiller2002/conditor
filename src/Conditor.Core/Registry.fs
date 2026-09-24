@@ -1,7 +1,7 @@
 namespace Conditor.Core
 
 module Registry =
-    let private lifecycle id displayName package source command version initArgs =
+    let private lifecycleWithVerification id displayName package source command version initArgs verifyArgs =
         { Id = id
           DisplayName = displayName
           Distribution = LifecycleNpm
@@ -10,8 +10,19 @@ module Registry =
           Command = Some command
           DefaultVersion = version
           InitArguments = initArgs
-          VerifyArguments = [ "verify"; "--strict" ]
+          VerifyArguments = verifyArgs
           DoctorArguments = [ "doctor" ] }
+
+    let private lifecycle id displayName package source command version initArgs =
+        lifecycleWithVerification
+            id
+            displayName
+            package
+            source
+            command
+            version
+            initArgs
+            [ "verify"; "--strict" ]
 
     let private githubSource repository commit entrypoint =
         GitHubSource
@@ -79,7 +90,7 @@ module Registry =
               "communication-engineering"
               "1.0.0"
               [ "init" ]
-          lifecycle
+          lifecycleWithVerification
               "limen"
               "Limen"
               "@echelon-foundry/typescript-wasm-kernel"
@@ -87,6 +98,7 @@ module Registry =
               "limen"
               "0.6.1"
               [ "init" ]
+              [ "verify" ]
           npmPackage "forma" "Forma" "@echelon-foundry/design-system" "0.2.0"
           npmPackage "folio" "Folio" "@echelon-foundry/print-components" "0.3.0"
           nugetPackage "aegis" "Aegis" "EchelonFoundry.Aegis.Core" "1.0.0"
