@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Conditor.Core/Conditor.Core.fsproj" />
+    <Project Path="src/Conditor.Cli/Conditor.Cli.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Conditor.Tests/Conditor.Tests.fsproj" />
+  </Folder>
+</Solution>
