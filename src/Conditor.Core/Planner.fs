@@ -254,7 +254,11 @@ module Planner =
             | Some mission ->
                 match resolved |> Seq.tryFind (fun component -> component.Id = "praxis") with
                 | None ->
-                    errors.Add "An execution contract requires the Praxis component so Conditor can establish attributable initial work."
+                    let executionEnabled =
+                        manifest.Execution |> Option.exists (fun execution -> execution.Enabled)
+
+                    if executionEnabled then
+                        errors.Add "Enabled execution requires the Praxis component so Conditor can establish attributable initial work."
                 | Some praxis ->
                     actions.Add
                         { Sequence = sequence
