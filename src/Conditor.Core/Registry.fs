@@ -80,7 +80,15 @@ module Registry =
               [ "init" ]
           npmPackage "forma" "Forma" "@echelon-foundry/design-system" "0.2.0"
           npmPackage "folio" "Folio" "@echelon-foundry/print-components" "0.3.0"
-          nugetPackage "aegis" "Aegis" "EchelonFoundry.Aegis.Core" "1.0.0" ]
+          nugetPackage "aegis" "Aegis" "EchelonFoundry.Aegis.Core" "1.0.0"
+          lifecycle
+              "tutela"
+              "Tutela Security Engineering"
+              "@echelon-foundry/tutela"
+              RegistryPackage
+              "tutela"
+              "0.1.0"
+              [ "init" ] ]
 
     let tryFind id =
         all |> List.tryFind (fun definition -> definition.Id = id)
