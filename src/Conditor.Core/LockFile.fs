@@ -25,18 +25,18 @@ module LockFile =
         writer.WriteString("manifestSha256", manifestHash manifestPath)
         writer.WriteStartArray("components")
 
-        for component in plan.Components do
+        for resolved in plan.Components do
             writer.WriteStartObject()
-            writer.WriteString("id", component.Id)
-            writer.WriteString("version", component.Version)
+            writer.WriteString("id", resolved.Id)
+            writer.WriteString("version", resolved.Version)
             writer.WriteString(
                 "distribution",
-                match component.Distribution with
+                match resolved.Distribution with
                 | LifecycleNpm -> "lifecycle-npm"
                 | NpmPackage -> "npm"
                 | NugetPackage -> "nuget"
             )
-            writer.WriteString("package", component.Package)
+            writer.WriteString("package", resolved.Package)
             writer.WriteEndObject()
 
         writer.WriteEndArray()
