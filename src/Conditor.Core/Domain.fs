@@ -17,6 +17,10 @@ type LifecycleSource =
     | RegistryPackage
     | GitHubSource of GitHubSource
 
+type ApplicationBinding =
+    | NpmDependency
+    | NugetReference
+
 type ComponentRequest =
     { Id: string
       Version: string option
@@ -44,6 +48,7 @@ type ComponentDefinition =
       Distribution: Distribution
       Package: string
       LifecycleSource: LifecycleSource option
+      ApplicationBinding: ApplicationBinding option
       Command: string option
       DefaultVersion: string
       InitArguments: string list
