@@ -286,17 +286,6 @@ withManifest
                 check "invalid requirements rejected before mutation" false)
 
 
-let exitCode =
-    if failures = 0 then
-        Console.WriteLine "All Conditor tests passed."
-        0
-    else
-        Console.Error.WriteLine $"{failures} Conditor test(s) failed."
-        1
-
-[<EntryPoint>]
-let main _ = exitCode
-
 
 withTarget
     (fun target ->
@@ -346,3 +335,43 @@ withManifest
                     (errors |> List.exists (fun error -> error.Contains("must already exist or match")))
             | Ok _ ->
                 check "missing execution contract rejected" false)
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"mission-demo","components":[{"id":"praxis","version":"3.1.4"}],"execution":{"enabled":false,"mission":"Build the governed application.","contractPath":"requirements/contract.json"},"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.json"}]}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"mission manifest parses: {details}" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"mission plan succeeds: {details}" false
+                    | Ok plan ->
+                        let missionAction =
+                            plan.Actions
+                            |> List.tryFind (fun action -> action.Kind = MissionWorkItem)
+
+                        check "Praxis mission planned" missionAction.IsSome
+
+                        match missionAction |> Option.map _.Execution with
+                        | Some(EnsurePraxisMission mission) ->
+                            check "mission id deterministic" (mission.Id = "COND-MISSION-001")
+                            check "mission contract preserved" (mission.ContractPath = "requirements/contract.json")
+                            check "mission description preserved" (mission.Description = "Build the governed application.")
+                        | _ ->
+                            check "Praxis mission execution modeled" false))
+
+let exitCode =
+    if failures = 0 then
+        Console.WriteLine "All Conditor tests passed."
+        0
+    else
+        Console.Error.WriteLine $"{failures} Conditor test(s) failed."
+        1
+
+[<EntryPoint>]
+let main _ = exitCode
