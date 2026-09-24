@@ -2,19 +2,24 @@
 
 ## Slice 1: deterministic foundation
 
+Status: complete and exercised by a clean-room CI installation.
+
 - manifest parser and validation
 - built-in registry
 - deterministic lifecycle planning
-- lifecycle execution through pinned npm packages
-- post-install verification
-- lock file
+- lifecycle execution through pinned registry packages
+- immutable GitHub commit source transport and cache
+- capability-aware post-install verification
+- lock file written only after the complete plan succeeds
 - dependency-free test harness
-- CI
+- CI and blank-target smoke test
 
 ## Slice 2: true empty-repository bootstrap
 
+Status: in progress. Native publishing and installers are implemented; project scaffolding is next.
+
 - native Conditor release artifacts for macOS, Linux, and Windows
-- one-command installer that does not require a preinstalled .NET SDK
+- checksum-verified Unix and Windows installers that do not require a preinstalled .NET SDK
 - project-type/scaffold contract
 - package binding for Forma, Folio, Aegis, and other application dependencies
 - compatibility graph and preflight
