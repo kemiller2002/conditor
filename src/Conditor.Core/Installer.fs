@@ -5,9 +5,9 @@ open System.IO
 
 module Installer =
     let private normalize (value: string) =
-        value.Replace("
-", "
-")
+        let carriageReturn = string (char 13)
+        let lineFeed = string (char 10)
+        value.Replace(carriageReturn + lineFeed, lineFeed)
 
     let private sourceEntrypointText source =
         match source.Entrypoint with
