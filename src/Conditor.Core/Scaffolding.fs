@@ -71,8 +71,9 @@ module Scaffolding =
             |> List.sortBy fst
 
         let dependencyBody = renderDependencies dependencies
+        let encodedName = jsonString (packageSlug projectName + "-kernel")
 
-        $"{{\n  \"name\": {jsonString (packageSlug projectName + "-kernel")},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n"
+        $"{{\n  \"name\": {encodedName},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n"
 
     let private projectFile projectName manifest =
         let packageReferences =
