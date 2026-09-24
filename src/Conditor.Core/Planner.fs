@@ -252,7 +252,7 @@ module Planner =
             match plannedMission with
             | None -> ()
             | Some mission ->
-                match resolved |> Seq.tryFind (fun component -> component.Id = "praxis") with
+                match resolved |> Seq.tryFind (fun resolvedComponent -> resolvedComponent.Id = "praxis") with
                 | None ->
                     let executionEnabled =
                         manifest.Execution |> Option.exists (fun execution -> execution.Enabled)
