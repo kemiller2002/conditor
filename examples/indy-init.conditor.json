@@ -1,0 +1,15 @@
+{
+  "$schema": "../schemas/conditor.schema.json",
+  "schemaVersion": 1,
+  "name": "indy-init-demo",
+  "components": [
+    { "id": "praxis", "version": "3.4.0" },
+    { "id": "ordo", "version": "1.4.0" },
+    { "id": "visual-engineering", "version": "1.0.0" },
+    { "id": "communication-engineering", "version": "1.0.0" },
+    { "id": "limen", "version": "0.6.2" }
+  ],
+  "execution": {
+    "enabled": false
+  }
+}
