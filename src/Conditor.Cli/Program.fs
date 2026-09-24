@@ -15,19 +15,22 @@ let private optionValue name (args: string array) =
     |> Option.bind (fun index ->
         if index + 1 < args.Length then Some args[index + 1] else None)
 
+let private writeErrors errors =
+    errors |> List.iter (fun error -> Console.Error.WriteLine error)
+
 let private run operation shouldExecute target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
-        errors |> List.iter Console.Error.WriteLine
+        writeErrors errors
         2
     | Ok manifest ->
         match Planner.create target operation manifest with
         | Error errors ->
-            errors |> List.iter Console.Error.WriteLine
+            writeErrors errors
             3
         | Ok plan ->
             Console.WriteLine $"Conditor plan for '{plan.ProjectName}'"
-            Installer.describe plan |> List.iter Console.WriteLine
+            Installer.describe plan |> List.iter (fun line -> Console.WriteLine line)
 
             if not shouldExecute then
                 0
@@ -40,11 +43,11 @@ let private run operation shouldExecute target manifestPath =
                     Console.WriteLine "Conditor completed successfully."
                     0
                 | Error errors ->
-                    errors |> List.iter Console.Error.WriteLine
+                    writeErrors errors
                     4
 
 [<EntryPoint>]
-let main args =
+let main (args: string array) =
     if args.Length = 0 then
         usage ()
         1
