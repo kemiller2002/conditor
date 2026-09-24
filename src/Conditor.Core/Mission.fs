@@ -135,3 +135,39 @@ module Mission =
                     Error [ $"Praxis mission '{mission.Id}' was abandoned; Conditor will not resurrect it automatically." ]
                 | state ->
                     Error [ $"Praxis mission '{mission.Id}' has unsupported state '{state}'." ]
+
+    let private conflictsFor target (mission: PraxisMission) =
+        match readExisting target mission.Id with
+        | Error errors -> Error errors
+        | Ok None -> Error [ $"Praxis mission '{mission.Id}' is missing. Run 'conditor init' first." ]
+        | Ok(Some existing) ->
+            let conflicts = validateExisting mission existing
+            if conflicts.IsEmpty then Ok existing else Error conflicts
+
+    let launchState target (mission: PraxisMission) =
+        match conflictsFor target mission with
+        | Error errors -> Error errors
+        | Ok existing ->
+            match existing.Status with
+            | "ready" -> Ok "ready"
+            | "active" -> Ok "active"
+            | "captured" ->
+                Error [ $"Praxis mission '{mission.Id}' has not been marked ready." ]
+            | "blocked" ->
+                Error [ $"Praxis mission '{mission.Id}' is blocked and cannot be launched." ]
+            | "complete" ->
+                Error [ $"Praxis mission '{mission.Id}' is already complete." ]
+            | "abandoned" ->
+                Error [ $"Praxis mission '{mission.Id}' was abandoned." ]
+            | state ->
+                Error [ $"Praxis mission '{mission.Id}' has unsupported state '{state}'." ]
+
+    let activate target (mission: PraxisMission) =
+        match launchState target mission with
+        | Error errors -> Error errors
+        | Ok "active" -> Ok()
+        | Ok "ready" ->
+            runRos target [ "work"; "start"; mission.Id; "--type"; "feature"; "--actor"; "conditor" ]
+        | Ok state ->
+            Error [ $"Praxis mission '{mission.Id}' cannot be activated from state '{state}'." ]
+
