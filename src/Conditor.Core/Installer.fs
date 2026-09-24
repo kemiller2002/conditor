@@ -61,11 +61,12 @@ module Installer =
                 let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
 
                 try
-                    File.WriteAllText(temporary, content)
-                    File.Move(temporary, fullPath)
-                    Ok()
-                with ex ->
-                    Error $"Unable to create scaffold file '{relativePath}': {ex.Message}"
+                    try
+                        File.WriteAllText(temporary, content)
+                        File.Move(temporary, fullPath)
+                        Ok()
+                    with ex ->
+                        Error $"Unable to create scaffold file '{relativePath}': {ex.Message}"
                 finally
                     if File.Exists temporary then
                         File.Delete temporary
