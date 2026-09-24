@@ -17,7 +17,7 @@ module Launcher =
         ProcessRunner.runProcess target executable arguments
         |> successOrErrors name
 
-    let probe target launcher =
+    let probe target (launcher: string) =
         match launcher.Trim().ToLowerInvariant() with
         | "codex" ->
             match probeCommand target "codex" [ "--version" ] "Codex" with
