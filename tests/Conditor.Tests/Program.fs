@@ -102,8 +102,8 @@ withManifest
             match Planner.create "/tmp/demo" Init manifest with
             | Error errors ->
                 check
-                    "application package binding is explicit"
-                    (errors |> List.exists (fun error -> error.Contains("will not guess where to install it")))
+                    "application package binding requires scaffold"
+                    (errors |> List.exists (fun error -> error.Contains("A scaffold is required")))
             | Ok _ ->
                 check "application package binding is explicit" false)
 
@@ -126,6 +126,109 @@ withManifest
                     check "limen bootstrap verification is non-strict" (arguments |> List.contains "--strict" |> not)
                 | _ ->
                     check "limen bootstrap verification is non-strict" false)
+
+let withTarget test =
+    let path = Path.Combine(Path.GetTempPath(), $"conditor-target-{Guid.NewGuid():N}")
+    Directory.CreateDirectory path |> ignore
+
+    try
+        test path
+    finally
+        if Directory.Exists path then
+            Directory.Delete(path, true)
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"scaffold-demo","components":[{"id":"limen","version":"0.6.1"},{"id":"forma","version":"0.2.0"},{"id":"folio","version":"0.3.0"},{"id":"aegis","version":"1.0.0"}],"scaffold":{"kind":"fsharp-limen-web","name":"scaffold-demo"}}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error _ ->
+                    check "scaffold manifest parses" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"scaffold plan succeeds: {details}" false
+                    | Ok plan ->
+                        check "scaffold application bindings resolve" (plan.Components.Length = 4)
+                        check "scaffold plans seven project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 7)
+                        check "scaffold ends in strict Limen readiness" (plan.Actions |> List.exists (fun action -> action.Kind = ReadinessVerify))
+
+                        let packageJson =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("src/kernel/package.json", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        let projectFile =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("src/engine/App.Engine.fsproj", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        check
+                            "scaffold binds Limen Forma and Folio to npm target"
+                            (packageJson
+                             |> Option.exists (fun text ->
+                                 text.Contains("@echelon-foundry/typescript-wasm-kernel")
+                                 && text.Contains("@echelon-foundry/design-system")
+                                 && text.Contains("@echelon-foundry/print-components")))
+
+                        check
+                            "scaffold binds Aegis to F# target"
+                            (projectFile
+                             |> Option.exists (fun text -> text.Contains("EchelonFoundry.Aegis.Core")))
+
+                        let readiness =
+                            plan.Actions
+                            |> List.tryFind (fun action -> action.Kind = ReadinessVerify)
+
+                        check
+                            "readiness uses strict Limen verification"
+                            (readiness
+                             |> Option.exists (fun action ->
+                                 match action.Execution with
+                                 | ExternalProcess(_, arguments) ->
+                                     arguments |> List.contains "--strict"
+                                 | _ -> false))))
+
+withTarget
+    (fun target ->
+        File.WriteAllText(Path.Combine(target, "Directory.Build.props"), "user-owned")
+        withManifest
+            """{"schemaVersion":1,"name":"conflict-demo","components":[],"scaffold":{"kind":"fsharp-limen-web"}}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error _ ->
+                    check "conflict scaffold manifest parses" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        check
+                            "scaffold conflict rejected before execution"
+                            (errors |> List.exists (fun error -> error.Contains("will not overwrite it")))
+                    | Ok _ ->
+                        check "scaffold conflict rejected before execution" false))
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"unknown-scaffold","components":[],"scaffold":{"kind":"not-a-scaffold"}}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error _ ->
+                    check "unknown scaffold manifest parses" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        check
+                            "unknown scaffold kind rejected"
+                            (errors |> List.exists (fun error -> error.Contains("Unsupported scaffold kind")))
+                    | Ok _ ->
+                        check "unknown scaffold kind rejected" false))
 
 withManifest
     """{"schemaVersion":1,"name":"secure-demo","components":[{"id":"tutela"}]}"""
