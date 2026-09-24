@@ -329,3 +329,18 @@ withTarget
                              |> Option.exists (fun content ->
                                  content.Contains(".echelon/kickoff/project.json")
                                  && content.Contains("Build the governed app.")))))
+
+
+withManifest
+    """{"schemaVersion":1,"name":"missing-contract","components":[],"execution":{"enabled":false,"contractPath":".echelon/kickoff/missing.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ -> check "missing contract manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/missing-contract" Init manifest with
+            | Error errors ->
+                check
+                    "missing execution contract rejected"
+                    (errors |> List.exists (fun error -> error.Contains("must already exist or match")))
+            | Ok _ ->
+                check "missing execution contract rejected" false)
