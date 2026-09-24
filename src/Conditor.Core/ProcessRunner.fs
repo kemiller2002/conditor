@@ -41,22 +41,30 @@ module ProcessRunner =
         | ExternalProcess(executable, arguments) ->
             runCommand workingDirectory executable arguments
         | GitHubSourceProcess(source, arguments) ->
-            match SourceCache.ensure action.ComponentId source with
-            | Error errors ->
+            match source.Entrypoint with
+            | FileArtifact _ ->
                 { ExitCode = -1
                   StandardOutput = String.Empty
-                  StandardError = String.Join(Environment.NewLine, errors) }
-            | Ok checkout ->
-                match SourceCache.resolveEntrypoint checkout source with
+                  StandardError = "FileArtifact sources must be materialized by the Conditor installer." }
+            | NodeScript _ ->
+                match SourceCache.ensure action.ComponentId source with
                 | Error errors ->
                     { ExitCode = -1
                       StandardOutput = String.Empty
                       StandardError = String.Join(Environment.NewLine, errors) }
-                | Ok entrypoint ->
-                    match source.Entrypoint with
-                    | NodeScript _ ->
+                | Ok checkout ->
+                    match SourceCache.resolveEntrypoint checkout source with
+                    | Error errors ->
+                        { ExitCode = -1
+                          StandardOutput = String.Empty
+                          StandardError = String.Join(Environment.NewLine, errors) }
+                    | Ok entrypoint ->
                         runCommand workingDirectory "node" (entrypoint :: arguments)
         | EnsureFile _ ->
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = "EnsureFile must be executed by the Conditor installer, not the process runner." }
+        | MaterializeSourceFile _ ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = "MaterializeSourceFile must be executed by the Conditor installer, not the process runner." }
