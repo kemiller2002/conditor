@@ -54,6 +54,7 @@ module SourceCache =
         let entrypoint =
             match source.Entrypoint with
             | NodeScript path -> path
+            | FileArtifact path -> path
 
         let entrypointParts =
             entrypoint.Replace('\\', '/').Split('/')
@@ -117,6 +118,7 @@ module SourceCache =
         let relative =
             match source.Entrypoint with
             | NodeScript path -> path
+            | FileArtifact path -> path
 
         let root = Path.GetFullPath checkout
         let candidate = Path.GetFullPath(Path.Combine(root, relative))
@@ -214,5 +216,6 @@ module SourceCache =
         let entrypoint =
             match source.Entrypoint with
             | NodeScript path -> $"node:{path}"
+            | FileArtifact path -> $"file:{path}"
 
         $"github:{source.Repository}#{source.Commit}|{entrypoint}"
