@@ -6,6 +6,9 @@ module Planner =
     let private npxExecutable () =
         if OperatingSystem.IsWindows() then "npx.cmd" else "npx"
 
+    let private npmExecutable () =
+        if OperatingSystem.IsWindows() then "npm.cmd" else "npm"
+
     let private packageSpec version (definition: ComponentDefinition) =
         match definition.LifecycleSource with
         | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
@@ -15,15 +18,39 @@ module Planner =
                 $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
         | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
 
-    let private lifecycleArguments target packageReference (definition: ComponentDefinition) arguments =
+    let private replaceTarget target arguments =
+        arguments
+        |> List.map (fun argument -> if argument = "{target}" then target else argument)
+
+    let private lifecycleInvocation
+        target
+        packageReference
+        (definition: ComponentDefinition)
+        arguments
+        =
         let command =
             definition.Command
             |> Option.defaultWith (fun () -> invalidOp "Lifecycle component has no command.")
 
-        [ "--yes"
-          $"--package={packageReference}"
-          command ]
-        @ (arguments |> List.map (fun argument -> if argument = "{target}" then target else argument))
+        let resolvedArguments = replaceTarget target arguments
+
+        match definition.LifecycleSource with
+        | Some RegistryPackage ->
+            npxExecutable (),
+            [ "--yes"
+              $"--package={packageReference}"
+              command ]
+            @ resolvedArguments
+        | Some(FixedPackageSpec _) ->
+            npmExecutable (),
+            [ "exec"
+              "--yes"
+              $"--package={packageReference}"
+              command
+              "--" ]
+            @ resolvedArguments
+        | None ->
+            invalidOp $"Lifecycle component '{definition.Id}' has no distribution source."
 
     let private actionKind operation phase =
         match operation, phase with
@@ -47,13 +74,16 @@ module Planner =
             (phase: string)
             (arguments: string list)
             =
+            let executable, invocationArguments =
+                lifecycleInvocation target packageReference definition arguments
+
             actions.Add
                 { Sequence = sequence
                   ComponentId = request.Id
                   ComponentVersion = version
                   Kind = actionKind operation phase
-                  Executable = npxExecutable ()
-                  Arguments = lifecycleArguments target packageReference definition arguments }
+                  Executable = executable
+                  Arguments = invocationArguments }
 
             sequence <- sequence + 1
 
