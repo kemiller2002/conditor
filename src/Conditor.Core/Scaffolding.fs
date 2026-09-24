@@ -112,7 +112,7 @@ module Scaffolding =
 
 
     let private requestedComponent id (manifest: ProjectManifest) =
-        manifest.Components |> List.tryFind (fun component -> component.Id = id)
+        manifest.Components |> List.tryFind (fun request -> request.Id = id)
 
     let private resolvedVersion id (manifest: ProjectManifest) =
         requestedComponent id manifest
