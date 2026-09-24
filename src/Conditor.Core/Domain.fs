@@ -5,6 +5,10 @@ type Distribution =
     | NpmPackage
     | NugetPackage
 
+type LifecycleSource =
+    | RegistryPackage
+    | FixedPackageSpec of string
+
 type ComponentRequest =
     { Id: string
       Version: string option
@@ -26,6 +30,7 @@ type ComponentDefinition =
       DisplayName: string
       Distribution: Distribution
       Package: string
+      LifecycleSource: LifecycleSource option
       Command: string option
       DefaultVersion: string
       InitArguments: string list
@@ -54,7 +59,8 @@ type ResolvedComponent =
     { Id: string
       Version: string
       Distribution: Distribution
-      Package: string }
+      Package: string
+      SourceReference: string option }
 
 type InstallationPlan =
     { ProjectName: string
