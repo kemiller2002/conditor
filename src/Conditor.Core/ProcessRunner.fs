@@ -64,6 +64,10 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = "EnsureFile must be executed by the Conditor installer, not the process runner." }
+        | EnsureManagedRegion _ ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = "EnsureManagedRegion must be executed by the Conditor installer, not the process runner." }
         | MaterializeSourceFile _ ->
             { ExitCode = -1
               StandardOutput = String.Empty
