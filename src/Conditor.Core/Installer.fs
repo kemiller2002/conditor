@@ -30,6 +30,8 @@ module Installer =
             $"ensure {relativePath}"
         | MaterializeSourceFile(source, relativePath) ->
             $"materialize github:{source.Repository}#{source.Commit} -> {relativePath}"
+        | EnsurePraxisMission mission ->
+            $"praxis mission {mission.Id} -> ready"
 
     let private safePath target relativePath =
         let root = Path.GetFullPath target
@@ -176,6 +178,14 @@ module Installer =
                             [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
                               $"Command: {commandText action}"
                               error ]
+                | EnsurePraxisMission mission ->
+                    match Mission.ensure target mission with
+                    | Ok() -> loop remaining
+                    | Error errors ->
+                        Error
+                            ([ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                               $"Command: {commandText action}" ]
+                             @ errors)
                 | ExternalProcess _
                 | GitHubSourceProcess _ ->
                     let result = ProcessRunner.run target action
