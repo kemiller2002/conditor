@@ -48,6 +48,96 @@ module Manifest =
                 )
         | Some _ -> Error "'scaffold' must be an object."
 
+    let private parseRequirementSource (element: JsonElement) =
+        let errors = ResizeArray<string>()
+
+        let id =
+            match requiredString "id" element with
+            | Ok value -> value.Trim()
+            | Error error ->
+                errors.Add error
+                String.Empty
+
+        let targetPath =
+            match requiredString "targetPath" element with
+            | Ok value -> value.Trim()
+            | Error error ->
+                errors.Add error
+                String.Empty
+
+        let source =
+            match tryProperty "source" element with
+            | Some value when value.ValueKind = JsonValueKind.Object ->
+                let repository =
+                    match requiredString "repository" value with
+                    | Ok parsed -> parsed.Trim()
+                    | Error error ->
+                        errors.Add $"requirements[{id}].source {error}"
+                        String.Empty
+
+                let commit =
+                    match requiredString "commit" value with
+                    | Ok parsed -> parsed.Trim().ToLowerInvariant()
+                    | Error error ->
+                        errors.Add $"requirements[{id}].source {error}"
+                        String.Empty
+
+                let sourcePath =
+                    match requiredString "path" value with
+                    | Ok parsed -> parsed.Trim()
+                    | Error error ->
+                        errors.Add $"requirements[{id}].source {error}"
+                        String.Empty
+
+                { Repository = repository
+                  Commit = commit
+                  Entrypoint = FileArtifact sourcePath }
+            | _ ->
+                errors.Add $"requirements[{id}].source must be an object."
+
+                { Repository = String.Empty
+                  Commit = String.Empty
+                  Entrypoint = FileArtifact String.Empty }
+
+        if errors.Count > 0 then
+            Error(List.ofSeq errors)
+        else
+            Ok
+                { Id = id
+                  Source = source
+                  TargetPath = targetPath }
+
+    let private parseRequirements (root: JsonElement) =
+        match tryProperty "requirements" root with
+        | None -> Ok []
+        | Some value when value.ValueKind = JsonValueKind.Array ->
+            let errors = ResizeArray<string>()
+            let sources = ResizeArray<RequirementSource>()
+
+            for item in value.EnumerateArray() do
+                match parseRequirementSource item with
+                | Ok parsed -> sources.Add parsed
+                | Error itemErrors -> itemErrors |> List.iter errors.Add
+
+            let duplicates =
+                sources
+                |> Seq.countBy _.Id
+                |> Seq.choose (fun (id, count) -> if count > 1 then Some id else None)
+
+            for duplicate in duplicates do
+                errors.Add $"Requirement source '{duplicate}' is declared more than once."
+
+            let duplicateTargets =
+                sources
+                |> Seq.countBy (fun source -> source.TargetPath)
+                |> Seq.choose (fun (targetPath, count) -> if count > 1 then Some targetPath else None)
+
+            for duplicateTarget in duplicateTargets do
+                errors.Add $"Requirement targetPath '{duplicateTarget}' is declared more than once."
+
+            if errors.Count > 0 then Error(List.ofSeq errors) else Ok(List.ofSeq sources)
+        | Some _ -> Error [ "'requirements' must be an array." ]
+
     let private parseExecution (root: JsonElement) =
         match tryProperty "execution" root with
         | None -> Ok None
@@ -117,6 +207,13 @@ module Manifest =
                         errors.Add error
                         None
 
+                let requirements =
+                    match parseRequirements root with
+                    | Ok value -> value
+                    | Error requirementErrors ->
+                        requirementErrors |> List.iter errors.Add
+                        []
+
                 let execution =
                     match parseExecution root with
                     | Ok value -> value
@@ -132,6 +229,7 @@ module Manifest =
                           Name = name
                           Components = components
                           Scaffold = scaffold
+                          Requirements = requirements
                           Execution = execution }
             with
             | :? JsonException as ex -> Error [ $"Manifest is not valid JSON: {ex.Message}" ]
