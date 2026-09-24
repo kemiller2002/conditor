@@ -56,7 +56,9 @@ module Scaffolding =
             values
             |> List.mapi (fun index (package, version) ->
                 let comma = if index = values.Length - 1 then String.Empty else ","
-                $"    {jsonString package}: {jsonString version}{comma}")
+                let encodedPackage = jsonString package
+                let encodedVersion = jsonString version
+                $"    {encodedPackage}: {encodedVersion}{comma}")
             |> fun lines -> String.concat "\n" lines + "\n  }"
 
     let private packageJson projectName manifest =
