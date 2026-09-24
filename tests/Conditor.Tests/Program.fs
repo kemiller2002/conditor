@@ -58,7 +58,7 @@ withManifest
                 let expectedSource =
                     Some "github:kemiller2002/communication-engineering#4590d2fe6f7e80b339117d3fbee5803f2dd39122"
 
-                check "fixed source resolves to commit" (plan.Components[0].SourceReference = expectedSource)
+                check "fixed source resolves to commit" (plan.Components[0].SourceReference = expectedSource))
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"communication-engineering","version":"9.9.9"}]}"""
