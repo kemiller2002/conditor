@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "name": "evidence-triage-rehearsal",
+    "product": "Incident Evidence Triage Board"
+  },
+  "goal": "Prove a fresh agent can build a small governed application from an empty repository without architecture coaching.",
+  "requirements": [
+    "Capture an original incident statement without overwriting it.",
+    "Support at least three candidate explanations.",
+    "Capture evidence with provenance.",
+    "Represent one blocking unknown.",
+    "Expose a legal transition that remains unavailable while the blocking unknown exists.",
+    "Persist through a provider abstraction rather than provider-specific domain types.",
+    "Provide one responsive mobile workspace.",
+    "Generate one report.",
+    "Use AI only through structured proposals.",
+    "Produce tests and repository evidence for completion."
+  ],
+  "architecture": {
+    "language": "F#",
+    "domainRule": "UI, persistence, and AI depend inward on Domain; Domain depends on none of them.",
+    "stateRule": "Consequential changes use explicit commands and domain decisions.",
+    "aiRule": "AI proposes; deterministic domain code owns authority.",
+    "persistenceRule": "Provider metadata must not enter generic domain identity."
+  },
+  "ui": {
+    "primaryQuestion": "What happened, which explanation currently fits, and what evidence should we collect next?",
+    "requiredRegions": [
+      "incident statement",
+      "candidate explanations",
+      "evidence",
+      "blocking unknown",
+      "legal actions",
+      "persistence state"
+    ]
+  },
+  "completion": [
+    "clean build",
+    "domain tests",
+    "blocked transition test",
+    "responsive workspace evidence",
+    "provider boundary test",
+    "AI proposal boundary test",
+    "report generation evidence"
+  ],
+  "stopTheLine": [
+    "UI owns transition legality",
+    "AI writes authoritative state directly",
+    "provider-specific types enter Domain",
+    "blocking unknown is hidden",
+    "original source statement is overwritten"
+  ]
+}
