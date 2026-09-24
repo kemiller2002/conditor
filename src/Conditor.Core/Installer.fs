@@ -45,11 +45,11 @@ module Installer =
 
         if full.StartsWith(rootPrefix, comparison) then Some full else None
 
-    let private ensureParent fullPath =
-        match Path.GetDirectoryName fullPath |> Option.ofObj with
-        | Some parent when not (String.IsNullOrWhiteSpace parent) ->
-            Directory.CreateDirectory parent |> ignore
-        | _ -> ()
+    let private ensureParent (fullPath: string) =
+        match Path.GetDirectoryName(fullPath) with
+        | null -> ()
+        | parent when String.IsNullOrWhiteSpace parent -> ()
+        | parent -> Directory.CreateDirectory parent |> ignore
 
     let private ensureFile target relativePath content =
         match safePath target relativePath with
