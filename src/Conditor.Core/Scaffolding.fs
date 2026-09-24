@@ -100,6 +100,21 @@ module Scaffolding =
 
         $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
 
+
+    let private agentEntryFile (manifest: ProjectManifest) =
+        manifest.Execution
+        |> Option.bind (fun execution ->
+            execution.ContractPath
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.map (fun contractPath ->
+                let mission =
+                    execution.Mission
+                    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                    |> Option.defaultValue "Execute the project contract and prove completion through repository evidence."
+
+                "AGENTS.md",
+                $"# Agent Entry\n\nThis repository was initialized by Conditor.\n\n## Canonical execution contract\n\nRead and obey `{contractPath}` before implementation.\n\n## Mission\n\n{mission}\n\n## Rules\n\n- Treat the contract and its referenced normative documents as authoritative.\n- Do not invent architecture decisions that the contract classifies as locked, experimental, or deferred.\n- Use installed lifecycle/component tooling rather than copying framework implementations.\n- Completion requires deterministic verification and repository evidence, not an agent completion statement.\n" ))
+
     let private desiredFiles (manifest: ProjectManifest) (scaffold: ScaffoldRequest) =
         let projectName =
             scaffold.Name
@@ -123,6 +138,10 @@ module Scaffolding =
                   "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ES2022\",\n    \"moduleResolution\": \"Bundler\",\n    \"strict\": true,\n    \"noEmit\": true,\n    \"lib\": [\"ES2022\", \"DOM\"]\n  },\n  \"include\": [\"**/*.ts\"]\n}\n"
                   "src/kernel/bootstrap.ts",
                   "export const scaffoldReady = true as const;\n" ]
+                |> fun files ->
+                    match agentEntryFile manifest with
+                    | Some agentFile -> agentFile :: files
+                    | None -> files
         | unknown ->
             Error [ $"Unsupported scaffold kind '{unknown}'." ]
 
