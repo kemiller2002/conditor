@@ -6,14 +6,12 @@ module Planner =
     let private npxExecutable () =
         if OperatingSystem.IsWindows() then "npx.cmd" else "npx"
 
-    let private npmExecutable () =
-        if OperatingSystem.IsWindows() then "npm.cmd" else "npm"
-
-    let private packageSpec version (definition: ComponentDefinition) =
+    let private sourceReference version (definition: ComponentDefinition) =
         match definition.LifecycleSource with
         | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
-        | Some(FixedPackageSpec specification) when version = definition.DefaultVersion -> Ok specification
-        | Some(FixedPackageSpec _) ->
+        | Some(GitHubSource source) when version = definition.DefaultVersion ->
+            Ok(SourceCache.sourceReference source)
+        | Some(GitHubSource _) ->
             Error
                 $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
         | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
@@ -22,9 +20,9 @@ module Planner =
         arguments
         |> List.map (fun argument -> if argument = "{target}" then target else argument)
 
-    let private lifecycleInvocation
+    let private lifecycleExecution
         target
-        packageReference
+        version
         (definition: ComponentDefinition)
         arguments
         =
@@ -36,19 +34,15 @@ module Planner =
 
         match definition.LifecycleSource with
         | Some RegistryPackage ->
-            npxExecutable (),
-            [ "--yes"
-              $"--package={packageReference}"
-              command ]
-            @ resolvedArguments
-        | Some(FixedPackageSpec _) ->
-            npmExecutable (),
-            [ "exec"
-              "--yes"
-              $"--package={packageReference}"
-              command
-              "--" ]
-            @ resolvedArguments
+            ExternalProcess(
+                npxExecutable (),
+                [ "--yes"
+                  $"--package={definition.Package}@{version}"
+                  command ]
+                @ resolvedArguments
+            )
+        | Some(GitHubSource source) ->
+            GitHubSourceProcess(source, resolvedArguments)
         | None ->
             invalidOp $"Lifecycle component '{definition.Id}' has no distribution source."
 
@@ -69,21 +63,16 @@ module Planner =
         let addAction
             (request: ComponentRequest)
             (version: string)
-            (packageReference: string)
             (definition: ComponentDefinition)
             (phase: string)
             (arguments: string list)
             =
-            let executable, invocationArguments =
-                lifecycleInvocation target packageReference definition arguments
-
             actions.Add
                 { Sequence = sequence
                   ComponentId = request.Id
                   ComponentVersion = version
                   Kind = actionKind operation phase
-                  Executable = executable
-                  Arguments = invocationArguments }
+                  Execution = lifecycleExecution target version definition arguments }
 
             sequence <- sequence + 1
 
@@ -97,26 +86,26 @@ module Planner =
 
                 match definition.Distribution with
                 | LifecycleNpm ->
-                    match packageSpec version definition with
+                    match sourceReference version definition with
                     | Error error ->
                         if request.Required then
                             errors.Add error
-                    | Ok packageReference ->
+                    | Ok resolvedSource ->
                         resolved.Add
                             { Id = definition.Id
                               Version = version
                               Distribution = definition.Distribution
                               Package = definition.Package
-                              SourceReference = Some packageReference }
+                              SourceReference = Some resolvedSource }
 
                         match operation with
                         | Init ->
-                            addAction request version packageReference definition "install" definition.InitArguments
-                            addAction request version packageReference definition "verify" definition.VerifyArguments
+                            addAction request version definition "install" definition.InitArguments
+                            addAction request version definition "verify" definition.VerifyArguments
                         | Verify ->
-                            addAction request version packageReference definition "verify" definition.VerifyArguments
+                            addAction request version definition "verify" definition.VerifyArguments
                         | Doctor ->
-                            addAction request version packageReference definition "doctor" definition.DoctorArguments
+                            addAction request version definition "doctor" definition.DoctorArguments
                 | NpmPackage
                 | NugetPackage ->
                     resolved.Add
