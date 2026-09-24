@@ -18,7 +18,9 @@ module LockFile =
         let path = Path.Combine(directory, "lock.json")
 
         use stream = File.Create path
-        use writer = new Utf8JsonWriter(stream, JsonWriterOptions(Indented = true))
+        let mutable options = JsonWriterOptions()
+        options.Indented <- true
+        use writer = new Utf8JsonWriter(stream, options)
         writer.WriteStartObject()
         writer.WriteNumber("schemaVersion", 1)
         writer.WriteString("project", plan.ProjectName)
