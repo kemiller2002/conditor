@@ -123,13 +123,13 @@ module Scaffolding =
     let private foundationManifest (projectName: string) (manifest: ProjectManifest) =
         let capabilities = JsonObject()
 
-        let addCapability id configure =
+        let addCapability (id: string) (configure: JsonObject -> unit) =
             let node = JsonObject()
             let request = requestedComponent id manifest
             node["required"] <- JsonValue.Create(request |> Option.exists _.Required)
 
             resolvedVersion id manifest
-            |> Option.iter (fun version -> node["version"] <- JsonValue.Create version)
+            |> Option.iter (fun (version: string) -> node["version"] <- JsonValue.Create version)
 
             configure node
             capabilities[id] <- node
