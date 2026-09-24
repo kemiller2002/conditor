@@ -113,10 +113,10 @@ module Planner =
                         |> Option.filter (String.IsNullOrWhiteSpace >> not)
                         |> Option.defaultValue "Execute the canonical Conditor contract and prove completion through repository evidence."
 
-                    { Id = "COND-MISSION-001"
-                      Title = $"Build {manifest.Name} from the Conditor execution contract"
-                      Description = description
-                      ContractPath = contractPath }))
+                    ({ Id = "COND-MISSION-001"
+                       Title = $"Build {manifest.Name} from the Conditor execution contract"
+                       Description = description
+                       ContractPath = contractPath }: PraxisMission)))
 
         match manifest.Execution |> Option.bind (fun execution -> execution.ContractPath) with
         | Some contractPath ->
