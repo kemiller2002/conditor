@@ -49,11 +49,13 @@ module SourceCache =
             match source.Entrypoint with
             | NodeScript path -> path
 
+        let entrypointParts =
+            entrypoint.Replace('\\', '/').Split('/')
+
         let entrypointOk =
             nonEmpty entrypoint
             && not (Path.IsPathRooted entrypoint)
-            && not (entrypoint.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    |> Array.exists ((=) ".."))
+            && not (entrypointParts |> Array.exists ((=) ".."))
 
         [ if not repositoryOk then
               yield $"Invalid GitHub repository '{source.Repository}'."
