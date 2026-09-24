@@ -5,9 +5,17 @@ type Distribution =
     | NpmPackage
     | NugetPackage
 
+type SourceEntrypoint =
+    | NodeScript of string
+
+type GitHubSource =
+    { Repository: string
+      Commit: string
+      Entrypoint: SourceEntrypoint }
+
 type LifecycleSource =
     | RegistryPackage
-    | FixedPackageSpec of string
+    | GitHubSource of GitHubSource
 
 type ComponentRequest =
     { Id: string
@@ -47,13 +55,16 @@ type PlanActionKind =
     | VerifyLifecycle
     | DiagnoseLifecycle
 
+type ActionExecution =
+    | ExternalProcess of executable: string * arguments: string list
+    | GitHubSourceProcess of source: GitHubSource * arguments: string list
+
 type PlanAction =
     { Sequence: int
       ComponentId: string
       ComponentVersion: string
       Kind: PlanActionKind
-      Executable: string
-      Arguments: string list }
+      Execution: ActionExecution }
 
 type ResolvedComponent =
     { Id: string
