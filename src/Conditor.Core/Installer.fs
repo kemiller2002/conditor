@@ -53,10 +53,10 @@ module Installer =
                 else
                     Error $"Scaffold file '{relativePath}' changed after planning; Conditor will not overwrite it."
             else
-                let parent = Path.GetDirectoryName fullPath
-
-                if not (String.IsNullOrWhiteSpace parent) then
+                match Path.GetDirectoryName fullPath |> Option.ofObj with
+                | Some parent when not (String.IsNullOrWhiteSpace parent) ->
                     Directory.CreateDirectory parent |> ignore
+                | _ -> ()
 
                 let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
 
