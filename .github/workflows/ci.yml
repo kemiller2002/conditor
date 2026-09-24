@@ -20,7 +20,9 @@ jobs:
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
       - run: dotnet run --project tests/Conditor.Tests --configuration Release --no-build
       - name: CLI plan smoke test
-        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target . --manifest examples/indy-init.conditor.json
+        run: |
+          mkdir -p "$RUNNER_TEMP/conditor-plan"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target "$RUNNER_TEMP/conditor-plan" --manifest examples/indy-init.conditor.json
 
   empty-repository-smoke:
     if: github.event_name == 'push'
@@ -72,5 +74,6 @@ jobs:
           --output "$RUNNER_TEMP/conditor-native"
       - name: Run native Conditor
         run: |
+          mkdir -p "$RUNNER_TEMP/conditor-native-target"
           chmod +x "$RUNNER_TEMP/conditor-native/conditor"
-          "$RUNNER_TEMP/conditor-native/conditor" plan --target . --manifest examples/indy-init.conditor.json
+          "$RUNNER_TEMP/conditor-native/conditor" plan --target "$RUNNER_TEMP/conditor-native-target" --manifest examples/indy-init.conditor.json
