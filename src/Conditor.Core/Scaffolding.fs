@@ -120,7 +120,7 @@ module Scaffolding =
             Registry.tryFind id
             |> Option.map (fun definition -> request.Version |> Option.defaultValue definition.DefaultVersion))
 
-    let private foundationManifest projectName (manifest: ProjectManifest) =
+    let private foundationManifest (projectName: string) (manifest: ProjectManifest) =
         let capabilities = JsonObject()
 
         let addCapability id configure =
@@ -152,7 +152,7 @@ module Scaffolding =
         root["capabilities"] <- capabilities
         root.ToJsonString(JsonSerializerOptions(WriteIndented = true, IndentSize = 2)) + "\n"
 
-    let private aegisBoundaryManifest projectName =
+    let private aegisBoundaryManifest (projectName: string) =
         let root = JsonObject()
         root["schema"] <- JsonValue.Create "aegis/boundaries/v1"
         root["application"] <- JsonValue.Create projectName
