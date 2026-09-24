@@ -296,3 +296,36 @@ let exitCode =
 
 [<EntryPoint>]
 let main _ = exitCode
+
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"contract-demo","components":[],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error errors ->
+                    check $"execution contract manifest parses: {String.concat "; " errors}" false
+                | Ok manifest ->
+                    check
+                        "execution contract path parsed"
+                        (manifest.Execution |> Option.bind _.ContractPath = Some ".echelon/kickoff/project.json")
+
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        check $"execution contract scaffold plans: {String.concat "; " errors}" false
+                    | Ok plan ->
+                        let agentFile =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("AGENTS.md", content) -> Some content
+                                | _ -> None)
+
+                        check "agent entry file generated" agentFile.IsSome
+                        check
+                            "agent entry points to canonical contract"
+                            (agentFile
+                             |> Option.exists (fun content ->
+                                 content.Contains(".echelon/kickoff/project.json")
+                                 && content.Contains("Build the governed app.")))))
