@@ -1,0 +1,95 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - run: dotnet run --project tests/Conditor.Tests --configuration Release --no-build
+
+  publish:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        rid:
+          - linux-x64
+          - linux-arm64
+          - osx-x64
+          - osx-arm64
+          - win-x64
+          - win-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Validate tag matches project version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          grep -F "<Version>$VERSION</Version>" Directory.Build.props
+      - name: Publish
+        shell: bash
+        run: |
+          RID="${{ matrix.rid }}"
+          dotnet publish src/Conditor.Cli/Conditor.Cli.fsproj \
+            --configuration Release \
+            --runtime "$RID" \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:DebugType=None \
+            -p:PublishTrimmed=false \
+            --output "$RUNNER_TEMP/publish"
+
+          mkdir -p "$RUNNER_TEMP/asset"
+          if [[ "$RID" == win-* ]]; then
+            cp "$RUNNER_TEMP/publish/conditor.exe" "$RUNNER_TEMP/asset/conditor-$RID.exe"
+          else
+            cp "$RUNNER_TEMP/publish/conditor" "$RUNNER_TEMP/asset/conditor-$RID"
+            chmod +x "$RUNNER_TEMP/asset/conditor-$RID"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conditor-${{ matrix.rid }}
+          path: ${{ runner.temp }}/asset/*
+          if-no-files-found: error
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: conditor-*
+          path: assets
+          merge-multiple: true
+      - name: Create checksums
+        run: |
+          (cd assets && sha256sum *) > checksums.txt
+          cat checksums.txt
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            assets/* \
+            checksums.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Conditor $GITHUB_REF_NAME" \
+            --generate-notes
