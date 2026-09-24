@@ -52,6 +52,12 @@ jobs:
           grep -F "@echelon-foundry/print-components" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
           grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
           grep -F "EchelonFoundry.Aegis.Core" "$RUNNER_TEMP/conditor-empty/src/engine/App.Engine.fsproj"
+          test -f "$RUNNER_TEMP/conditor-empty/requirements/contract.md"
+          test -f "$RUNNER_TEMP/conditor-empty/AGENTS.md"
+          test -f "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
+          grep -F "requirements/contract.md" "$RUNNER_TEMP/conditor-empty/AGENTS.md"
+          grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
+          grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
 
   native-cli-smoke:
     needs: build-test
