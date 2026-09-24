@@ -305,7 +305,8 @@ withTarget
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
-                    check $"execution contract manifest parses: {String.concat "; " errors}" false
+                    let details = String.concat "; " errors
+                    check $"execution contract manifest parses: {details}" false
                 | Ok manifest ->
                     check
                         "execution contract path parsed"
@@ -313,7 +314,8 @@ withTarget
 
                     match Planner.create target Init manifest with
                     | Error errors ->
-                        check $"execution contract scaffold plans: {String.concat "; " errors}" false
+                        let details = String.concat "; " errors
+                        check $"execution contract scaffold plans: {details}" false
                     | Ok plan ->
                         let agentFile =
                             plan.Actions
