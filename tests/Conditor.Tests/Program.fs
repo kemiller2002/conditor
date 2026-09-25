@@ -846,6 +846,47 @@ withManifest
                      && plan.Actions[0].Kind = UpgradeLifecycle
                      && plan.Actions[1].Kind = VerifyLifecycle))
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"source-lock-demo","components":[{"id":"praxis","version":"3.1.4"}],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                let targetManifest = Path.Combine(target, "conditor.json")
+                File.Copy(manifestPath, targetManifest)
+
+                match Manifest.load targetManifest with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"source lock manifest parses: {details}" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"source lock plan succeeds: {details}" false
+                    | Ok plan ->
+                        LockFile.write target targetManifest plan |> ignore
+
+                        check
+                            "locked component identity verifies when unchanged"
+                            (LockFile.verifyResolvedComponents target plan.Components |> Result.isOk)
+
+                        let drifted =
+                            plan.Components
+                            |> List.map (fun resolved ->
+                                if resolved.Id = "praxis" then
+                                    { resolved with SourceReference = Some "different-source" }
+                                else
+                                    resolved)
+
+                        match LockFile.verifyResolvedComponents target drifted with
+                        | Error errors ->
+                            check
+                                "locked component identity rejects source drift"
+                                (errors |> List.exists (fun error -> error.Contains("silently substitute")))
+                        | Ok() ->
+                            check "locked component identity rejects source drift" false))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
