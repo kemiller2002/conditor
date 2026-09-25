@@ -445,18 +445,6 @@ withTarget
                         | _ ->
                             check "Praxis mission execution modeled" false))
 
-let exitCode =
-    if failures = 0 then
-        Console.WriteLine "All Conditor tests passed."
-        0
-    else
-        Console.Error.WriteLine $"{failures} Conditor test(s) failed."
-        1
-
-[<EntryPoint>]
-let main _ = exitCode
-
-
 withTarget
     (fun target ->
         let agentsPath = Path.Combine(target, "AGENTS.md")
@@ -517,3 +505,14 @@ withTarget
                      && second.Contains("Keep this user-owned guidance.")
                      && second.Contains("Read kickoff/project-v2.json first.")
                      && not (second.Contains("Read kickoff/project.json first."))))
+
+let exitCode =
+    if failures = 0 then
+        Console.WriteLine "All Conditor tests passed."
+        0
+    else
+        Console.Error.WriteLine $"{failures} Conditor test(s) failed."
+        1
+
+[<EntryPoint>]
+let main _ = exitCode
