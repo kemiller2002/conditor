@@ -390,7 +390,7 @@ withTarget
                             plan.Actions
                             |> List.tryPick (fun action ->
                                 match action.Execution with
-                                | EnsureFile("AGENTS.md", content) -> Some content
+                                | EnsureManagedRegion("AGENTS.md", "agent-entry", content) -> Some content
                                 | _ -> None)
 
                         check "agent entry file generated" agentFile.IsSome
@@ -455,3 +455,63 @@ let exitCode =
 
 [<EntryPoint>]
 let main _ = exitCode
+
+
+withTarget
+    (fun target ->
+        let agentsPath = Path.Combine(target, "AGENTS.md")
+        File.WriteAllText(agentsPath, "# Repository Notes\n\nKeep this user-owned guidance.\n")
+
+        let plan =
+            { ProjectName = "managed-region-test"
+              Operation = Init
+              Components = []
+              Actions =
+                [ { Sequence = 1
+                    ComponentId = "scaffold:fsharp-limen-web"
+                    ComponentVersion = "1"
+                    Kind = ScaffoldFile
+                    Execution =
+                        EnsureManagedRegion(
+                            "AGENTS.md",
+                            "agent-entry",
+                            "# Agent Entry\n\nRead kickoff/project.json first.\n"
+                        ) } ] }
+
+        match Installer.execute target "test-manifest.json" plan with
+        | Error errors ->
+            check $"managed AGENTS region executes: {String.concat "; " errors}" false
+        | Ok _ ->
+            let first = File.ReadAllText agentsPath
+
+            check
+                "managed AGENTS region preserves user content"
+                (first.Contains("# Repository Notes")
+                 && first.Contains("Keep this user-owned guidance.")
+                 && first.Contains("<!-- conditor:agent-entry:start -->")
+                 && first.Contains("Read kickoff/project.json first.")
+                 && first.Contains("<!-- conditor:agent-entry:end -->"))
+
+            let updatedPlan =
+                { plan with
+                    Actions =
+                        [ { plan.Actions.Head with
+                              Execution =
+                                EnsureManagedRegion(
+                                    "AGENTS.md",
+                                    "agent-entry",
+                                    "# Agent Entry\n\nRead kickoff/project-v2.json first.\n"
+                                ) } ] }
+
+            match Installer.execute target "test-manifest.json" updatedPlan with
+            | Error errors ->
+                check $"managed AGENTS region updates: {String.concat "; " errors}" false
+            | Ok _ ->
+                let second = File.ReadAllText agentsPath
+
+                check
+                    "managed AGENTS region updates only owned content"
+                    (second.Contains("# Repository Notes")
+                     && second.Contains("Keep this user-owned guidance.")
+                     && second.Contains("Read kickoff/project-v2.json first.")
+                     && not (second.Contains("Read kickoff/project.json first."))))
