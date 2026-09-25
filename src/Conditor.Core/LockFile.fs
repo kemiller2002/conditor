@@ -53,9 +53,14 @@ module LockFile =
         options.Indented <- true
         use writer = new Utf8JsonWriter(stream, options)
         writer.WriteStartObject()
-        writer.WriteNumber("schemaVersion", 1)
+        writer.WriteNumber("schemaVersion", 2)
         writer.WriteString("project", plan.ProjectName)
         writer.WriteString("manifestSha256", manifestHash manifestPath)
+        writer.WritePropertyName("manifest")
+
+        use manifestDocument = JsonDocument.Parse(File.ReadAllText manifestPath)
+        manifestDocument.RootElement.WriteTo writer
+
         writer.WriteStartArray("components")
 
         for resolved in plan.Components do
