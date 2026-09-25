@@ -66,6 +66,8 @@ conditor plan   --target . --manifest ./conditor.json
 conditor init   --target . --manifest ./conditor.json
 conditor verify --target . --manifest ./conditor.json
 conditor doctor --target . --manifest ./conditor.json
+conditor status --target . --manifest ./conditor.json
+conditor repair --target . --manifest ./conditor.json
 conditor start  --check --target . --manifest ./conditor.json
 ```
 
@@ -88,6 +90,18 @@ Git fetches can use an existing Git credential helper. For non-interactive envir
 The token is passed to the child Git process only as an in-memory HTTP authorization header and is not placed in the Git command line.
 
 For the private Indy Init governing repository, authenticate Git or set a token with read access before the first `init` or `start --preset indy-init`.
+
+
+## Status and repair
+
+`conditor status` is read-only. It reports:
+
+- whether `conditor.json` still matches the Conditor lock;
+- whether every pinned requirement artifact still matches its immutable source;
+- whether declared lifecycle components verify;
+- and, when execution is enabled, whether the Praxis mission and canonical contract are execution-ready.
+
+`conditor repair` is intentionally narrower than upgrade. It reconciles only the exact manifest already recorded by the lock. Missing tool-owned/generated state may be restored through the component and scaffold contracts, but Conditor refuses repair when `conditor.json` has changed since the lock was written. A declaration/version change is governance work and must not be smuggled through a repair command.
 
 ## Canonical execution contract
 
