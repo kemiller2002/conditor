@@ -534,7 +534,7 @@ withTarget
                             plan.Actions
                             |> List.tryPick (fun action ->
                                 match action.Execution with
-                                | EnsureFile("context/CURRENT-STATE.md", fileContent) -> Some fileContent
+                                | EnsureManagedRegion("context/CURRENT-STATE.md", "ordo-baseline", fileContent) -> Some fileContent
                                 | _ -> None)
 
                         check "Ordo semantic map is initialized" semanticMap.IsSome
