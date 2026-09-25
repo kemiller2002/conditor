@@ -142,13 +142,33 @@ module Manifest =
         match tryProperty "execution" root with
         | None -> Ok None
         | Some value when value.ValueKind = JsonValueKind.Object ->
-            Ok(
-                Some
-                    { Enabled = optionalBool false "enabled" value
-                      Launcher = optionalString "launcher" value
-                      Mission = optionalString "mission" value
-                      ContractPath = optionalString "contractPath" value }
-            )
+            let enabled = optionalBool false "enabled" value
+            let launcher = optionalString "launcher" value
+            let mission = optionalString "mission" value
+            let contractPath = optionalString "contractPath" value
+            let errors = ResizeArray<string>()
+
+            match launcher with
+            | Some provider when provider <> "codex" && provider <> "claude" ->
+                errors.Add $"Unsupported execution launcher '{provider}'. Supported launchers: codex, claude."
+            | _ -> ()
+
+            if enabled && launcher.IsNone then
+                errors.Add "Enabled execution requires 'execution.launcher'."
+
+            if enabled && contractPath.IsNone then
+                errors.Add "Enabled execution requires 'execution.contractPath'."
+
+            if errors.Count > 0 then
+                Error(String.Join(" ", errors))
+            else
+                Ok(
+                    Some
+                        { Enabled = enabled
+                          Launcher = launcher
+                          Mission = mission
+                          ContractPath = contractPath }
+                )
         | Some _ -> Error "'execution' must be an object."
 
     let load path : Result<ProjectManifest, string list> =
