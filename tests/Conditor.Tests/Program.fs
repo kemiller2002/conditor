@@ -887,6 +887,29 @@ withTarget
                         | Ok() ->
                             check "locked component identity rejects source drift" false))
 
+
+withManifest
+    """{"schemaVersion":1,"name":"bad-launcher","components":[],"execution":{"enabled":true,"launcher":"mystery","contractPath":"requirements/contract.md"}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error errors ->
+            check
+                "unsupported execution launcher rejected during manifest load"
+                (errors |> List.exists (fun error -> error.Contains("Unsupported execution launcher")))
+        | Ok _ ->
+            check "unsupported execution launcher rejected during manifest load" false)
+
+withManifest
+    """{"schemaVersion":1,"name":"missing-contract","components":[],"execution":{"enabled":true,"launcher":"codex"}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error errors ->
+            check
+                "enabled execution requires canonical contract during manifest load"
+                (errors |> List.exists (fun error -> error.Contains("execution.contractPath")))
+        | Ok _ ->
+            check "enabled execution requires canonical contract during manifest load" false)
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
