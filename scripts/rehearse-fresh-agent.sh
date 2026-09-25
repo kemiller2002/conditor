@@ -55,4 +55,6 @@ fi
 
 node "$TARGET/ros" validate
 
+bash "$ROOT/scripts/score-fresh-agent-rehearsal.sh" "$TARGET"
+
 echo "Fresh-agent rehearsal passed: $TARGET"
