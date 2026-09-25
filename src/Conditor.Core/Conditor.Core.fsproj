@@ -6,6 +6,7 @@
     <Compile Include="Domain.fs" />
     <Compile Include="Presets.fs" />
     <Compile Include="Manifest.fs" />
+    <Compile Include="ComponentDescriptors.fs" />
     <Compile Include="Registry.fs" />
     <Compile Include="Compatibility.fs" />
     <Compile Include="SourceCache.fs" />
@@ -28,5 +29,14 @@
     <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />
     <EmbeddedResource Include="../../examples/clean-room.conditor.json" LogicalName="Conditor.Presets.clean-room.json" />
     <EmbeddedResource Include="../../examples/rehearsal-evidence-triage.conditor.json" LogicalName="Conditor.Presets.evidence-triage-rehearsal.json" />
+    <EmbeddedResource Include="../../components/praxis.component.json" LogicalName="Conditor.Components.praxis.component.json" />
+    <EmbeddedResource Include="../../components/ordo.component.json" LogicalName="Conditor.Components.ordo.component.json" />
+    <EmbeddedResource Include="../../components/visual-engineering.component.json" LogicalName="Conditor.Components.visual-engineering.component.json" />
+    <EmbeddedResource Include="../../components/communication-engineering.component.json" LogicalName="Conditor.Components.communication-engineering.component.json" />
+    <EmbeddedResource Include="../../components/limen.component.json" LogicalName="Conditor.Components.limen.component.json" />
+    <EmbeddedResource Include="../../components/forma.component.json" LogicalName="Conditor.Components.forma.component.json" />
+    <EmbeddedResource Include="../../components/folio.component.json" LogicalName="Conditor.Components.folio.component.json" />
+    <EmbeddedResource Include="../../components/aegis.component.json" LogicalName="Conditor.Components.aegis.component.json" />
+    <EmbeddedResource Include="../../components/tutela.component.json" LogicalName="Conditor.Components.tutela.component.json" />
   </ItemGroup>
 </Project>
