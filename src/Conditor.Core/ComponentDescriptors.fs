@@ -23,7 +23,7 @@ module ComponentDescriptors =
 
     let private assembly = typeof<ComponentDefinition>.Assembly
 
-    let private tryProperty name (element: JsonElement) =
+    let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
         if element.TryGetProperty(name, &value) then Some value else None
 
@@ -115,7 +115,7 @@ module ComponentDescriptors =
             use reader = new StreamReader(value)
             Ok(reader.ReadToEnd())
 
-    let private parse resourceName text =
+    let private parse (resourceName: string) (text: string) =
         try
             use document = JsonDocument.Parse(text)
             let root = document.RootElement
