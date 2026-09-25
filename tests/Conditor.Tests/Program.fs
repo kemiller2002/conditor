@@ -323,7 +323,8 @@ withManifest
                 check "tutela init plus verify planned" (plan.Actions.Length = 2)
                 check
                     "tutela package source is immutable"
-                    (plan.Components[0].SourceReference = Some "@echelon-foundry/tutela@0.1.0"))
+                    (plan.Components[0].SourceReference =
+                        Some "github:kemiller2002/tutela#5e9dcc56948d30f616659c8c2a4f0b7826aded8d|node:bin/tutela.mjs"))
 
 withManifest
     """{"schemaVersion":1,"name":"requirements-demo","components":[],"requirements":[{"id":"spec","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/SPEC.md"}]}"""
