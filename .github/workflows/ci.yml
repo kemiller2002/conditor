@@ -172,7 +172,8 @@ jobs:
       - name: Resume active mission through Claude override
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- resume --launcher claude --target "$RUNNER_TEMP/conditor-empty"
       - name: Verify resume preserves Praxis active state
-        run: grep -F '"semanticState": "active"' "$RUNNER_TEMP/conditor-empty/.ros/context/current.json"
+        run: |
+          grep -F '"semanticState": "active"' "$RUNNER_TEMP/conditor-empty/.ros/context/current.json"
 
   native-cli-smoke:
     needs: build-test
