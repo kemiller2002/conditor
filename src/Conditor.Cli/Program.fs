@@ -8,7 +8,7 @@ let private usage () =
     Console.WriteLine "  conditor init   [--target PATH] [--manifest PATH]"
     Console.WriteLine "  conditor verify [--target PATH] [--manifest PATH]"
     Console.WriteLine "  conditor doctor [--target PATH] [--manifest PATH]"
-    Console.WriteLine "  conditor start  [--check] [--target PATH] [--manifest PATH]"
+    Console.WriteLine "  conditor start  [--check] [--launcher codex|claude] [--target PATH] [--manifest PATH]"
 
 let private optionValue name (args: string array) =
     args
@@ -50,30 +50,46 @@ let private run operation shouldExecute target manifestPath =
                     writeErrors errors
                     4
 
-let private runStart checkOnly target manifestPath =
+let private withLauncherOverride launcherOverride (manifest: ProjectManifest) =
+    match launcherOverride with
+    | None -> Ok manifest
+    | Some launcher ->
+        match manifest.Execution with
+        | None -> Error [ "--launcher requires an execution section in the Conditor manifest." ]
+        | Some execution when not execution.Enabled ->
+            Error [ "--launcher cannot enable execution that the Conditor manifest has disabled." ]
+        | Some execution ->
+            Ok { manifest with Execution = Some { execution with Launcher = Some launcher } }
+
+let private runStart checkOnly launcherOverride target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
         writeErrors errors
         2
-    | Ok manifest when checkOnly ->
-        match Execution.check target manifestPath manifest with
+    | Ok loadedManifest ->
+        match withLauncherOverride launcherOverride loadedManifest with
         | Error errors ->
             writeErrors errors
             5
-        | Ok ready ->
-            Console.WriteLine $"Execution ready: launcher={ready.Launcher}; mission={ready.Mission.Id}; state={ready.MissionState}; contract={ready.ContractPath}"
-            0
-    | Ok manifest ->
-        match Execution.start target manifestPath manifest with
-        | Error errors ->
-            writeErrors errors
-            6
-        | Ok result ->
-            if not (String.IsNullOrWhiteSpace result.StandardOutput) then
-                Console.WriteLine(result.StandardOutput.Trim())
+        | Ok manifest when checkOnly ->
+            match Execution.check target manifestPath manifest with
+            | Error errors ->
+                writeErrors errors
+                5
+            | Ok ready ->
+                Console.WriteLine $"Execution ready: launcher={ready.Launcher}; mission={ready.Mission.Id}; state={ready.MissionState}; contract={ready.ContractPath}"
+                0
+        | Ok manifest ->
+            match Execution.start target manifestPath manifest with
+            | Error errors ->
+                writeErrors errors
+                6
+            | Ok result ->
+                if not (String.IsNullOrWhiteSpace result.StandardOutput) then
+                    Console.WriteLine(result.StandardOutput.Trim())
 
-            Console.WriteLine "Launcher exited successfully. Praxis remains authoritative for mission completion."
-            0
+                Console.WriteLine "Launcher exited successfully. Praxis remains authoritative for mission completion."
+                0
 
 [<EntryPoint>]
 let main (args: string array) =
@@ -96,7 +112,12 @@ let main (args: string array) =
         | "init" -> run Init true target manifestPath
         | "verify" -> run Verify true target manifestPath
         | "doctor" -> run Doctor true target manifestPath
-        | "start" -> runStart (hasFlag "--check" args) target manifestPath
+        | "start" ->
+            runStart
+                (hasFlag "--check" args)
+                (optionValue "--launcher" args)
+                target
+                manifestPath
         | _ ->
             usage ()
             1
