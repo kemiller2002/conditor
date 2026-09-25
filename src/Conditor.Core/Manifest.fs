@@ -235,3 +235,13 @@ module Manifest =
             with
             | :? JsonException as ex -> Error [ $"Manifest is not valid JSON: {ex.Message}" ]
             | ex -> Error [ $"Unable to read manifest: {ex.Message}" ]
+
+    let parseText (text: string) : Result<ProjectManifest, string list> =
+        let path = Path.Combine(Path.GetTempPath(), $"conditor-manifest-{Guid.NewGuid():N}.json")
+
+        try
+            File.WriteAllText(path, text)
+            load path
+        finally
+            if File.Exists path then
+                File.Delete path
