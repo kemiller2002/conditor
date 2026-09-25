@@ -1006,6 +1006,69 @@ withTarget
                                  && finding.Severity = Doctor.Error
                                  && finding.Remediation.IsSome))))
 
+
+match ComponentDescriptors.loadAll () with
+| Error errors ->
+    let details = String.concat "; " errors
+    check $"embedded component descriptors load: {details}" false
+| Ok descriptors ->
+    let ids = descriptors |> List.map (fun descriptor -> descriptor.Definition.Id) |> Set.ofList
+    let expected =
+        Set.ofList
+            [ "praxis"
+              "ordo"
+              "visual-engineering"
+              "communication-engineering"
+              "limen"
+              "forma"
+              "folio"
+              "aegis"
+              "tutela" ]
+
+    check "embedded component descriptor count" (descriptors.Length = 9)
+    check "embedded component descriptor ids" (ids = expected)
+    check "registry is projected from component descriptors" (Registry.all.Length = descriptors.Length)
+
+    let compatibilityMatchesDescriptors =
+        descriptors
+        |> List.forall (fun descriptor ->
+            Registry.qualifiedVersions descriptor.Definition.Id = Some descriptor.QualifiedVersions
+            && (Compatibility.supported
+                |> List.tryFind (fun item -> item.Id = descriptor.Definition.Id)
+                |> Option.exists (fun item -> item.Versions = descriptor.QualifiedVersions)))
+
+    check "compatibility versions are descriptor-derived" compatibilityMatchesDescriptors
+
+    let communication =
+        descriptors
+        |> List.tryFind (fun descriptor -> descriptor.Definition.Id = "communication-engineering")
+
+    check
+        "communication descriptor preserves immutable source identity"
+        (communication
+         |> Option.exists (fun descriptor ->
+             match descriptor.Definition.LifecycleSource with
+             | Some(GitHubSource source) ->
+                 source.Repository = "kemiller2002/communication-engineering"
+                 && source.Commit = "4590d2fe6f7e80b339117d3fbee5803f2dd39122"
+                 && source.Entrypoint = NodeScript "bin/communication-engineering.mjs"
+             | _ -> false))
+
+    let tutela =
+        descriptors
+        |> List.tryFind (fun descriptor -> descriptor.Definition.Id = "tutela")
+
+    check
+        "Tutela descriptor preserves immutable source identity"
+        (tutela
+         |> Option.exists (fun descriptor ->
+             match descriptor.Definition.LifecycleSource with
+             | Some(GitHubSource source) ->
+                 source.Repository = "kemiller2002/tutela"
+                 && source.Commit = "1acf421e7d940665c134012f11b082a502e17537"
+                 && source.Entrypoint = NodeScript "bin/tutela.mjs"
+             | _ -> false))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
