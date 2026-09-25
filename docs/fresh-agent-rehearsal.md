@@ -49,3 +49,57 @@ After the provider returns, the rehearsal requires the live Praxis item to be `c
 Public CI uses fake Codex and Claude executables to exercise the launch boundary without credentials or model cost. This script is intentionally separate because it performs a real authenticated model run.
 
 A failed rehearsal leaves the target repository intact for inspection.
+
+
+## Independent scorecard
+
+A provider returning successfully and a Praxis item reaching `complete` are necessary but not sufficient.
+
+After the agent run, `scripts/rehearse-fresh-agent.sh` invokes:
+
+```bash
+bash scripts/score-fresh-agent-rehearsal.sh <target>
+```
+
+The scorer independently requires:
+
+- all seven completion-evidence categories are present and marked `verified`;
+- every referenced evidence path exists inside the target repository;
+- the live Praxis mission is complete;
+- ROS validation succeeds;
+- the .NET solution builds;
+- at least one F# test project exists and passes;
+- generic Domain source does not contain GitHub/Octokit/token-specific concepts.
+
+The scorer writes:
+
+```text
+rehearsal/score.json
+```
+
+Failures are classified to an owning area such as Conditor, ROS, Ordo, architecture, proof, or factory-context so the repair goes back into the reusable factory rather than being patched only in the sacrificial application.
+
+## Completion evidence contract
+
+The initialized rehearsal repository receives:
+
+- `kickoff/evidence-triage.kickoff.json`
+- `kickoff/completion-evidence.schema.json`
+
+The implementing agent must produce:
+
+```text
+rehearsal/completion-evidence.json
+```
+
+with exactly the evidence categories:
+
+1. `clean-build`
+2. `domain-tests`
+3. `blocked-transition`
+4. `responsive-workspace`
+5. `provider-boundary`
+6. `ai-authority-boundary`
+7. `report-generation`
+
+A self-asserted `verified` value is not enough; every verified category must point to repository artifacts that the independent scorer can resolve.
