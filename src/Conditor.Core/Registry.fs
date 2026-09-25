@@ -12,7 +12,8 @@ module Registry =
           DefaultVersion = version
           InitArguments = initArgs
           VerifyArguments = verifyArgs
-          DoctorArguments = [ "doctor" ] }
+          DoctorArguments = [ "doctor" ]
+          UpgradeArguments = [ "upgrade" ] }
 
     let private lifecycle id displayName package source command version initArgs =
         lifecycleWithVerification
@@ -42,7 +43,8 @@ module Registry =
           DefaultVersion = version
           InitArguments = []
           VerifyArguments = []
-          DoctorArguments = [] }
+          DoctorArguments = []
+          UpgradeArguments = [] }
 
     let private nugetPackage id displayName package version =
         { Id = id
