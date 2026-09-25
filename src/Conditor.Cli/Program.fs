@@ -17,6 +17,7 @@ let private usage () =
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
 let private optionValue name (args: string array) =
@@ -129,6 +130,28 @@ let private runEstablishedStart checkOnly launcherOverride target manifestPath =
                     Console.WriteLine(result.StandardOutput.Trim())
 
                 Console.WriteLine "Launcher exited successfully. Praxis remains authoritative for mission completion."
+                0
+
+let private runResume launcherOverride target manifestPath =
+    match Manifest.load manifestPath with
+    | Error errors ->
+        writeErrors errors
+        2
+    | Ok loadedManifest ->
+        match withLauncherOverride launcherOverride loadedManifest with
+        | Error errors ->
+            writeErrors errors
+            5
+        | Ok manifest ->
+            match Execution.resume target manifestPath manifest with
+            | Error errors ->
+                writeErrors errors
+                10
+            | Ok result ->
+                if not (String.IsNullOrWhiteSpace result.StandardOutput) then
+                    Console.WriteLine(result.StandardOutput.Trim())
+
+                Console.WriteLine "Launcher resume exited successfully. Praxis remains authoritative for mission completion."
                 0
 
 let private presetTargetState target (preset: ResolvedPreset) =
@@ -298,6 +321,7 @@ let main (args: string array) =
                 | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
                 | "repair" -> runRepair target selection.ManifestPath
                 | "upgrade" -> runUpgrade target selection.ManifestPath
+                | "resume" -> runResume (optionValue "--launcher" args) target selection.ManifestPath
                 | "start" ->
                     runStart
                         (hasFlag "--check" args)
