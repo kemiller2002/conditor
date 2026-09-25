@@ -54,6 +54,8 @@ module Planner =
         | Init, "verify"
         | Verify, "verify" -> VerifyLifecycle
         | Doctor, "doctor" -> DiagnoseLifecycle
+        | Upgrade, "upgrade" -> UpgradeLifecycle
+        | Upgrade, "verify" -> VerifyLifecycle
         | _ -> invalidArg (nameof phase) $"Unsupported plan phase '{phase}'."
 
     let private validateRelativeTarget target relativePath =
@@ -189,6 +191,9 @@ module Planner =
                             addLifecycleAction request version definition "verify" definition.VerifyArguments
                         | Doctor ->
                             addLifecycleAction request version definition "doctor" definition.DoctorArguments
+                        | Upgrade ->
+                            addLifecycleAction request version definition "upgrade" definition.UpgradeArguments
+                            addLifecycleAction request version definition "verify" definition.VerifyArguments
 
                         if definition.Id = "limen" && manifest.Scaffold.IsSome then
                             limenReadiness <- Some(version, definition)
