@@ -82,6 +82,7 @@ type PlanActionKind =
     | ReadinessVerify
     | RequirementFile
     | MissionWorkItem
+    | ManifestFile
 
 type ActionExecution =
     | ExternalProcess of executable: string * arguments: string list
