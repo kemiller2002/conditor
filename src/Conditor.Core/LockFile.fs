@@ -121,12 +121,12 @@ module LockFile =
 
                     let current =
                         resolved
-                        |> List.map (fun component ->
-                            component.Id,
-                            (Some component.Version,
-                             Some(distributionText component.Distribution),
-                             Some component.Package,
-                             component.SourceReference))
+                        |> List.map (fun resolvedComponent ->
+                            resolvedComponent.Id,
+                            (Some resolvedComponent.Version,
+                             Some(distributionText resolvedComponent.Distribution),
+                             Some resolvedComponent.Package,
+                             resolvedComponent.SourceReference))
                         |> Map.ofList
 
                     let errors = ResizeArray<string>()
