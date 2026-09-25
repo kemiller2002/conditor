@@ -452,7 +452,7 @@ withTarget
 
         let plan =
             { ProjectName = "managed-region-test"
-              Operation = Init
+              Operation = Verify
               Components = []
               Actions =
                 [ { Sequence = 1
