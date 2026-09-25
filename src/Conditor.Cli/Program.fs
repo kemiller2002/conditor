@@ -13,6 +13,7 @@ let private usage () =
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor status [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
 let private optionValue name (args: string array) =
@@ -167,6 +168,30 @@ let private runStart checkOnly launcherOverride target selection =
             else
                 runEstablishedStart false launcherOverride target targetManifest
 
+let private runStatus target manifestPath =
+    match Manifest.load manifestPath with
+    | Error errors ->
+        writeErrors errors
+        2
+    | Ok manifest ->
+        let report = Status.inspect target manifestPath manifest
+        Console.WriteLine $"Project: {report.Project}"
+
+        if report.Components.IsEmpty then
+            Console.WriteLine "Components: none"
+        else
+            Console.WriteLine "Components:"
+
+            for component in report.Components do
+                Console.WriteLine $"  {component}"
+
+        Console.WriteLine "Checks:"
+
+        for check in report.Checks do
+            Console.WriteLine $"  [{Status.stateText check.State}] {check.Name}: {check.Detail}"
+
+        if Status.isHealthy report then 0 else 7
+
 let private printPresets () =
     Console.WriteLine "Built-in Conditor presets:"
 
@@ -201,6 +226,7 @@ let main (args: string array) =
                 | "init" -> run Init true target selection
                 | "verify" -> run Verify true target selection
                 | "doctor" -> run Doctor true target selection
+                | "status" -> runStatus target selection.ManifestPath
                 | "start" ->
                     runStart
                         (hasFlag "--check" args)
