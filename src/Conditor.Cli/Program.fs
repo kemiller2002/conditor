@@ -16,7 +16,7 @@ let private usage () =
     Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor upgrade [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
@@ -194,11 +194,27 @@ let private runStart checkOnly launcherOverride target selection =
             else
                 runEstablishedStart false launcherOverride target targetManifest
 
-let private runUpgrade target manifestPath =
+let private runUpgrade checkOnly target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
         writeErrors errors
         2
+    | Ok manifest when checkOnly ->
+        match Upgrade.preview target manifest with
+        | Error errors ->
+            writeErrors errors
+            9
+        | Ok preview ->
+            if preview.ChangedComponents.IsEmpty then
+                Console.WriteLine "Upgrade preview: no lifecycle version changes are required."
+            else
+                let changed = String.Join(", ", preview.ChangedComponents)
+                Console.WriteLine $"Upgrade preview: {changed}"
+
+            Installer.describe preview.Plan
+            |> List.iter (fun line -> Console.WriteLine $"  {line}")
+
+            0
     | Ok manifest ->
         match Upgrade.apply target manifestPath manifest with
         | Error errors ->
@@ -320,7 +336,7 @@ let main (args: string array) =
                 | "doctor" -> run Doctor true target selection
                 | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
                 | "repair" -> runRepair target selection.ManifestPath
-                | "upgrade" -> runUpgrade target selection.ManifestPath
+                | "upgrade" -> runUpgrade (hasFlag "--check" args) target selection.ManifestPath
                 | "resume" -> runResume (optionValue "--launcher" args) target selection.ManifestPath
                 | "start" ->
                     runStart
