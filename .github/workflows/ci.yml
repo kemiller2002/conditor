@@ -68,6 +68,10 @@ jobs:
           grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
       - name: Inspect Conditor status
         run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-empty"
+      - name: Reconcile established project
+        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- repair --target "$RUNNER_TEMP/conditor-empty"
+      - name: Re-check Conditor status after repair
+        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-empty"
       - name: Install fake Codex adapter
         run: |
           mkdir -p "$RUNNER_TEMP/fake-bin"
