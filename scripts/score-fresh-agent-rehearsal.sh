@@ -16,8 +16,8 @@ record_failure() {
 if [[ ! -f "$EVIDENCE" ]]; then
   record_failure "Missing rehearsal/completion-evidence.json" "factory-context"
 else
-  python3 - "$TARGET" "$EVIDENCE" <<'PY'
-import json, os, pathlib, sys
+  if ! python3 - "$TARGET" "$EVIDENCE" <<'PY'
+import json, pathlib, sys
 
 target = pathlib.Path(sys.argv[1]).resolve()
 evidence_path = pathlib.Path(sys.argv[2])
@@ -70,7 +70,7 @@ if errors:
         print(error)
     sys.exit(20)
 PY
-  if [[ $? -ne 0 ]]; then
+  then
     record_failure "Completion evidence is incomplete, unverified, or references missing paths" "proof"
   fi
 fi
