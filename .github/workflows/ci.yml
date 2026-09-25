@@ -66,6 +66,8 @@ jobs:
           grep -F "requirements/contract.md" "$RUNNER_TEMP/conditor-empty/AGENTS.md"
           grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
           grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
+      - name: Inspect Conditor status
+        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-empty"
       - name: Install fake Codex adapter
         run: |
           mkdir -p "$RUNNER_TEMP/fake-bin"
