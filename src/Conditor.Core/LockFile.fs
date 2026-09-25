@@ -13,6 +13,40 @@ module LockFile =
         |> fun value -> value.ToLowerInvariant()
 
 
+    let readManifestSnapshot target =
+        let path = Path.Combine(target, ".conditor", "lock.json")
+
+        if not (File.Exists path) then
+            Error [ $"Conditor lock is missing: {path}. Run 'conditor init' first." ]
+        else
+            try
+                use document = JsonDocument.Parse(File.ReadAllText path)
+                let root = document.RootElement
+                let mutable schemaElement = Unchecked.defaultof<JsonElement>
+                let mutable manifestElement = Unchecked.defaultof<JsonElement>
+
+                let schemaVersion =
+                    if root.TryGetProperty("schemaVersion", &schemaElement)
+                       && schemaElement.ValueKind = JsonValueKind.Number then
+                        match schemaElement.TryGetInt32() with
+                        | true, value -> value
+                        | _ -> 0
+                    else
+                        0
+
+                if schemaVersion < 2 then
+                    Error
+                        [ $"Conditor lock schema {schemaVersion} does not contain the prior declaration required for safe upgrade."
+                          "Run 'conditor repair' against the unchanged manifest to migrate the lock before upgrading." ]
+                elif not (root.TryGetProperty("manifest", &manifestElement))
+                     || manifestElement.ValueKind <> JsonValueKind.Object then
+                    Error [ "Conditor lock schema v2 is missing its manifest snapshot." ]
+                else
+                    Ok(manifestElement.GetRawText())
+            with
+            | :? JsonException as ex -> Error [ $"Conditor lock is not valid JSON: {ex.Message}" ]
+            | ex -> Error [ $"Unable to read Conditor lock: {ex.Message}" ]
+
     let verifyManifest target manifestPath =
         let path = Path.Combine(target, ".conditor", "lock.json")
 
