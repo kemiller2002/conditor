@@ -133,7 +133,7 @@ The compatibility graph is intentionally conservative. A newer upstream release 
 
 ## Upgrade
 
-Conditor lock schema v2 stores the complete governing declaration that produced the installed state. `conditor upgrade` compares that prior declaration with the current `conditor.json` before any mutation.
+Conditor lock schema v3 stores the complete governing declaration and the SHA-256 identity of every embedded component descriptor that produced the installed state. `conditor upgrade` compares that prior declaration with the current `conditor.json` before any mutation.
 
 The initial upgrade implementation deliberately supports one change class:
 
@@ -148,9 +148,9 @@ It currently rejects, before mutation:
 - execution-policy/mission/contract changes;
 - Forma, Folio, Aegis, Limen, or other application-bound version changes;
 - fixed-source lifecycle version changes without an immutable mapping;
-- repositories that still have a lock schema older than v2.
+- repositories that still have a lock schema older than v3.
 
-For a v1 lock, run `conditor repair` against the unchanged manifest first. Repair proves the current declaration still matches the old hash and rewrites the lock in v2 form.
+For a v1 or v2 lock, run `conditor repair` against the unchanged manifest first. Repair proves the current declaration still matches the recorded manifest identity and deliberately adopts the current descriptor set into a v3 lock.
 
 A successful lifecycle upgrade runs the target component's own `upgrade` contract using the newly declared exact version, verifies the resulting lifecycle environment, verifies pinned requirements, and writes a new lock snapshot.
 
