@@ -110,9 +110,30 @@ The target acceptance test is:
 
 > Given a newly created empty Git repository and the pinned Indy Init preset, Conditor establishes the engineering environment, materializes all governing contracts, records the initial Ordo/Praxis state, verifies readiness, creates the mission, and starts the selected agent without manual file copying or hand editing.
 
+## Remote bootstrap
+
+Status: initial same-owner empty-repository flow implemented.
+
+Implemented:
+
+- GitHub App installation-token authentication;
+- workflow-dispatch input for target repository, preset, and initial branch;
+- strict refusal of non-empty target repositories;
+- cloud-runner Conditor build, initialization, verification, and machine-readable status;
+- private pinned-source authentication through the App token;
+- initial governed commit and push as the GitHub App bot;
+- documented iPad/browser operating flow.
+
+Remaining:
+
+- remote Codex/Claude execution as a separate credential and telemetry boundary;
+- existing-repository reconciliation;
+- cross-owner/multi-installation token routing;
+- a dedicated web front end if workflow-dispatch UI is not sufficient.
+
 ## Later platform work
 
-- remote GitHub bootstrap for iPad/browser use
+- remote agent execution from the GitHub/iPad path after bootstrap
 - GitHub App or equivalent remote authorization boundary
 - reusable component descriptor publication so registry knowledge can move out of Conditor core
 - first-class Percepta lifecycle distribution rather than contract-only materialization
