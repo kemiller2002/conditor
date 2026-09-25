@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "aegis",
+  "displayName": "Aegis",
+  "distribution": "nuget",
+  "package": "EchelonFoundry.Aegis.Core",
+  "defaultVersion": "1.0.0",
+  "qualifiedVersions": [
+    "1.0.0"
+  ],
+  "applicationBinding": "nuget",
+  "initArguments": [],
+  "verifyArguments": [],
+  "doctorArguments": [],
+  "upgradeArguments": []
+}
