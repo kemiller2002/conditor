@@ -17,5 +17,10 @@ module Registry =
         |> List.tryFind (fun descriptor -> descriptor.Definition.Id = id)
         |> Option.map _.QualifiedVersions
 
+    let descriptorSha256 id =
+        descriptors
+        |> List.tryFind (fun descriptor -> descriptor.Definition.Id = id)
+        |> Option.map _.Sha256
+
     let tryFind id =
         all |> List.tryFind (fun definition -> definition.Id = id)
