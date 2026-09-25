@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor/rehearsal-completion-evidence/v1",
+  "title": "Fresh-Agent Rehearsal Completion Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "rehearsal", "agent", "evidence", "limitations"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "rehearsal": { "const": "evidence-triage" },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "modelOrLauncher"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "modelOrLauncher": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "paths", "claim"],
+        "properties": {
+          "id": {
+            "enum": [
+              "clean-build",
+              "domain-tests",
+              "blocked-transition",
+              "responsive-workspace",
+              "provider-boundary",
+              "ai-authority-boundary",
+              "report-generation"
+            ]
+          },
+          "status": { "enum": ["verified", "failed", "not-run"] },
+          "paths": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "claim": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
