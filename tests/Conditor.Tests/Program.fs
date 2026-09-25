@@ -588,6 +588,40 @@ withTarget
                             (praxisActions[2].Sequence > lastScaffoldSequence
                              && praxisActions[3].Sequence > praxisActions[2].Sequence)))
 
+
+match Presets.resolve "indy-init" with
+| Error errors ->
+    let details = String.concat "; " errors
+    check $"embedded Indy preset resolves: {details}" false
+| Ok preset ->
+    check "embedded Indy preset content is present" (preset.Content.Contains("indy-init-root-cause-investigator"))
+
+    match Manifest.load preset.ManifestPath with
+    | Error errors ->
+        let details = String.concat "; " errors
+        check $"embedded Indy preset parses: {details}" false
+    | Ok manifest ->
+        check "embedded Indy preset is execution enabled" (manifest.Execution |> Option.exists _.Enabled)
+
+        match Planner.create "/tmp/embedded-indy-plan" Init manifest with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"embedded Indy preset plans: {details}" false
+        | Ok plan ->
+            let bound = Presets.bindToTarget preset plan
+
+            match bound.Actions.Head.Execution with
+            | EnsureFile("conditor.json", fileContent) ->
+                check "embedded preset is first-class target manifest" (fileContent = preset.Content)
+            | _ ->
+                check "embedded preset is first-class target manifest" false
+
+match Presets.resolve "does-not-exist" with
+| Error errors ->
+    check "unknown embedded preset rejected" (errors |> List.exists (fun error -> error.Contains("Available presets")))
+| Ok _ ->
+    check "unknown embedded preset rejected" false
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
