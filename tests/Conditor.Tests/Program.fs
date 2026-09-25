@@ -693,6 +693,38 @@ withTarget
                     | Ok() ->
                         check "repair refuses manifest drift" false))
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"lock-snapshot-demo","components":[],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                match Manifest.load manifestPath with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"lock snapshot manifest parses: {details}" false
+                | Ok manifest ->
+                    let targetManifest = Path.Combine(target, "conditor.json")
+                    File.Copy(manifestPath, targetManifest)
+
+                    let plan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    let lockPath = LockFile.write target targetManifest plan
+                    use document = System.Text.Json.JsonDocument.Parse(File.ReadAllText lockPath)
+                    let root = document.RootElement
+                    let schemaVersion = root.GetProperty("schemaVersion").GetInt32()
+                    let lockedManifest = root.GetProperty("manifest")
+
+                    check "lock schema v2 is written" (schemaVersion = 2)
+                    check
+                        "lock stores the exact governing declaration"
+                        (lockedManifest.GetProperty("name").GetString() = "lock-snapshot-demo"
+                         && lockedManifest.GetProperty("schemaVersion").GetInt32() = 1)))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
