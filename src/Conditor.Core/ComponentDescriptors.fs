@@ -10,18 +10,15 @@ type ComponentDescriptor =
       QualifiedVersions: Set<string> }
 
 module ComponentDescriptors =
-    let private resources =
-        [ "Conditor.Components.praxis.component.json"
-          "Conditor.Components.ordo.component.json"
-          "Conditor.Components.visual-engineering.component.json"
-          "Conditor.Components.communication-engineering.component.json"
-          "Conditor.Components.limen.component.json"
-          "Conditor.Components.forma.component.json"
-          "Conditor.Components.folio.component.json"
-          "Conditor.Components.aegis.component.json"
-          "Conditor.Components.tutela.component.json" ]
-
     let private assembly = typeof<ComponentDefinition>.Assembly
+
+    let private resources =
+        assembly.GetManifestResourceNames()
+        |> Array.filter (fun name ->
+            name.StartsWith("Conditor.Components.", StringComparison.Ordinal)
+            && name.EndsWith(".component.json", StringComparison.Ordinal))
+        |> Array.sort
+        |> Array.toList
 
     let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
