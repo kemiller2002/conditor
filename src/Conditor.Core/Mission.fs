@@ -76,14 +76,30 @@ module Mission =
                       result.StandardError.Trim() ]
                 |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
 
+    let private occurredAt () =
+        DateTimeOffset.UtcNow.ToString("O")
+
     let private markReady target (mission: PraxisMission) =
-        runRos target [ "work"; "ready"; mission.Id ]
+        runRos
+            target
+            [ "work"
+              "backlog-transition"
+              "--id"
+              mission.Id
+              "--action"
+              "ready"
+              "--occurred-at"
+              occurredAt () ]
 
     let private create target (mission: PraxisMission) =
         runRos
             target
-            [ "add"
+            [ "work"
+              "capture"
+              "--title"
               mission.Title
+              "--occurred-at"
+              occurredAt ()
               "--id"
               mission.Id
               "--priority"
@@ -167,7 +183,18 @@ module Mission =
         | Error errors -> Error errors
         | Ok "active" -> Ok()
         | Ok "ready" ->
-            runRos target [ "work"; "start"; mission.Id; "--type"; "feature"; "--actor"; "conditor" ]
+            runRos
+                target
+                [ "work"
+                  "start"
+                  "--id"
+                  mission.Id
+                  "--occurred-at"
+                  occurredAt ()
+                  "--type"
+                  "feature"
+                  "--actor"
+                  "conditor" ]
         | Ok state ->
             Error [ $"Praxis mission '{mission.Id}' cannot be activated from state '{state}'." ]
 
