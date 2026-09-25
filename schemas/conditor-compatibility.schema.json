@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor-compatibility/v1",
+  "title": "Conditor Compatibility Graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "components", "requirements"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "versions", "notes"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "versions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "notes": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["subject", "requires", "reason"],
+        "properties": {
+          "subject": { "type": "string", "minLength": 1 },
+          "requires": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
