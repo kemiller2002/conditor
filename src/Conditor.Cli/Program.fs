@@ -14,6 +14,7 @@ let private usage () =
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
 let private optionValue name (args: string array) =
@@ -168,6 +169,20 @@ let private runStart checkOnly launcherOverride target selection =
             else
                 runEstablishedStart false launcherOverride target targetManifest
 
+let private runRepair target manifestPath =
+    match Manifest.load manifestPath with
+    | Error errors ->
+        writeErrors errors
+        2
+    | Ok manifest ->
+        match Repair.reconcile target manifestPath manifest with
+        | Ok() ->
+            Console.WriteLine "Conditor repair completed successfully."
+            0
+        | Error errors ->
+            writeErrors errors
+            8
+
 let private runStatus target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
@@ -227,6 +242,7 @@ let main (args: string array) =
                 | "verify" -> run Verify true target selection
                 | "doctor" -> run Doctor true target selection
                 | "status" -> runStatus target selection.ManifestPath
+                | "repair" -> runRepair target selection.ManifestPath
                 | "start" ->
                     runStart
                         (hasFlag "--check" args)
