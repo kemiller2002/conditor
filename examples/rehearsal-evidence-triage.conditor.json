@@ -52,9 +52,10 @@
     }
   ],
   "execution": {
-    "enabled": false,
+    "enabled": true,
     "mission": "Build the Incident Evidence Triage Board from the canonical rehearsal contract without architecture coaching. Prove completion through tests and repository evidence.",
-    "contractPath": "kickoff/evidence-triage.kickoff.json"
+    "contractPath": "kickoff/evidence-triage.kickoff.json",
+    "launcher": "codex"
   },
   "scaffold": {
     "kind": "fsharp-limen-web",
