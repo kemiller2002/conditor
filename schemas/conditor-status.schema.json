@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor-status/v1",
+  "title": "Conditor Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "healthy", "components", "checks"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "healthy": { "type": "boolean" },
+    "components": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "state", "detail"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "state": { "enum": ["ok", "failed", "info"] },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}
