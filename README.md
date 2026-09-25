@@ -41,7 +41,7 @@ conditor verify --target . --manifest ./conditor.json
 conditor doctor --target . --manifest ./conditor.json
 ```
 
-The committed Indy Init example is at `examples/indy-init.conditor.json`.
+The committed Indy Init preset is at `examples/indy-init.conditor.json`. It is execution-enabled with Codex as its default launcher. Use `conditor start --launcher claude` to select Claude for the same initialized repository without editing the manifest.
 
 See `docs/architecture.md`, `docs/component-contract.md`, and `docs/roadmap.md`.
 
@@ -73,4 +73,4 @@ bash scripts/rehearse-clean-room.sh
 
 The rehearsal begins from an empty temporary Git repository, plans and initializes the governed scaffold, materializes the canonical rehearsal contract, verifies the agent handoff and application bindings, and fails if bootstrap output contains competition-style application implementation. CI runs the same rehearsal after the core build/tests pass.
 
-The next validation layer is the fresh-agent rehearsal described by the Indy Init planning repository: a new agent receives only the initialized repository contract and must build the sacrificial app without architecture coaching.
+The clean-room CI path now proves initialization, a second zero-drift initialization, Ordo baseline routing, Praxis mission creation, `start --check`, guarded provider handoff through a fake Codex adapter, and Praxis-owned active execution state. The next validation layer is an authenticated fresh-agent rehearsal in a sacrificial repository, kept separate from public CI so model credentials are never required by ordinary builds.
