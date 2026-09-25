@@ -87,8 +87,9 @@ jobs:
       - name: Verify execution handoff remains Praxis-owned
         run: |
           grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
-          node "$RUNNER_TEMP/conditor-empty/ros" work show COND-MISSION-001 > "$RUNNER_TEMP/mission-show.txt"
-          grep -F '"status": "active"' "$RUNNER_TEMP/mission-show.txt"
+          test -f "$RUNNER_TEMP/conditor-empty/.ros/context/current.json"
+          grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/context/current.json"
+          grep -F '"semanticState": "active"' "$RUNNER_TEMP/conditor-empty/.ros/context/current.json"
 
   native-cli-smoke:
     needs: build-test
