@@ -70,6 +70,7 @@ conditor status --target . --manifest ./conditor.json
 conditor repair  --target . --manifest ./conditor.json
 conditor upgrade --target . --manifest ./conditor.json
 conditor start   --check --target . --manifest ./conditor.json
+conditor resume  --launcher claude --target . --manifest ./conditor.json
 ```
 
 The committed source form of the Indy Init preset remains at `examples/indy-init.conditor.json`; release binaries embed that exact content.
@@ -92,6 +93,21 @@ The token is passed to the child Git process only as an in-memory HTTP authoriza
 
 For the private Indy Init governing repository, authenticate Git or set a token with read access before the first `init` or `start --preset indy-init`.
 
+
+
+## Start versus resume
+
+`conditor start` owns the ready-to-active transition. It verifies the environment, activates the deterministic Praxis mission when it is `ready`, and then launches the selected provider.
+
+`conditor resume` never performs that transition. It requires the Praxis mission to already be `active`, re-runs the same readiness/provider checks, and invokes the selected provider against the existing work context. This makes provider handoff explicit:
+
+```bash
+conditor start
+# Codex session exits while work remains active
+conditor resume --launcher claude
+```
+
+A resume attempt against `ready`, `blocked`, `complete`, or `abandoned` work fails without changing Praxis state.
 
 ## Status and repair
 
