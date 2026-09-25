@@ -29,6 +29,8 @@ module Installer =
         | EnsureFile(relativePath, _) ->
             $"ensure {relativePath}"
         | EnsureManagedRegion(relativePath, regionId, _) ->
+            $"ensure-region {relativePath}#{regionId}"
+        | EnsureManagedRegion(relativePath, regionId, _) ->
             $"ensure managed region {regionId} in {relativePath}"
         | MaterializeSourceFile(source, relativePath) ->
             $"materialize github:{source.Repository}#{source.Commit} -> {relativePath}"
@@ -81,6 +83,69 @@ module Installer =
                 finally
                     if File.Exists temporary then
                         File.Delete temporary
+
+
+    let private regionMarkers regionId =
+        $"<!-- conditor:managed:{regionId}:start -->",
+        $"<!-- conditor:managed:{regionId}:end -->"
+
+    let private renderRegion regionId content =
+        let startMarker, endMarker = regionMarkers regionId
+        let body = normalize content |> fun value -> value.TrimEnd()
+        $"{startMarker}{Environment.NewLine}{body}{Environment.NewLine}{endMarker}{Environment.NewLine}"
+
+    let private ensureManagedRegion target relativePath regionId content =
+        if String.IsNullOrWhiteSpace regionId then
+            Error $"Managed region id is required for '{relativePath}'."
+        else
+            match safePath target relativePath with
+            | None ->
+                Error $"Scaffold path escapes the target repository: {relativePath}"
+            | Some fullPath ->
+                let replacement = renderRegion regionId content
+                let startMarker, endMarker = regionMarkers regionId
+
+                let desired =
+                    if not (File.Exists fullPath) then
+                        replacement
+                    else
+                        let existing = File.ReadAllText fullPath
+                        let startIndex = existing.IndexOf(startMarker, StringComparison.Ordinal)
+                        let endIndex = existing.IndexOf(endMarker, StringComparison.Ordinal)
+
+                        match startIndex >= 0, endIndex >= 0 with
+                        | false, false ->
+                            let separator =
+                                if String.IsNullOrWhiteSpace existing then String.Empty
+                                elif existing.EndsWith(Environment.NewLine, StringComparison.Ordinal) then Environment.NewLine
+                                else Environment.NewLine + Environment.NewLine
+
+                            existing + separator + replacement
+                        | true, true when endIndex > startIndex ->
+                            let suffixStart = endIndex + endMarker.Length
+                            existing.Substring(0, startIndex) + replacement.TrimEnd() + existing.Substring(suffixStart)
+                        | _ ->
+                            raise (InvalidDataException($"Managed region '{regionId}' in '{relativePath}' has unmatched or invalid markers."))
+
+                try
+                    if File.Exists fullPath && normalize (File.ReadAllText fullPath) = normalize desired then
+                        Ok()
+                    else
+                        ensureParent fullPath
+                        let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
+
+                        try
+                            File.WriteAllText(temporary, desired)
+                            if File.Exists fullPath then
+                                File.Move(temporary, fullPath, true)
+                            else
+                                File.Move(temporary, fullPath)
+                            Ok()
+                        finally
+                            if File.Exists temporary then
+                                File.Delete temporary
+                with ex ->
+                    Error $"Unable to update managed region '{regionId}' in '{relativePath}': {ex.Message}"
 
 
     let private managedRegionStart regionId =
