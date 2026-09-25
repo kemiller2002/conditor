@@ -11,6 +11,7 @@ type private ManifestSelection =
 let private usage () =
     Console.WriteLine "Conditor"
     Console.WriteLine "  conditor presets"
+    Console.WriteLine "  conditor components [--json]"
     Console.WriteLine "  conditor compatibility [--json]"
     Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
@@ -419,6 +420,88 @@ let private runStatus json target manifestPath =
 
         if Status.isHealthy report then 0 else 7
 
+let private distributionText =
+    function
+    | LifecycleNpm -> "lifecycle-npm"
+    | NpmPackage -> "npm"
+    | NugetPackage -> "nuget"
+
+let private bindingText =
+    function
+    | NpmDependency -> "npm"
+    | NugetReference -> "nuget"
+
+let private sourceText =
+    function
+    | RegistryPackage -> "registry"
+    | GitHubSource source ->
+        let entrypoint =
+            match source.Entrypoint with
+            | NodeScript path -> $"node-script:{path}"
+            | FileArtifact path -> $"file-artifact:{path}"
+
+        $"github:{source.Repository}#{source.Commit}:{entrypoint}"
+
+let private printComponents json =
+    let descriptors = Registry.descriptors |> List.sortBy (fun descriptor -> descriptor.Definition.Id)
+
+    if json then
+        use stream = Console.OpenStandardOutput()
+        let mutable options = JsonWriterOptions()
+        options.Indented <- true
+        use writer = new Utf8JsonWriter(stream, options)
+        writer.WriteStartObject()
+        writer.WriteNumber("schemaVersion", 1)
+        writer.WriteStartArray("components")
+
+        for descriptor in descriptors do
+            let definition = descriptor.Definition
+            writer.WriteStartObject()
+            writer.WriteString("id", definition.Id)
+            writer.WriteString("displayName", definition.DisplayName)
+            writer.WriteString("distribution", distributionText definition.Distribution)
+            writer.WriteString("package", definition.Package)
+            writer.WriteString("defaultVersion", definition.DefaultVersion)
+            writer.WriteStartArray("qualifiedVersions")
+
+            for version in descriptor.QualifiedVersions |> Seq.sort do
+                writer.WriteStringValue version
+
+            writer.WriteEndArray()
+
+            match definition.LifecycleSource with
+            | Some source -> writer.WriteString("lifecycleSource", sourceText source)
+            | None -> ()
+
+            match definition.ApplicationBinding with
+            | Some binding -> writer.WriteString("applicationBinding", bindingText binding)
+            | None -> ()
+
+            match definition.Command with
+            | Some command -> writer.WriteString("command", command)
+            | None -> ()
+
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+        writer.Flush()
+    else
+        Console.WriteLine "Built-in Conditor components:"
+
+        for descriptor in descriptors do
+            let definition = descriptor.Definition
+            let versions = descriptor.QualifiedVersions |> Seq.sort |> String.concat ", "
+            let source =
+                definition.LifecycleSource
+                |> Option.map sourceText
+                |> Option.defaultValue "application-binding-only"
+
+            Console.WriteLine
+                $"  {definition.Id}@{definition.DefaultVersion} [{distributionText definition.Distribution}] qualified={versions} source={source}"
+
+    0
+
 let private printCompatibility json =
     if json then
         use stream = Console.OpenStandardOutput()
@@ -484,6 +567,8 @@ let private execute (args: string array) =
 
         if command = "presets" then
             printPresets ()
+        elif command = "components" then
+            printComponents (hasFlag "--json" args)
         elif command = "compatibility" then
             printCompatibility (hasFlag "--json" args)
         else
