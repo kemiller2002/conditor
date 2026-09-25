@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "forma",
+  "displayName": "Forma",
+  "distribution": "npm",
+  "package": "@echelon-foundry/design-system",
+  "defaultVersion": "0.2.0",
+  "qualifiedVersions": [
+    "0.2.0"
+  ],
+  "applicationBinding": "npm",
+  "initArguments": [],
+  "verifyArguments": [],
+  "doctorArguments": [],
+  "upgradeArguments": []
+}
