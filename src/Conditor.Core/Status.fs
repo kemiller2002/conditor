@@ -31,7 +31,7 @@ module Status =
             let suffix = if request.Required then String.Empty else " (optional)"
             $"{request.Id}@{requestedVersion request}{suffix}")
 
-    let private check name result successDetail =
+    let private check name (result: Result<'a, string list>) successDetail =
         match result with
         | Ok _ ->
             { Name = name
