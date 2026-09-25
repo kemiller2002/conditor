@@ -98,9 +98,12 @@ module Readiness =
             match Planner.create target Verify manifest with
             | Error planErrors -> planErrors |> List.iter errors.Add
             | Ok plan ->
-                match Installer.execute target manifestPath plan with
-                | Ok _ -> ()
-                | Error verificationErrors -> verificationErrors |> List.iter errors.Add
+                match LockFile.verifyResolvedComponents target plan.Components with
+                | Error identityErrors -> identityErrors |> List.iter errors.Add
+                | Ok() ->
+                    match Installer.execute target manifestPath plan with
+                    | Ok _ -> ()
+                    | Error verificationErrors -> verificationErrors |> List.iter errors.Add
 
         if errors.Count > 0 then
             Error(List.ofSeq errors)
