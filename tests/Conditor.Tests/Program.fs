@@ -719,7 +719,7 @@ withTarget
                     let schemaVersion = root.GetProperty("schemaVersion").GetInt32()
                     let lockedManifest = root.GetProperty("manifest")
 
-                    check "lock schema v2 is written" (schemaVersion = 2)
+                    check "lock schema v3 is written" (schemaVersion = 3)
                     check
                         "lock stores the exact governing declaration"
                         (lockedManifest.GetProperty("name").GetString() = "lock-snapshot-demo"
@@ -885,7 +885,24 @@ withTarget
                                 "locked component identity rejects source drift"
                                 (errors |> List.exists (fun error -> error.Contains("silently substitute")))
                         | Ok() ->
-                            check "locked component identity rejects source drift" false))
+                            check "locked component identity rejects source drift" false
+
+                        match Registry.descriptorSha256 "praxis" with
+                        | None ->
+                            check "locked component identity rejects descriptor drift" false
+                        | Some descriptorSha ->
+                            let lockPath = Path.Combine(target, ".conditor", "lock.json")
+                            let lockText = File.ReadAllText lockPath
+                            let differentSha = String.replicate 64 "0"
+                            File.WriteAllText(lockPath, lockText.Replace(descriptorSha, differentSha))
+
+                            match LockFile.verifyResolvedComponents target plan.Components with
+                            | Error errors ->
+                                check
+                                    "locked component identity rejects descriptor drift"
+                                    (errors |> List.exists (fun error -> error.Contains("descriptor")))
+                            | Ok() ->
+                                check "locked component identity rejects descriptor drift" false))
 
 
 withManifest
@@ -912,7 +929,7 @@ withManifest
 
 
 withManifest
-    """{"schemaVersion":1,"name":"unsupported-version","components":[{"id":"praxis","version":"3.4.0"}],"requirements":[],"execution":{"enabled":false}}"""
+    """{"schemaVersion":1,"name":"unsupported-version","components":[{"id":"praxis","version":"99.0.0"}],"requirements":[],"execution":{"enabled":false}}"""
     (fun path ->
         match Manifest.load path with
         | Error _ ->
