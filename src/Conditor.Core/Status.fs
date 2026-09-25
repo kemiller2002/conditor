@@ -46,7 +46,10 @@ module Status =
         match Planner.create target Verify manifest with
         | Error errors -> Error errors
         | Ok plan ->
-            Installer.execute target manifestPath plan |> Result.map ignore
+            match LockFile.verifyResolvedComponents target plan.Components with
+            | Error errors -> Error errors
+            | Ok() ->
+                Installer.execute target manifestPath plan |> Result.map ignore
 
     let inspect target manifestPath (manifest: ProjectManifest) =
         let checks = ResizeArray<StatusCheck>()
