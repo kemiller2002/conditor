@@ -176,6 +176,31 @@ jobs:
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --target "$RUNNER_TEMP/conditor-empty"
       - name: Check Claude launcher override
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --launcher claude --target "$RUNNER_TEMP/conditor-empty"
+      - name: Rehearse external Claude provider handoff
+        run: |
+          handoff_target="$RUNNER_TEMP/conditor-handoff"
+          cp -a "$RUNNER_TEMP/conditor-empty" "$handoff_target"
+          prompt_path="$RUNNER_TEMP/claude-handoff-prompt.txt"
+
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            handoff \
+            --launcher claude \
+            --target "$handoff_target" \
+            --prompt-file "$prompt_path"
+
+          test -f "$prompt_path"
+          grep -F 'COND-MISSION-001' "$prompt_path"
+          grep -F 'canonical execution contract' "$prompt_path"
+          grep -F '"semanticState": "active"' "$handoff_target/.ros/context/current.json"
+
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            handoff \
+            --resume \
+            --launcher claude \
+            --target "$handoff_target" \
+            --prompt-file "$RUNNER_TEMP/claude-resume-prompt.txt"
+
+          grep -F '"semanticState": "active"' "$handoff_target/.ros/context/current.json"
       - name: Refuse resume before mission activation
         run: |
           if PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- resume --launcher claude --target "$RUNNER_TEMP/conditor-empty"; then
