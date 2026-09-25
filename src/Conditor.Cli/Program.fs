@@ -15,7 +15,7 @@ let private usage () =
     Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor doctor [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
@@ -297,6 +297,57 @@ let private runUpgrade checkOnly target manifestPath =
             Console.WriteLine $"Updated lock: {result.LockPath}"
             0
 
+let private writeDoctorJson (report: Doctor.Report) =
+    use stream = Console.OpenStandardOutput()
+    let mutable options = JsonWriterOptions()
+    options.Indented <- true
+    use writer = new Utf8JsonWriter(stream, options)
+    writer.WriteStartObject()
+    writer.WriteNumber("schemaVersion", 1)
+    writer.WriteString("project", report.Project)
+    writer.WriteBoolean("healthy", report.Healthy)
+    writer.WriteStartArray("findings")
+
+    for finding in report.Findings do
+        writer.WriteStartObject()
+        writer.WriteString("code", finding.Code)
+        writer.WriteString("severity", Doctor.severityText finding.Severity)
+        writer.WriteString("area", finding.Area)
+        writer.WriteString("detail", finding.Detail)
+
+        match finding.Remediation with
+        | Some remediation -> writer.WriteString("remediation", remediation)
+        | None -> ()
+
+        writer.WriteEndObject()
+
+    writer.WriteEndArray()
+    writer.WriteEndObject()
+    writer.Flush()
+
+let private runDoctor json target manifestPath =
+    match Manifest.load manifestPath with
+    | Error errors ->
+        writeErrors errors
+        2
+    | Ok manifest ->
+        let report = Doctor.inspect target manifestPath manifest
+
+        if json then
+            writeDoctorJson report
+        else
+            Console.WriteLine $"Project: {report.Project}"
+            Console.WriteLine $"Doctor: {if report.Healthy then "healthy" else "attention required"}"
+
+            for finding in report.Findings do
+                Console.WriteLine $"  [{Doctor.severityText finding.Severity}] {finding.Code} {finding.Area}: {finding.Detail}"
+
+                match finding.Remediation with
+                | Some remediation -> Console.WriteLine $"    remediation: {remediation}"
+                | None -> ()
+
+        if report.Healthy then 0 else 12
+
 let private runRepair target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
@@ -449,7 +500,7 @@ let private execute (args: string array) =
                 | "plan" -> run Init false target selection
                 | "init" -> run Init true target selection
                 | "verify" -> run Verify true target selection
-                | "doctor" -> run Doctor true target selection
+                | "doctor" -> runDoctor (hasFlag "--json" args) target selection.ManifestPath
                 | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
                 | "repair" -> runRepair target selection.ManifestPath
                 | "upgrade" -> runUpgrade (hasFlag "--check" args) target selection.ManifestPath
