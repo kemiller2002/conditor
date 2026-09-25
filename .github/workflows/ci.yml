@@ -154,6 +154,13 @@ jobs:
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --target "$RUNNER_TEMP/conditor-empty"
       - name: Check Claude launcher override
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --launcher claude --target "$RUNNER_TEMP/conditor-empty"
+      - name: Refuse resume before mission activation
+        run: |
+          if PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- resume --launcher claude --target "$RUNNER_TEMP/conditor-empty"; then
+            echo "resume unexpectedly activated a ready mission" >&2
+            exit 1
+          fi
+          grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
       - name: Start through fake Codex adapter
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --target "$RUNNER_TEMP/conditor-empty"
       - name: Verify execution handoff remains Praxis-owned
