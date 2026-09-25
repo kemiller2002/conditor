@@ -111,6 +111,12 @@ jobs:
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --json --target "$RUNNER_TEMP/conditor-empty" > "$RUNNER_TEMP/conditor-status.json"
           grep -F '"healthy": true' "$RUNNER_TEMP/conditor-status.json"
           grep -F '"schemaVersion": 1' "$RUNNER_TEMP/conditor-status.json"
+      - name: Diagnose established project
+        run: |
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- doctor --target "$RUNNER_TEMP/conditor-empty"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- doctor --json --target "$RUNNER_TEMP/conditor-empty" > "$RUNNER_TEMP/conditor-doctor.json"
+          grep -F '"healthy": true' "$RUNNER_TEMP/conditor-doctor.json"
+          grep -F '"code": "COND-DOC-LOCK"' "$RUNNER_TEMP/conditor-doctor.json"
       - name: Reconcile established project
         run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- repair --target "$RUNNER_TEMP/conditor-empty"
       - name: Re-check Conditor status after repair
