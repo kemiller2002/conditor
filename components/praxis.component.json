@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "praxis",
+  "displayName": "Praxis / Repository Operating System",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/repository-operating-system",
+  "defaultVersion": "3.1.4",
+  "qualifiedVersions": [
+    "3.1.3",
+    "3.1.4"
+  ],
+  "lifecycleSource": {
+    "kind": "registry"
+  },
+  "command": "ros",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
