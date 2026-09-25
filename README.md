@@ -58,6 +58,7 @@ Use `conditor start --check --preset indy-init` only after initialization when y
 
 ```bash
 conditor presets
+conditor compatibility [--json]
 conditor plan   --preset indy-init --target .
 conditor init   --preset indy-init --target .
 conditor start  --preset indy-init --target .
@@ -65,8 +66,8 @@ conditor start  --preset indy-init --target .
 conditor plan   --target . --manifest ./conditor.json
 conditor init   --target . --manifest ./conditor.json
 conditor verify --target . --manifest ./conditor.json
-conditor doctor --target . --manifest ./conditor.json
-conditor status --target . --manifest ./conditor.json
+conditor doctor --json --target . --manifest ./conditor.json
+conditor status --json --target . --manifest ./conditor.json
 conditor repair  --target . --manifest ./conditor.json
 conditor upgrade --target . --manifest ./conditor.json
 conditor start   --check --target . --manifest ./conditor.json
@@ -108,6 +109,15 @@ conditor resume --launcher claude
 ```
 
 A resume attempt against `ready`, `blocked`, `complete`, or `abandoned` work fails without changing Praxis state.
+
+
+## Compatibility and Doctor
+
+`conditor compatibility` exposes the exact component versions and dependency relationships this Conditor build has qualified. Planning fails closed when a manifest asks for an unqualified version or violates a declared capability dependency.
+
+`conditor doctor` is read-only and aggregates Conditor-owned checks with each lifecycle component's own doctor command. Findings use stable `COND-DOC-...` codes and include remediation when action is required. Use `--json` for agents and automation.
+
+The compatibility graph is intentionally conservative. A newer upstream release is not automatically considered compatible merely because it exists.
 
 ## Status and repair
 
