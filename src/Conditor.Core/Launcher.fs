@@ -71,7 +71,7 @@ module Launcher =
         | unsupported ->
             Error [ $"Unsupported execution launcher '{unsupported}'. Supported launchers: codex, claude." ]
 
-    let private prompt (ready: Readiness.ReadyExecution) =
+    let instruction (ready: Readiness.ReadyExecution) =
         $"""Execute the active Praxis mission {ready.Mission.Id} in this repository.
 
 Read AGENTS.md first. Then read the canonical execution contract at {ready.ContractPath} and every normative document it references. Run the repository Praxis work-context command for {ready.Mission.Id} and obey the installed Ordo, Praxis, Aegis, Limen, Forma, Folio, security, visual, and communication constraints.
@@ -79,7 +79,7 @@ Read AGENTS.md first. Then read the canonical execution contract at {ready.Contr
 Implement the mission in the repository. Use repository-native lifecycle and verification commands as evidence. If blocked, record the block through Praxis. Do not treat your own statement that the work is finished as completion. Complete the Praxis work item only when its required implementation, tests, runtime/verification evidence, and governing requirements are satisfied."""
 
     let launch target (ready: Readiness.ReadyExecution) =
-        let instruction = prompt ready
+        let instruction = instruction ready
 
         match ready.Launcher.Trim().ToLowerInvariant() with
         | "codex" ->
