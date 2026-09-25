@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "limen",
+  "displayName": "Limen",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/typescript-wasm-kernel",
+  "defaultVersion": "0.6.1",
+  "qualifiedVersions": [
+    "0.6.1"
+  ],
+  "lifecycleSource": {
+    "kind": "registry"
+  },
+  "applicationBinding": "npm",
+  "command": "limen",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
