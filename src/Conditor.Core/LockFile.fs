@@ -34,10 +34,10 @@ module LockFile =
                     else
                         0
 
-                if schemaVersion < 2 then
+                if schemaVersion < 3 then
                     Error
-                        [ $"Conditor lock schema {schemaVersion} does not contain the prior declaration required for safe upgrade."
-                          "Run 'conditor repair' against the unchanged manifest to migrate the lock before upgrading." ]
+                        [ $"Conditor lock schema {schemaVersion} does not contain the component descriptor identity required for safe upgrade."
+                          "Run 'conditor repair' against the unchanged manifest to adopt the current descriptor set and migrate the lock before upgrading." ]
                 elif not (root.TryGetProperty("manifest", &manifestElement))
                      || manifestElement.ValueKind <> JsonValueKind.Object then
                     Error [ "Conditor lock schema v2 is missing its manifest snapshot." ]
@@ -92,10 +92,24 @@ module LockFile =
             try
                 use document = JsonDocument.Parse(File.ReadAllText path)
                 let root = document.RootElement
+                let mutable schemaElement = Unchecked.defaultof<JsonElement>
                 let mutable componentsElement = Unchecked.defaultof<JsonElement>
 
-                if not (root.TryGetProperty("components", &componentsElement))
-                   || componentsElement.ValueKind <> JsonValueKind.Array then
+                let schemaVersion =
+                    if root.TryGetProperty("schemaVersion", &schemaElement)
+                       && schemaElement.ValueKind = JsonValueKind.Number then
+                        match schemaElement.TryGetInt32() with
+                        | true, value -> value
+                        | _ -> 0
+                    else
+                        0
+
+                if schemaVersion < 3 then
+                    Error
+                        [ $"Conditor lock schema {schemaVersion} does not record component descriptor identity."
+                          "Run 'conditor repair' against the unchanged manifest before relying on component identity verification." ]
+                elif not (root.TryGetProperty("components", &componentsElement))
+                     || componentsElement.ValueKind <> JsonValueKind.Array then
                     Error [ "Conditor lock does not contain a valid components array." ]
                 else
                     let locked =
@@ -116,7 +130,8 @@ module LockFile =
                             (getString "version",
                              getString "distribution",
                              getString "package",
-                             getString "sourceReference"))
+                             getString "sourceReference",
+                             getString "descriptorSha256"))
                         |> Map.ofSeq
 
                     let current =
@@ -126,7 +141,8 @@ module LockFile =
                             (Some resolvedComponent.Version,
                              Some(distributionText resolvedComponent.Distribution),
                              Some resolvedComponent.Package,
-                             resolvedComponent.SourceReference))
+                             resolvedComponent.SourceReference,
+                             Registry.descriptorSha256 resolvedComponent.Id))
                         |> Map.ofList
 
                     let errors = ResizeArray<string>()
@@ -142,7 +158,7 @@ module LockFile =
                     for id in Set.intersect lockedIds currentIds do
                         if locked[id] <> current[id] then
                             errors.Add
-                                $"Resolved identity for component '{id}' differs from the Conditor lock; Conditor will not silently substitute a different version/package/source."
+                                $"Resolved identity for component '{id}' differs from the Conditor lock; Conditor will not silently substitute a different version/package/source/descriptor."
 
                     if errors.Count = 0 then Ok() else Error(List.ofSeq errors)
             with
@@ -159,7 +175,7 @@ module LockFile =
         options.Indented <- true
         use writer = new Utf8JsonWriter(stream, options)
         writer.WriteStartObject()
-        writer.WriteNumber("schemaVersion", 2)
+        writer.WriteNumber("schemaVersion", 3)
         writer.WriteString("project", plan.ProjectName)
         writer.WriteString("manifestSha256", manifestHash manifestPath)
         writer.WritePropertyName("manifest")
@@ -178,6 +194,10 @@ module LockFile =
                 distributionText resolved.Distribution
             )
             writer.WriteString("package", resolved.Package)
+
+            match Registry.descriptorSha256 resolved.Id with
+            | Some descriptorSha256 -> writer.WriteString("descriptorSha256", descriptorSha256)
+            | None -> invalidOp $"Resolved component '{resolved.Id}' has no embedded descriptor identity."
 
             match resolved.SourceReference with
             | Some source -> writer.WriteString("sourceReference", source)
