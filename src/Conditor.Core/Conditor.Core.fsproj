@@ -17,6 +17,7 @@
     <Compile Include="Installer.fs" />
     <Compile Include="Readiness.fs" />
     <Compile Include="Status.fs" />
+    <Compile Include="Repair.fs" />
     <Compile Include="Launcher.fs" />
     <Compile Include="Execution.fs" />
   </ItemGroup>
