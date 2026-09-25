@@ -67,17 +67,20 @@ type ComponentDefinition =
       DefaultVersion: string
       InitArguments: string list
       VerifyArguments: string list
-      DoctorArguments: string list }
+      DoctorArguments: string list
+      UpgradeArguments: string list }
 
 type Operation =
     | Init
     | Verify
     | Doctor
+    | Upgrade
 
 type PlanActionKind =
     | InstallLifecycle
     | VerifyLifecycle
     | DiagnoseLifecycle
+    | UpgradeLifecycle
     | ScaffoldFile
     | ReadinessVerify
     | RequirementFile
