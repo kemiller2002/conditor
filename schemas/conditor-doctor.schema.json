@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor-doctor/v1",
+  "title": "Conditor Doctor Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "healthy", "findings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "healthy": { "type": "boolean" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "area", "detail"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^COND-DOC-[A-Z0-9-]+$" },
+          "severity": { "enum": ["info", "warning", "error"] },
+          "area": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string" },
+          "remediation": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
