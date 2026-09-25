@@ -480,7 +480,8 @@ withTarget
 
         match Installer.execute target "test-manifest.json" plan with
         | Error errors ->
-            check $"managed AGENTS region executes: {String.concat "; " errors}" false
+            let details = String.concat "; " errors
+            check $"managed AGENTS region executes: {details}" false
         | Ok _ ->
             let first = File.ReadAllText agentsPath
 
@@ -505,7 +506,8 @@ withTarget
 
             match Installer.execute target "test-manifest.json" updatedPlan with
             | Error errors ->
-                check $"managed AGENTS region updates: {String.concat "; " errors}" false
+                let details = String.concat "; " errors
+                check $"managed AGENTS region updates: {details}" false
             | Ok _ ->
                 let second = File.ReadAllText agentsPath
 
