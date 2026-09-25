@@ -80,3 +80,14 @@ Conditor must transform an uninitialized Git repository into a reproducible, gov
 - **CON-101** The demonstration shall not require manual copying or hand editing of generated setup files.
 - **CON-102** A Conditor entry point shall install the selected engineering environment, validate it, ingest the predefined requirements, create the initial mission, and start the selected agent.
 - **CON-103** The resulting repository shall retain enough lock, requirement, mission, and verification evidence to reconstruct what Conditor established and why.
+
+## Shared Echelon application foundations
+
+- **CON-120** Conditor's .NET/F# execution path MUST use Aegis for unexpected operational failures at download, package resolution, filesystem, process launch, Git/repository mutation, integrity verification, network, registry/provider invocation, and other external boundaries.
+- **CON-121** Expected Conditor outcomes such as unsupported manifest version, unresolved required component, compatibility refusal, missing prerequisite, failed verification result, or execution-readiness refusal MUST remain typed Conditor/Ordo outcomes and MUST NOT be converted into Aegis faults.
+- **CON-122** Aegis recovery MUST respect idempotency and unknown-effect risk. Conditor MUST NOT retry a repository mutation or external action whose completion state is unknown unless reconciliation proves retry is safe.
+- **CON-123** Aegis context and diagnostics MUST redact credentials, tokens, private package information, and other sensitive values.
+- **CON-124** If Conditor gains an interactive browser UI, that UI MUST consume a pinned Forma release and use existing Forma components/patterns before local equivalents.
+- **CON-125** If Conditor produces printable/PDF/paginated installation plans, audit reports, bootstrap evidence packets, or similar documents, those surfaces MUST consume a pinned Folio release and use existing Folio primitives.
+- **CON-126** Forma and Folio are conditional until their corresponding UI/document surfaces exist; Aegis is applicable now because Conditor already owns operational boundaries.
+- **CON-127** Shared dependencies MUST be pinned to released versions or immutable artifacts. Missing shared behavior MUST be raised as a gap in the owning shared repository rather than silently reimplemented.
