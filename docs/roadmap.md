@@ -23,6 +23,8 @@ Implemented:
 
 - six self-contained release targets for Linux, macOS, and Windows on x64 and ARM64
 - SHA-256 release checksum generation
+- signed GitHub artifact attestations for every native release binary
+- release-job provenance verification before GitHub Release publication
 - checksum-verifying Unix and PowerShell installers
 - native Linux CLI smoke execution
 - embedded named presets available directly from the self-contained binary
@@ -37,6 +39,8 @@ Implemented:
 - sacrificial clean-room/factory rehearsal
 - second-initialization no-drift assertion
 - read-only `status` across lock, requirements, lifecycle verification, and execution readiness
+- structured read-only `doctor` with stable finding codes, remediation, and JSON output
+- explicit machine-readable compatibility graph with qualified versions and dependency rules
 - locked-state `repair` that refuses declaration drift
 - Conditor lock schema v2 with the prior governing declaration
 - initial version-only lifecycle `upgrade` path with hard rejection of application-bound/governance changes
@@ -44,10 +48,9 @@ Implemented:
 
 Remaining:
 
-- signature/attestation policy beyond published SHA-256 checksums
-- first-class compatibility graph instead of only registry-level source/version constraints
+- component/source attestation and signature policy beyond Conditor's own release provenance
 - broader scaffold catalog
-- generated-state reset/reconciliation commands
+- generated-state reset only when Conditor owns meaningful resettable generated state; current reconciliation is `repair`
 
 ## Slice 3: requirements to mission
 
@@ -126,7 +129,7 @@ Implemented:
 
 Remaining:
 
-- remote Codex/Claude execution as a separate credential and telemetry boundary;
+- complete remote Codex/Claude execution validation across credential and telemetry boundaries;
 - existing-repository reconciliation;
 - cross-owner/multi-installation token routing;
 - a dedicated web front end if workflow-dispatch UI is not sufficient.
