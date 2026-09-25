@@ -1,0 +1,228 @@
+name: remote-execute-codex
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repository:
+        description: Established Conditor repository under this GitHub owner
+        required: true
+        type: string
+      branch:
+        description: Branch to execute and push
+        required: true
+        default: main
+        type: string
+      mode:
+        description: Start a ready mission or resume an active mission
+        required: true
+        default: start
+        type: choice
+        options:
+          - start
+          - resume
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: conditor-remote-codex-${{ inputs.target_repository }}-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate inputs
+        env:
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_REPOSITORY" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "target_repository must be a repository name under ${{ github.repository_owner }}" >&2
+            exit 2
+          fi
+          if [[ ! "$TARGET_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$TARGET_BRANCH" == -* ]] || [[ "$TARGET_BRANCH" == *..* ]]; then
+            echo "branch contains unsupported characters" >&2
+            exit 2
+          fi
+
+      - name: Checkout Conditor
+        uses: actions/checkout@v4
+        with:
+          path: conditor-source
+          persist-credentials: false
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.CONDITOR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CONDITOR_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+
+      - name: Clone governed target
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git clone --single-branch --branch "$TARGET_BRANCH" \
+            "https://github.com/$OWNER/$TARGET_REPOSITORY.git" \
+            "$RUNNER_TEMP/conditor-target"
+
+          test -f "$RUNNER_TEMP/conditor-target/conditor.json"
+          test -f "$RUNNER_TEMP/conditor-target/.conditor/lock.json"
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build self-contained Conditor
+        working-directory: conditor-source
+        run: |
+          set -euo pipefail
+          dotnet restore Conditor.slnx
+          dotnet publish src/Conditor.Cli/Conditor.Cli.fsproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:DebugType=None \
+            -p:PublishTrimmed=false \
+            --output "$RUNNER_TEMP/conditor-native"
+          chmod +x "$RUNNER_TEMP/conditor-native/conditor"
+
+      - name: Install pinned Codex CLI
+        env:
+          CODEX_VERSION: ${{ vars.CONDITOR_CODEX_VERSION }}
+        run: |
+          set -euo pipefail
+          : "${CODEX_VERSION:?Set repository variable CONDITOR_CODEX_VERSION to an explicit Codex CLI version}"
+          npm install --global "@openai/codex@$CODEX_VERSION"
+          codex --version
+
+      - name: Configure GitHub App commit identity
+        id: app-identity
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          user_id="$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)"
+          echo "name=${{ steps.app-token.outputs.app-slug }}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=$user_id+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      - name: Execute governed Codex mission
+        env:
+          CONDITOR_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+          OPENAI_FEDERATION_RULE_ID: ${{ vars.OPENAI_FEDERATION_RULE_ID }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          : "${OPENAI_WIF_AUDIENCE:?Set repository variable OPENAI_WIF_AUDIENCE}"
+          : "${OPENAI_FEDERATION_RULE_ID:?Set repository variable OPENAI_FEDERATION_RULE_ID}"
+
+          target="$RUNNER_TEMP/conditor-target"
+          token_path="$RUNNER_TEMP/openai-wif/identity-token"
+
+          cd "$target"
+          git config user.name "${{ steps.app-identity.outputs.name }}"
+          git config user.email "${{ steps.app-identity.outputs.email }}"
+
+          "$GITHUB_WORKSPACE/conditor-source/scripts/write-github-oidc-token.sh" \
+            "$OPENAI_WIF_AUDIENCE" \
+            "$token_path"
+
+          refresh_oidc() {
+            while sleep 180; do
+              "$GITHUB_WORKSPACE/conditor-source/scripts/write-github-oidc-token.sh" \
+                "$OPENAI_WIF_AUDIENCE" \
+                "$token_path" || return
+            done
+          }
+
+          refresh_oidc &
+          refresh_pid=$!
+          cleanup() {
+            kill "$refresh_pid" 2>/dev/null || true
+            wait "$refresh_pid" 2>/dev/null || true
+            rm -rf "$RUNNER_TEMP/openai-wif"
+          }
+          trap cleanup EXIT
+
+          export OPENAI_IDENTITY_TOKEN_FILE="$token_path"
+          export OPENAI_WORKLOAD_IDENTITY_CONTEXT
+          OPENAI_WORKLOAD_IDENTITY_CONTEXT="$(
+            jq -cn \
+              --arg repository "${{ github.repository }}" \
+              --arg target "${{ github.repository_owner }}/${{ inputs.target_repository }}" \
+              --arg run_id "${{ github.run_id }}" \
+              --arg run_attempt "${{ github.run_attempt }}" \
+              '{repository:$repository,target_repository:$target,run_id:$run_id,run_attempt:$run_attempt}'
+          )"
+
+          "$RUNNER_TEMP/conditor-native/conditor" status --json --target "$target" > "$RUNNER_TEMP/pre-execution-status.json"
+          grep -F '"healthy": true' "$RUNNER_TEMP/pre-execution-status.json"
+
+          case "$MODE" in
+            start)
+              "$RUNNER_TEMP/conditor-native/conditor" start --launcher codex --target "$target"
+              ;;
+            resume)
+              "$RUNNER_TEMP/conditor-native/conditor" resume --launcher codex --target "$target"
+              ;;
+            *)
+              echo "Unsupported mode: $MODE" >&2
+              exit 2
+              ;;
+          esac
+
+          node "$target/ros" validate
+
+      - name: Commit and push execution state
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/conditor-target"
+          gh auth setup-git
+
+          git -C "$target" config user.name "${{ steps.app-identity.outputs.name }}"
+          git -C "$target" config user.email "${{ steps.app-identity.outputs.email }}"
+          git -C "$target" add -A
+
+          if ! git -C "$target" diff --cached --quiet; then
+            git -C "$target" commit -m "Record Conditor remote Codex execution"
+          fi
+
+          git -C "$target" push origin "$TARGET_BRANCH"
+
+      - name: Summary
+        run: |
+          state="unknown"
+          context="$RUNNER_TEMP/conditor-target/.ros/context/current.json"
+          if [[ -f "$context" ]]; then
+            state="$(jq -r '.workItems[0].semanticState // "unknown"' "$context")"
+          fi
+
+          {
+            echo "## Conditor remote Codex execution"
+            echo
+            echo "- Repository: `${{ github.repository_owner }}/${{ inputs.target_repository }}`"
+            echo "- Branch: `${{ inputs.branch }}`"
+            echo "- Mode: `${{ inputs.mode }}`"
+            echo "- Praxis semantic state after provider exit: `$state`"
+            echo "- Changes pushed with GitHub App identity"
+          } >> "$GITHUB_STEP_SUMMARY"
