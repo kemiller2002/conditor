@@ -8,5 +8,8 @@ module Repair =
             match Planner.create target Init manifest with
             | Error errors -> Error errors
             | Ok plan ->
-                Installer.execute target manifestPath plan
-                |> Result.map (fun _ -> ())
+                match LockFile.verifyResolvedComponents target plan.Components with
+                | Error errors -> Error errors
+                | Ok() ->
+                    Installer.execute target manifestPath plan
+                    |> Result.map (fun _ -> ())
