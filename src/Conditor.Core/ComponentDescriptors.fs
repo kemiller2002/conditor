@@ -3,11 +3,14 @@ namespace Conditor.Core
 open System
 open System.IO
 open System.Reflection
+open System.Security.Cryptography
+open System.Text
 open System.Text.Json
 
 type ComponentDescriptor =
     { Definition: ComponentDefinition
-      QualifiedVersions: Set<string> }
+      QualifiedVersions: Set<string>
+      Sha256: string }
 
 module ComponentDescriptors =
     let private assembly = typeof<ComponentDefinition>.Assembly
@@ -200,6 +203,12 @@ module ComponentDescriptors =
                 Error(List.ofSeq errors)
             else
                 Ok
+                    let descriptorSha256 =
+                        Encoding.UTF8.GetBytes(text)
+                        |> SHA256.HashData
+                        |> Convert.ToHexString
+                        |> fun value -> value.ToLowerInvariant()
+
                     { Definition =
                         { Id = id
                           DisplayName = displayName
@@ -213,7 +222,8 @@ module ComponentDescriptors =
                           VerifyArguments = verifyArguments
                           DoctorArguments = doctorArguments
                           UpgradeArguments = upgradeArguments }
-                      QualifiedVersions = qualifiedVersions }
+                      QualifiedVersions = qualifiedVersions
+                      Sha256 = descriptorSha256 }
         with
         | :? JsonException as ex -> Error [ $"Component descriptor '{resourceName}' is invalid JSON: {ex.Message}" ]
         | ex -> Error [ $"Unable to parse component descriptor '{resourceName}': {ex.Message}" ]
