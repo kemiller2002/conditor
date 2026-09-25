@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "ordo",
+  "displayName": "Ordo / State-Directed Engineering",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/sde",
+  "defaultVersion": "1.3.0",
+  "qualifiedVersions": [
+    "1.3.0"
+  ],
+  "lifecycleSource": {
+    "kind": "registry"
+  },
+  "command": "sde",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
