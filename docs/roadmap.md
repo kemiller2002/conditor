@@ -86,12 +86,13 @@ Implemented:
 - Praxis activation before provider invocation
 - provider exit does not imply project completion
 - safe `--launcher codex|claude` override that cannot enable disabled execution
+- explicit `resume` that requires an already-active Praxis mission and never activates ready work
 - fake Codex and fake Claude readiness coverage in public CI
 - authenticated fresh-agent rehearsal script kept outside public CI
 
 Remaining:
 
-- resumable provider execution metadata and explicit `resume`
+- resumable provider execution metadata beyond the repository/Praxis state already used by explicit `resume`
 - richer provider telemetry handoff into Praxis
 - actual authenticated fresh-agent trial evidence for both providers
 
