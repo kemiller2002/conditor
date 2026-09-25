@@ -958,6 +958,54 @@ withManifest
             | Ok _ ->
                 check "enabled execution requires Praxis through compatibility graph" false)
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"doctor-demo","components":[],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                let targetManifest = Path.Combine(target, "conditor.json")
+                File.Copy(manifestPath, targetManifest)
+
+                match Manifest.load targetManifest with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"doctor manifest parses: {details}" false
+                | Ok manifest ->
+                    let lockPlan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    LockFile.write target targetManifest lockPlan |> ignore
+
+                    let report = Doctor.inspect target targetManifest manifest
+                    check "doctor reports healthy locked project" report.Healthy
+                    check
+                        "doctor exposes stable lock finding code"
+                        (report.Findings
+                         |> List.exists (fun finding ->
+                             finding.Code = "COND-DOC-LOCK"
+                             && finding.Severity = Doctor.Info))
+
+                    File.AppendAllText(targetManifest, Environment.NewLine)
+
+                    match Manifest.load targetManifest with
+                    | Error _ ->
+                        check "doctor drifted manifest still parses" false
+                    | Ok drifted ->
+                        let driftReport = Doctor.inspect target targetManifest drifted
+
+                        check "doctor detects lock drift" (not driftReport.Healthy)
+                        check
+                            "doctor lock drift includes remediation"
+                            (driftReport.Findings
+                             |> List.exists (fun finding ->
+                                 finding.Code = "COND-DOC-LOCK"
+                                 && finding.Severity = Doctor.Error
+                                 && finding.Remediation.IsSome))))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
