@@ -337,7 +337,8 @@ let private runDoctor json target manifestPath =
             writeDoctorJson report
         else
             Console.WriteLine $"Project: {report.Project}"
-            Console.WriteLine $"Doctor: {if report.Healthy then "healthy" else "attention required"}"
+            let healthText = if report.Healthy then "healthy" else "attention required"
+            Console.WriteLine $"Doctor: {healthText}"
 
             for finding in report.Findings do
                 Console.WriteLine $"  [{Doctor.severityText finding.Severity}] {finding.Code} {finding.Area}: {finding.Detail}"
