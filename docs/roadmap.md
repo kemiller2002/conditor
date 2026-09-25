@@ -21,7 +21,10 @@ Status: substantially implemented and exercised by clean-room CI.
 
 Implemented:
 
-- self-contained native CLI publishing and native smoke execution
+- six self-contained release targets for Linux, macOS, and Windows on x64 and ARM64
+- SHA-256 release checksum generation
+- checksum-verifying Unix and PowerShell installers
+- native Linux CLI smoke execution
 - `fsharp-limen-web` scaffold
 - explicit package binding for Forma, Folio, Aegis, and Limen
 - foundation and Aegis boundary manifests
@@ -33,7 +36,7 @@ Implemented:
 
 Remaining:
 
-- complete signed/checksum-verified release delivery for every supported OS/architecture
+- signature/attestation policy beyond published SHA-256 checksums
 - first-class compatibility graph instead of only registry-level source/version constraints
 - broader scaffold catalog
 - `status`, `upgrade`, `repair`, and generated-state reset/reconciliation commands
@@ -85,9 +88,9 @@ Remaining:
 
 ## Indy Init competition preset
 
-Status: governed preset assembled; launch enablement follows the reusable clean-room gate.
+Status: governed preset assembled and execution-enabled after the reusable clean-room gate passed.
 
-The preset currently pins:
+The preset defaults to Codex and can be started with Claude through the safe launcher override. It currently pins:
 
 - Praxis, Ordo, Visual Engineering, Communication Engineering, Limen, Forma, Folio, Aegis, and Tutela;
 - the Indy Init kickoff contract and normative requirements to an exact Indy Init commit; and
