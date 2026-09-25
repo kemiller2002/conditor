@@ -654,6 +654,45 @@ withTarget
                              && item.State = Status.Informational
                              && item.Detail.Contains("disabled")))))
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"repair-demo","components":[],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                match Manifest.load manifestPath with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"repair manifest parses: {details}" false
+                | Ok manifest ->
+                    let targetManifest = Path.Combine(target, "conditor.json")
+                    File.Copy(manifestPath, targetManifest)
+
+                    let plan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    LockFile.write target targetManifest plan |> ignore
+
+                    match Repair.reconcile target targetManifest manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"intact locked project repairs: {details}" false
+                    | Ok() ->
+                        check "intact locked project repairs" true
+
+                    File.AppendAllText(targetManifest, Environment.NewLine)
+
+                    match Repair.reconcile target targetManifest manifest with
+                    | Error errors ->
+                        check
+                            "repair refuses manifest drift"
+                            (errors |> List.exists (fun error -> error.Contains("manifest has changed")))
+                    | Ok() ->
+                        check "repair refuses manifest drift" false))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
