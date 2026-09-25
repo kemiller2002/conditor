@@ -128,6 +128,10 @@ jobs:
             exit 0
           fi
           if [[ "${1:-}" == "login" && "${2:-}" == "status" ]]; then
+            if [[ -n "${OPENAI_FEDERATION_RULE_ID:-}" || -n "${OPENAI_IDENTITY_TOKEN_FILE:-}" ]]; then
+              echo "login status must not consume a WIF assertion during Conditor readiness" >&2
+              exit 91
+            fi
             echo "Logged in for Conditor CI"
             exit 0
           fi
@@ -160,6 +164,16 @@ jobs:
           chmod +x "$RUNNER_TEMP/fake-bin/claude"
       - name: Check execution readiness
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --target "$RUNNER_TEMP/conditor-empty"
+      - name: Check Codex workload identity readiness without consuming assertion
+        run: |
+          mkdir -p "$RUNNER_TEMP/openai-wif"
+          chmod 700 "$RUNNER_TEMP/openai-wif"
+          printf '%s\n' 'fake-github-oidc-jwt' > "$RUNNER_TEMP/openai-wif/identity-token"
+          chmod 600 "$RUNNER_TEMP/openai-wif/identity-token"
+          PATH="$RUNNER_TEMP/fake-bin:$PATH" \
+          OPENAI_FEDERATION_RULE_ID="idpm_conditor_ci" \
+          OPENAI_IDENTITY_TOKEN_FILE="$RUNNER_TEMP/openai-wif/identity-token" \
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --target "$RUNNER_TEMP/conditor-empty"
       - name: Check Claude launcher override
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --launcher claude --target "$RUNNER_TEMP/conditor-empty"
       - name: Refuse resume before mission activation
