@@ -15,6 +15,7 @@ let private usage () =
     Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor upgrade [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
 let private optionValue name (args: string array) =
@@ -169,6 +170,26 @@ let private runStart checkOnly launcherOverride target selection =
             else
                 runEstablishedStart false launcherOverride target targetManifest
 
+let private runUpgrade target manifestPath =
+    match Manifest.load manifestPath with
+    | Error errors ->
+        writeErrors errors
+        2
+    | Ok manifest ->
+        match Upgrade.apply target manifestPath manifest with
+        | Error errors ->
+            writeErrors errors
+            9
+        | Ok result ->
+            if result.ChangedComponents.IsEmpty then
+                Console.WriteLine "Conditor upgrade completed: no lifecycle version changes were required."
+            else
+                let changed = String.Join(", ", result.ChangedComponents)
+                Console.WriteLine $"Conditor upgraded lifecycle components: {changed}"
+
+            Console.WriteLine $"Updated lock: {result.LockPath}"
+            0
+
 let private runRepair target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
@@ -243,6 +264,7 @@ let main (args: string array) =
                 | "doctor" -> run Doctor true target selection
                 | "status" -> runStatus target selection.ManifestPath
                 | "repair" -> runRepair target selection.ManifestPath
+                | "upgrade" -> runUpgrade target selection.ManifestPath
                 | "start" ->
                     runStart
                         (hasFlag "--check" args)
