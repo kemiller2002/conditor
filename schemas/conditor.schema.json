@@ -53,8 +53,10 @@
           "default": false
         },
         "launcher": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "codex",
+            "claude"
+          ]
         },
         "mission": {
           "type": "string",
@@ -128,5 +130,37 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "execution"
+        ]
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "required": [
+              "launcher",
+              "contractPath"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }
