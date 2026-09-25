@@ -2,15 +2,15 @@
 
 ## Purpose
 
-Conditor is the establishment layer for an Echelon project. It begins before application code exists.
+Conditor is the establishment layer for an Echelon project. It begins before application code exists and carries the repository through a verified execution handoff.
 
 The core invariant is:
 
 > Conditor orchestrates capabilities; it does not absorb their implementation or ownership.
 
-A component that owns repository lifecycle behavior remains responsible for its own `init`, `verify`, `doctor`, and `upgrade` semantics. Conditor resolves the desired system and invokes those contracts in a deterministic order.
+A component that owns repository lifecycle behavior remains responsible for its own `init`, `verify`, `doctor`, and `upgrade` semantics. Conditor resolves the desired system, invokes those contracts deterministically, binds application dependencies only to declared scaffold targets, and refuses to launch an agent until the governed repository is execution-ready.
 
-## Pipeline
+## Implemented pipeline
 
 ```text
 empty repository
@@ -19,50 +19,129 @@ empty repository
 conditor.json
       |
       v
-manifest validation
+manifest + source validation
       |
       v
-registry resolution
+registry/distribution resolution
       |
       v
-deterministic plan
+read-only deterministic plan
       |
       v
-capability init
+capability installation
       |
       v
 capability verification
       |
       v
+deterministic project scaffold
+      |
+      +--> explicit Forma / Folio / Aegis / Limen bindings
+      +--> application foundation metadata
+      +--> shared-file managed regions
+      |
+      v
+immutable requirements materialization
+      |
+      v
+Ordo greenfield baseline
+      |
+      +--> SDE-MAP.md
+      +--> bounded context/CURRENT-STATE.md baseline
+      +--> explicit unknowns and obligations
+      |
+      v
+strict project readiness verification
+      |
+      v
+Praxis mission creation
+      |
+      v
 .conditor/lock.json
       |
       v
-project scaffold / dependency binding   [next slice]
+conditor start --check
+      |
+      +--> lock/manifest identity
+      +--> requirement drift checks
+      +--> canonical contract existence
+      +--> component/project verification
+      +--> mission launchability
+      +--> provider executable/authentication
       |
       v
-requirements ingestion                  [next slice]
+Praxis mission activation
       |
       v
-mission creation + agent launcher       [next slice]
+Codex / Claude launcher adapter
+      |
+      v
+agent execution
 ```
 
-## Boundaries
+Agent process success does not complete the Praxis mission. Project completion remains evidence-driven through the repository's governing requirements and verification contracts.
 
-Conditor owns orchestration, version resolution, planning, installation ordering, lock state, compatibility checks, and launch handoff.
+## State and authority boundaries
 
-Praxis, Ordo, Visual Engineering, Communication Engineering, and Limen own their installed files and lifecycle semantics.
+Conditor owns orchestration, source/version resolution, planning, installation ordering, scaffold selection, immutable requirements materialization, Conditor lock state, readiness gating, initial mission handoff, and provider launch.
 
-Forma, Folio, and Aegis are application dependencies, not repository lifecycle systems. Conditor will bind them only after it knows the application scaffold and the exact package target.
+Praxis owns repository work state, attribution, execution telemetry, mission lifecycle, and completion evidence.
+
+Ordo owns semantic engineering rules. Conditor initializes only a greenfield routing baseline from accepted governing inputs. It does not invent domain concepts, legal states, transitions, invariants, capabilities, or effect semantics.
+
+Lifecycle capabilities own their installed tool files and lifecycle semantics. Application libraries such as Forma, Folio, Aegis, and Limen application bindings are installed only when an explicit scaffold identifies the correct package/project target.
+
+Percepta contracts may be materialized as immutable governing artifacts without implying that the Percepta CLI itself has been installed.
+
+## Shared integration files
+
+Some repository files are integration surfaces rather than single-tool property. Conditor therefore uses bounded managed regions instead of claiming entire-file ownership.
+
+Current examples:
+
+- `AGENTS.md`: Conditor owns only the `conditor:agent-entry` region.
+- `context/CURRENT-STATE.md`: Conditor owns only the `conditor:ordo-baseline` region.
+
+Content outside those markers is preserved. A malformed partial region is a hard failure rather than an excuse to overwrite surrounding content.
+
+## Distribution identity
+
+Capability version and distribution identity are separate concepts.
+
+A capability can currently resolve from:
+
+- an exact package-registry version; or
+- an exact GitHub commit plus declared executable entrypoint.
+
+Moving branch names are not accepted as reproducible sources. The resolved source reference is written into Conditor lock state.
 
 ## Failure semantics
 
 - Planning is read-only.
-- Unknown required components fail before mutation.
-- Unsupported application dependency binding fails before mutation.
-- Execution stops on the first failed lifecycle action.
-- The Conditor lock is written only after every requested action succeeds.
-- Component lifecycle tools remain responsible for their own atomicity and conflict detection.
+- Unknown required components fail before target mutation.
+- Invalid or escaping requirement paths fail before target mutation.
+- A fixed-source capability version without an immutable mapping fails closed.
+- Application dependency binding without an explicit scaffold fails closed.
+- Existing user-owned files are not silently overwritten.
+- Shared files are modified only inside valid Conditor-managed regions.
+- Lifecycle execution stops on the first required failure.
+- The Conditor lock is written only after initialization, requirements materialization, readiness verification, and initial mission establishment succeed.
+- `conditor start` refuses execution when the manifest has drifted from the lock, governing requirements differ from their pinned sources, the contract is missing, verification fails, the Praxis mission cannot be launched, or provider authentication is unavailable.
 
-## Reproducibility
+## Reproducibility and clean-room proof
 
-Competition presets and committed production manifests should pin every component explicitly. The generated lock records every resolved version and a SHA-256 of the manifest.
+Competition and production presets pin component versions and immutable requirement sources. The generated lock records resolved component/distribution identity and a SHA-256 of the manifest.
+
+CI exercises:
+
+- build and dependency-free unit tests;
+- deterministic planning;
+- a self-contained native Conditor binary;
+- empty-repository initialization;
+- immutable requirement materialization;
+- Ordo baseline generation;
+- Praxis mission creation and activation;
+- `start --check`;
+- a fake Codex adapter so the execution boundary is tested without model credentials;
+- a sacrificial factory rehearsal that rejects accidental application implementation; and
+- repeated initialization with a repository snapshot comparison to prove zero unintended drift.
