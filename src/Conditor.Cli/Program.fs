@@ -182,8 +182,8 @@ let private runStatus target manifestPath =
         else
             Console.WriteLine "Components:"
 
-            for component in report.Components do
-                Console.WriteLine $"  {component}"
+            for componentText in report.Components do
+                Console.WriteLine $"  {componentText}"
 
         Console.WriteLine "Checks:"
 
