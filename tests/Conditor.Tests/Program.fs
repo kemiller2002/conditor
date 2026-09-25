@@ -279,7 +279,7 @@ withTarget
     (fun target ->
         File.WriteAllText(Path.Combine(target, "Directory.Build.props"), "user-owned")
         withManifest
-            """{"schemaVersion":1,"name":"conflict-demo","components":[],"scaffold":{"kind":"fsharp-limen-web"}}"""
+            """{"schemaVersion":1,"name":"conflict-demo","components":[{"id":"limen","version":"0.6.1"}],"scaffold":{"kind":"fsharp-limen-web"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error _ ->
@@ -371,7 +371,7 @@ withManifest
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"contract-demo","components":[],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"package.json"},"targetPath":".echelon/kickoff/project.json"}],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
+            """{"schemaVersion":1,"name":"contract-demo","components":[{"id":"limen","version":"0.6.1"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"package.json"},"targetPath":".echelon/kickoff/project.json"}],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
@@ -511,7 +511,7 @@ withTarget
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"ordo-baseline-demo","components":[{"id":"ordo","version":"1.3.0"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.md"}],"execution":{"enabled":false,"contractPath":"requirements/contract.md"},"scaffold":{"kind":"fsharp-limen-web","name":"ordo-baseline-demo"}}"""
+            """{"schemaVersion":1,"name":"ordo-baseline-demo","components":[{"id":"ordo","version":"1.3.0"},{"id":"limen","version":"0.6.1"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.md"}],"execution":{"enabled":false,"contractPath":"requirements/contract.md"},"scaffold":{"kind":"fsharp-limen-web","name":"ordo-baseline-demo"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
@@ -560,7 +560,7 @@ withTarget
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"praxis-reconcile-demo","components":[{"id":"praxis","version":"3.1.4"}],"scaffold":{"kind":"fsharp-limen-web","name":"praxis-reconcile-demo"}}"""
+            """{"schemaVersion":1,"name":"praxis-reconcile-demo","components":[{"id":"praxis","version":"3.1.4"},{"id":"limen","version":"0.6.1"}],"scaffold":{"kind":"fsharp-limen-web","name":"praxis-reconcile-demo"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
