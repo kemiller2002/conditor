@@ -622,6 +622,38 @@ match Presets.resolve "does-not-exist" with
 | Ok _ ->
     check "unknown embedded preset rejected" false
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"status-demo","components":[],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                match Manifest.load manifestPath with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"status manifest parses: {details}" false
+                | Ok manifest ->
+                    let plan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    let targetManifest = Path.Combine(target, "conditor.json")
+                    File.Copy(manifestPath, targetManifest)
+                    LockFile.write target targetManifest plan |> ignore
+
+                    let report = Status.inspect target targetManifest manifest
+                    check "status report is healthy for locked empty project" (Status.isHealthy report)
+                    check "status reports project name" (report.Project = "status-demo")
+                    check
+                        "status reports disabled execution informationally"
+                        (report.Checks
+                         |> List.exists (fun item ->
+                             item.Name = "execution"
+                             && item.State = Status.Informational
+                             && item.Detail.Contains("disabled")))))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
