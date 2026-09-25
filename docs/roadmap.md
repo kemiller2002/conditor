@@ -42,7 +42,7 @@ Implemented:
 - structured read-only `doctor` with stable finding codes, remediation, and JSON output
 - explicit machine-readable compatibility graph with qualified versions and dependency rules
 - locked-state `repair` that refuses declaration drift
-- Conditor lock schema v2 with the prior governing declaration
+- Conditor lock schema v3 with the prior governing declaration and component descriptor identities
 - initial version-only lifecycle `upgrade` path with hard rejection of application-bound/governance changes
 - real Praxis lifecycle upgrade rehearsal in CI
 
