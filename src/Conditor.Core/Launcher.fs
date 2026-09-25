@@ -1,6 +1,7 @@
 namespace Conditor.Core
 
 open System
+open System.IO
 
 module Launcher =
     let private successOrErrors (name: string) (result: ProcessResult) =
@@ -17,13 +18,51 @@ module Launcher =
         ProcessRunner.runProcess target executable arguments
         |> successOrErrors name
 
+    let private environmentValue name =
+        Environment.GetEnvironmentVariable name
+        |> Option.ofObj
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+    let private validateCodexWorkloadIdentity () =
+        let ruleId = environmentValue "OPENAI_FEDERATION_RULE_ID"
+        let tokenPath = environmentValue "OPENAI_IDENTITY_TOKEN_FILE"
+
+        match ruleId, tokenPath with
+        | None, None -> Ok false
+        | Some _, None ->
+            Error
+                [ "OPENAI_FEDERATION_RULE_ID is set but OPENAI_IDENTITY_TOKEN_FILE is missing."
+                  "Codex workload identity requires both variables." ]
+        | None, Some _ ->
+            Error
+                [ "OPENAI_IDENTITY_TOKEN_FILE is set but OPENAI_FEDERATION_RULE_ID is missing."
+                  "Codex workload identity requires both variables." ]
+        | Some _, Some path when not (Path.IsPathRooted path) ->
+            Error [ "OPENAI_IDENTITY_TOKEN_FILE must be an absolute path." ]
+        | Some _, Some path when not (File.Exists path) ->
+            Error [ $"Codex workload identity token file is missing: {path}" ]
+        | Some _, Some path ->
+            let token = File.ReadAllText(path).Trim()
+
+            if String.IsNullOrWhiteSpace token then
+                Error [ $"Codex workload identity token file is empty: {path}" ]
+            else
+                Ok true
+
     let probe target (launcher: string) =
         match launcher.Trim().ToLowerInvariant() with
         | "codex" ->
             match probeCommand target "codex" [ "--version" ] "Codex" with
             | Error errors -> Error errors
             | Ok() ->
-                probeCommand target "codex" [ "login"; "status" ] "Codex authentication"
+                match validateCodexWorkloadIdentity () with
+                | Error errors -> Error errors
+                | Ok true ->
+                    // Avoid login-status under WIF. Replay protection can consume
+                    // the GitHub OIDC assertion before the actual exec process.
+                    Ok()
+                | Ok false ->
+                    probeCommand target "codex" [ "login"; "status" ] "Codex authentication"
         | "claude" ->
             match probeCommand target "claude" [ "--version" ] "Claude Code" with
             | Error errors -> Error errors
