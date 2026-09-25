@@ -202,13 +202,13 @@ module ComponentDescriptors =
             if errors.Count > 0 then
                 Error(List.ofSeq errors)
             else
-                Ok
-                    let descriptorSha256 =
-                        Encoding.UTF8.GetBytes(text)
-                        |> SHA256.HashData
-                        |> Convert.ToHexString
-                        |> fun value -> value.ToLowerInvariant()
+                let descriptorSha256 =
+                    Encoding.UTF8.GetBytes(text)
+                    |> SHA256.HashData
+                    |> Convert.ToHexString
+                    |> fun value -> value.ToLowerInvariant()
 
+                Ok
                     { Definition =
                         { Id = id
                           DisplayName = displayName
