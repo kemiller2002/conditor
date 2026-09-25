@@ -154,6 +154,7 @@ module Planner =
             sequence <- sequence + 1
 
         let mutable limenReadiness: (string * ComponentDefinition) option = None
+        let mutable praxisReconciliation: (ComponentRequest * string * ComponentDefinition) option = None
 
         for request in manifest.Components do
             match Registry.tryFind request.Id with
@@ -191,6 +192,9 @@ module Planner =
 
                         if definition.Id = "limen" && manifest.Scaffold.IsSome then
                             limenReadiness <- Some(version, definition)
+
+                        if definition.Id = "praxis" && manifest.Scaffold.IsSome then
+                            praxisReconciliation <- Some(request, version, definition)
                 | NpmPackage
                 | NugetPackage ->
                     resolved.Add
@@ -243,6 +247,13 @@ module Planner =
                       Execution = MaterializeSourceFile(requirement.Source, requirement.TargetPath) }
 
                 sequence <- sequence + 1
+
+        if errors.Count = 0 && operation = Init then
+            match praxisReconciliation with
+            | Some(request, version, definition) ->
+                addLifecycleAction request version definition "install" definition.InitArguments
+                addLifecycleAction request version definition "verify" definition.VerifyArguments
+            | None -> ()
 
         if errors.Count = 0 then
             match limenReadiness, operation with
