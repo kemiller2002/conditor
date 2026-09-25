@@ -139,4 +139,4 @@ jobs:
           test -f "$RUNNER_TEMP/evidence-triage-rehearsal/AGENTS.md"
           test -f "$RUNNER_TEMP/evidence-triage-rehearsal/kickoff/evidence-triage.kickoff.json"
           test -f "$RUNNER_TEMP/evidence-triage-rehearsal/.conditor/lock.json"
-          grep -F "canonical execution contract" "$RUNNER_TEMP/evidence-triage-rehearsal/AGENTS.md"
+          grep -F "Canonical execution contract" "$RUNNER_TEMP/evidence-triage-rehearsal/AGENTS.md"
