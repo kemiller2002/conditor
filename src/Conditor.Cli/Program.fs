@@ -157,7 +157,7 @@ let private runResume launcherOverride target manifestPath =
                 Console.WriteLine "Launcher resume exited successfully. Praxis remains authoritative for mission completion."
                 0
 
-let private writeExternalPrompt target promptPath promptText =
+let private writeExternalPrompt (target: string) (promptPath: string) (promptText: string) =
     if not (Path.IsPathRooted promptPath) then
         Error [ "--prompt-file must be an absolute path outside the target repository." ]
     else
@@ -173,10 +173,10 @@ let private writeExternalPrompt target promptPath promptText =
             Error [ "--prompt-file must be outside the target repository." ]
         else
             try
-                let parent = Path.GetDirectoryName fullPath
-
-                if not (String.IsNullOrWhiteSpace parent) then
-                    Directory.CreateDirectory parent |> ignore
+                match Path.GetDirectoryName fullPath with
+                | null -> ()
+                | parent when String.IsNullOrWhiteSpace parent -> ()
+                | parent -> Directory.CreateDirectory parent |> ignore
 
                 let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
 
