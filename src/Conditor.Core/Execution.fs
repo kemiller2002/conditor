@@ -40,3 +40,22 @@ module Execution =
                   "Use 'conditor start' to activate a ready mission; resume never performs a state transition." ]
         | Ok ready ->
             executeLauncher target ready
+
+    let handoff resumeOnly target manifestPath manifest =
+        match Readiness.check target manifestPath manifest with
+        | Error errors -> Error errors
+        | Ok ready when resumeOnly && ready.MissionState <> "active" ->
+            Error
+                [ $"Praxis mission '{ready.Mission.Id}' is '{ready.MissionState}', not active."
+                  "External resume handoff never performs a state transition." ]
+        | Ok ready ->
+            let activation =
+                if resumeOnly then
+                    Ok()
+                else
+                    Mission.activate target ready.Mission
+
+            match activation with
+            | Error errors -> Error errors
+            | Ok() ->
+                Ok(ready, Launcher.instruction ready)
