@@ -2,6 +2,7 @@ open System
 open System.IO
 open System.Text.Json
 open Conditor.Core
+open Aegis
 
 type private ManifestSelection =
     { ManifestPath: string
@@ -422,8 +423,7 @@ let private printPresets () =
 
     0
 
-[<EntryPoint>]
-let main (args: string array) =
+let private execute (args: string array) =
     if args.Length = 0 then
         usage ()
         1
@@ -470,3 +470,42 @@ let main (args: string array) =
                 | _ ->
                     usage ()
                     1
+
+
+[<EntryPoint>]
+let main (args: string array) =
+    let version =
+        System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
+        |> Option.ofObj
+        |> Option.map string
+
+    let config = Aegis.configure "Conditor.Cli" version [ Sinks.console ]
+
+    match Bootstrap.validate None config with
+    | Result.Error problems ->
+        for problem in problems do
+            let _, message = Bootstrap.describe problem
+            Console.Error.WriteLine $"Aegis configuration error: {message}"
+
+        1
+    | Ok validated ->
+        let scope = Aegis.scope validated "Conditor.Cli.Main" Map.empty
+
+        let classify scope ex =
+            Aegis.faultOf
+                validated
+                scope
+                (FaultCode "CONDITOR.CLI.UNHANDLED")
+                UnknownFailure
+                FaultSeverity.Error
+                DegradedApplication
+                RequiresIntervention
+                ManualIntervention
+                "Conditor encountered an unexpected operational failure."
+                ex
+
+        match Aegis.capture validated scope classify (fun () -> execute args) with
+        | Ok exitCode -> exitCode
+        | Result.Error fault ->
+            Console.Error.WriteLine $"{fault.UserMessage} Reference {fault.Id.Value}"
+            1
