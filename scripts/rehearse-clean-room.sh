@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET="${1:-$(mktemp -d)}"
-MANIFEST="$ROOT/examples/rehearsal-evidence-triage.conditor.json"
-
 cleanup=0
 if [[ $# -eq 0 ]]; then
   cleanup=1
@@ -22,9 +20,9 @@ git -C "$TARGET" init -q
 
 pushd "$ROOT" >/dev/null
 
-dotnet run --project src/Conditor.Cli --configuration Release -- plan   --target "$TARGET"   --manifest "$MANIFEST"
+dotnet run --project src/Conditor.Cli --configuration Release -- plan --preset evidence-triage-rehearsal --target "$TARGET"
 
-dotnet run --project src/Conditor.Cli --configuration Release -- init   --target "$TARGET"   --manifest "$MANIFEST"
+dotnet run --project src/Conditor.Cli --configuration Release -- init --preset evidence-triage-rehearsal --target "$TARGET"
 
 popd >/dev/null
 
@@ -45,8 +43,8 @@ snapshot_tree > "$FIRST_SNAPSHOT"
 
 pushd "$ROOT" >/dev/null
 dotnet run --project src/Conditor.Cli --configuration Release -- init \
-  --target "$TARGET" \
-  --manifest "$MANIFEST"
+  --preset evidence-triage-rehearsal \
+  --target "$TARGET"
 popd >/dev/null
 
 snapshot_tree > "$SECOND_SNAPSHOT"
