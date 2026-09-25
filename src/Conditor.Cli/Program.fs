@@ -462,6 +462,7 @@ let private printComponents json =
             writer.WriteString("distribution", distributionText definition.Distribution)
             writer.WriteString("package", definition.Package)
             writer.WriteString("defaultVersion", definition.DefaultVersion)
+            writer.WriteString("descriptorSha256", descriptor.Sha256)
             writer.WriteStartArray("qualifiedVersions")
 
             for version in descriptor.QualifiedVersions |> Seq.sort do
@@ -498,7 +499,7 @@ let private printComponents json =
                 |> Option.defaultValue "application-binding-only"
 
             Console.WriteLine
-                $"  {definition.Id}@{definition.DefaultVersion} [{distributionText definition.Distribution}] qualified={versions} source={source}"
+                $"  {definition.Id}@{definition.DefaultVersion} [{distributionText definition.Distribution}] qualified={versions} descriptor={descriptor.Sha256} source={source}"
 
     0
 
