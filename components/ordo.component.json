@@ -6,7 +6,8 @@
   "package": "@echelon-foundry/sde",
   "defaultVersion": "1.3.0",
   "qualifiedVersions": [
-    "1.3.0"
+    "1.3.0",
+    "1.4.0"
   ],
   "lifecycleSource": {
     "kind": "registry"
