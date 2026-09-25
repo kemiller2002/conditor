@@ -27,6 +27,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-plan"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- presets
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility --json > "$RUNNER_TEMP/conditor-compatibility.json"
+          grep -F '"schemaVersion": 1' "$RUNNER_TEMP/conditor-compatibility.json"
+          grep -F '"id": "praxis"' "$RUNNER_TEMP/conditor-compatibility.json"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --preset clean-room --target "$RUNNER_TEMP/conditor-plan"
       - name: Indy Init preset plan smoke test
         run: |
@@ -246,6 +250,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/conditor-native-target"
           chmod +x "$RUNNER_TEMP/conditor-native/conditor"
           "$RUNNER_TEMP/conditor-native/conditor" presets
+          "$RUNNER_TEMP/conditor-native/conditor" compatibility
           "$RUNNER_TEMP/conditor-native/conditor" plan --preset clean-room --target "$RUNNER_TEMP/conditor-native-target"
 
 
