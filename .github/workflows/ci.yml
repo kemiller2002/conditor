@@ -88,8 +88,29 @@ jobs:
           exit 2
           EOF
           chmod +x "$RUNNER_TEMP/fake-bin/codex"
+          cat > "$RUNNER_TEMP/fake-bin/claude" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ "${1:-}" == "--version" ]]; then
+            echo "claude-test 1.0"
+            exit 0
+          fi
+          if [[ "${1:-}" == "auth" && "${2:-}" == "status" ]]; then
+            echo "authenticated"
+            exit 0
+          fi
+          if [[ "${1:-}" == "-p" ]]; then
+            echo "fake Claude execution accepted"
+            exit 0
+          fi
+          echo "unexpected fake claude invocation: $*" >&2
+          exit 2
+          EOF
+          chmod +x "$RUNNER_TEMP/fake-bin/claude"
       - name: Check execution readiness
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
+      - name: Check Claude launcher override
+        run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --check --launcher claude --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
       - name: Start through fake Codex adapter
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --target "$RUNNER_TEMP/conditor-empty" --manifest "$RUNNER_TEMP/conditor-empty/conditor.json"
       - name: Verify execution handoff remains Praxis-owned
