@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "folio",
+  "displayName": "Folio",
+  "distribution": "npm",
+  "package": "@echelon-foundry/print-components",
+  "defaultVersion": "0.3.0",
+  "qualifiedVersions": [
+    "0.3.0"
+  ],
+  "applicationBinding": "npm",
+  "initArguments": [],
+  "verifyArguments": [],
+  "doctorArguments": [],
+  "upgradeArguments": []
+}
