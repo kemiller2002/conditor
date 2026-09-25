@@ -42,9 +42,20 @@ grep -F "@echelon-foundry/design-system" "$TARGET/src/kernel/package.json"
 grep -F "@echelon-foundry/print-components" "$TARGET/src/kernel/package.json"
 grep -F "EchelonFoundry.Aegis.Core" "$TARGET/src/engine/App.Engine.fsproj"
 
-if find "$TARGET" -maxdepth 3 -type f | grep -E '/(index\.html|App\.fs|Program\.fs)$' >/dev/null 2>&1; then
+if find "$TARGET" -maxdepth 3 -type f \( -name 'App.fs' -o -name 'Program.fs' \) | grep . >/dev/null 2>&1; then
   echo "Unexpected application implementation detected in bootstrap output." >&2
   exit 1
 fi
+
+unexpected_index="$(
+  find "$TARGET" -maxdepth 3 -type f -name 'index.html' ! -path "$TARGET/src/kernel/index.html" -print -quit
+)"
+if [[ -n "$unexpected_index" ]]; then
+  echo "Unexpected application index detected in bootstrap output: $unexpected_index" >&2
+  exit 1
+fi
+
+grep -F 'export const scaffoldReady = true as const;' "$TARGET/src/kernel/bootstrap.ts"
+grep -F '<ef-button><button type="button">Ready</button></ef-button>' "$TARGET/src/kernel/index.html"
 
 echo "Conditor clean-room rehearsal bootstrap passed: $TARGET"
