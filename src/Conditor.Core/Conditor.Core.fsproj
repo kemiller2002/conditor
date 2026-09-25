@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Domain.fs" />
+    <Compile Include="Presets.fs" />
     <Compile Include="Manifest.fs" />
     <Compile Include="Registry.fs" />
     <Compile Include="SourceCache.fs" />
@@ -17,5 +18,10 @@
     <Compile Include="Readiness.fs" />
     <Compile Include="Launcher.fs" />
     <Compile Include="Execution.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />
+    <EmbeddedResource Include="../../examples/clean-room.conditor.json" LogicalName="Conditor.Presets.clean-room.json" />
+    <EmbeddedResource Include="../../examples/rehearsal-evidence-triage.conditor.json" LogicalName="Conditor.Presets.evidence-triage-rehearsal.json" />
   </ItemGroup>
 </Project>
