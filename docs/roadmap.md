@@ -36,13 +36,18 @@ Implemented:
 - strict Limen project-readiness verification
 - sacrificial clean-room/factory rehearsal
 - second-initialization no-drift assertion
+- read-only `status` across lock, requirements, lifecycle verification, and execution readiness
+- locked-state `repair` that refuses declaration drift
+- Conditor lock schema v2 with the prior governing declaration
+- initial version-only lifecycle `upgrade` path with hard rejection of application-bound/governance changes
+- real Praxis lifecycle upgrade rehearsal in CI
 
 Remaining:
 
 - signature/attestation policy beyond published SHA-256 checksums
 - first-class compatibility graph instead of only registry-level source/version constraints
 - broader scaffold catalog
-- `status`, `upgrade`, `repair`, and generated-state reset/reconciliation commands
+- generated-state reset/reconciliation commands
 
 ## Slice 3: requirements to mission
 
