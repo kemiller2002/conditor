@@ -33,28 +33,29 @@ fi
 echo "Fresh-agent target: $TARGET"
 echo "Launcher: $LAUNCHER"
 
+set +e
 "${CONDITOR[@]}" start \
   --preset evidence-triage-rehearsal \
   --launcher "$LAUNCHER" \
   --target "$TARGET"
+start_code=$?
+set -e
 
-test -f "$TARGET/.ros/context/current.json"
-test -f "$TARGET/.conditor/lock.json"
-test -f "$TARGET/conditor.json"
-
-if ! grep -F '"id": "COND-MISSION-001"' "$TARGET/.ros/context/current.json" >/dev/null; then
-  echo "Praxis mission is missing from live work context." >&2
-  exit 3
-fi
-
-if ! grep -F '"semanticState": "complete"' "$TARGET/.ros/context/current.json" >/dev/null; then
-  echo "Fresh agent returned without completing the Praxis mission." >&2
-  echo "Repository retained for inspection: $TARGET" >&2
-  exit 4
-fi
-
-node "$TARGET/ros" validate
-
+set +e
 bash "$ROOT/scripts/score-fresh-agent-rehearsal.sh" "$TARGET"
+score_code=$?
+set -e
+
+if [[ "$start_code" -ne 0 ]]; then
+  echo "Conditor/provider execution failed with exit code $start_code." >&2
+  echo "Repository and independent score retained for inspection: $TARGET" >&2
+  exit "$start_code"
+fi
+
+if [[ "$score_code" -ne 0 ]]; then
+  echo "Fresh agent returned, but independent rehearsal acceptance failed." >&2
+  echo "Repository retained for inspection: $TARGET" >&2
+  exit "$score_code"
+fi
 
 echo "Fresh-agent rehearsal passed: $TARGET"
