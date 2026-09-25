@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "visual-engineering",
+  "displayName": "Visual Engineering",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/visual-engineering",
+  "defaultVersion": "1.0.0",
+  "qualifiedVersions": [
+    "1.0.0"
+  ],
+  "lifecycleSource": {
+    "kind": "registry"
+  },
+  "command": "visual-engineering",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
