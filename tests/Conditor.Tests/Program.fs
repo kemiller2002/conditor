@@ -725,6 +725,127 @@ withTarget
                         (lockedManifest.GetProperty("name").GetString() = "lock-snapshot-demo"
                          && lockedManifest.GetProperty("schemaVersion").GetInt32() = 1)))
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"upgrade-noop","components":[],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                let targetManifest = Path.Combine(target, "conditor.json")
+                File.Copy(manifestPath, targetManifest)
+
+                match Manifest.load targetManifest with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"upgrade noop manifest parses: {details}" false
+                | Ok manifest ->
+                    let lockPlan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    LockFile.write target targetManifest lockPlan |> ignore
+
+                    match Upgrade.apply target targetManifest manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"no-op lifecycle upgrade succeeds: {details}" false
+                    | Ok result ->
+                        check "no-op lifecycle upgrade succeeds" result.ChangedComponents.IsEmpty))
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"upgrade-governance","components":[],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                let targetManifest = Path.Combine(target, "conditor.json")
+                File.Copy(manifestPath, targetManifest)
+
+                match Manifest.load targetManifest with
+                | Error _ ->
+                    check "upgrade governance baseline parses" false
+                | Ok manifest ->
+                    let lockPlan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    LockFile.write target targetManifest lockPlan |> ignore
+
+                    File.WriteAllText(
+                        targetManifest,
+                        """{"schemaVersion":1,"name":"upgrade-governance-renamed","components":[],"requirements":[],"execution":{"enabled":false}}"""
+                    )
+
+                    match Manifest.load targetManifest with
+                    | Error _ ->
+                        check "upgrade changed governance parses" false
+                    | Ok changedManifest ->
+                        match Upgrade.apply target targetManifest changedManifest with
+                        | Error errors ->
+                            check
+                                "upgrade rejects non-version governance changes"
+                                (errors |> List.exists (fun error -> error.Contains("unsupported governing fields")))
+                        | Ok _ ->
+                            check "upgrade rejects non-version governance changes" false))
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"upgrade-app-binding","components":[{"id":"forma","version":"0.2.0"}],"requirements":[],"execution":{"enabled":false}}"""
+            (fun manifestPath ->
+                let targetManifest = Path.Combine(target, "conditor.json")
+                File.Copy(manifestPath, targetManifest)
+
+                match Manifest.load targetManifest with
+                | Error _ ->
+                    check "upgrade app binding baseline parses" false
+                | Ok manifest ->
+                    let lockPlan =
+                        { ProjectName = manifest.Name
+                          Operation = Init
+                          Components = []
+                          Actions = [] }
+
+                    LockFile.write target targetManifest lockPlan |> ignore
+
+                    File.WriteAllText(
+                        targetManifest,
+                        """{"schemaVersion":1,"name":"upgrade-app-binding","components":[{"id":"forma","version":"0.3.0"}],"requirements":[],"execution":{"enabled":false}}"""
+                    )
+
+                    match Manifest.load targetManifest with
+                    | Error _ ->
+                        check "upgrade app binding changed manifest parses" false
+                    | Ok changedManifest ->
+                        match Upgrade.apply target targetManifest changedManifest with
+                        | Error errors ->
+                            check
+                                "upgrade rejects application-bound version changes"
+                                (errors |> List.exists (fun error -> error.Contains("application binding")))
+                        | Ok _ ->
+                            check "upgrade rejects application-bound version changes" false))
+
+withManifest
+    """{"schemaVersion":1,"name":"upgrade-plan","components":[{"id":"praxis","version":"3.1.4"}],"requirements":[],"execution":{"enabled":false}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "upgrade planner manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/upgrade-plan" Upgrade manifest with
+            | Error errors ->
+                let details = String.concat "; " errors
+                check $"upgrade planner succeeds: {details}" false
+            | Ok plan ->
+                check
+                    "upgrade planner emits lifecycle upgrade and verify"
+                    (plan.Actions.Length = 2
+                     && plan.Actions[0].Kind = UpgradeLifecycle
+                     && plan.Actions[1].Kind = VerifyLifecycle))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
