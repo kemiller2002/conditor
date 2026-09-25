@@ -10,6 +10,7 @@ type private ManifestSelection =
 let private usage () =
     Console.WriteLine "Conditor"
     Console.WriteLine "  conditor presets"
+    Console.WriteLine "  conditor compatibility [--json]"
     Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
@@ -365,6 +366,54 @@ let private runStatus json target manifestPath =
 
         if Status.isHealthy report then 0 else 7
 
+let private printCompatibility json =
+    if json then
+        use stream = Console.OpenStandardOutput()
+        let mutable options = JsonWriterOptions()
+        options.Indented <- true
+        use writer = new Utf8JsonWriter(stream, options)
+        writer.WriteStartObject()
+        writer.WriteNumber("schemaVersion", 1)
+        writer.WriteStartArray("components")
+
+        for item in Compatibility.supported |> List.sortBy _.Id do
+            writer.WriteStartObject()
+            writer.WriteString("id", item.Id)
+            writer.WriteStartArray("versions")
+
+            for version in item.Versions |> Seq.sort do
+                writer.WriteStringValue version
+
+            writer.WriteEndArray()
+            writer.WriteString("notes", item.Notes)
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+        writer.WriteStartArray("requirements")
+
+        for requirement in Compatibility.requirements do
+            writer.WriteStartObject()
+            writer.WriteString("subject", requirement.Subject)
+            writer.WriteString("requires", requirement.Requires)
+            writer.WriteString("reason", requirement.Reason)
+            writer.WriteEndObject()
+
+        writer.WriteEndArray()
+        writer.WriteEndObject()
+        writer.Flush()
+    else
+        Console.WriteLine "Qualified component versions:"
+
+        for line in Compatibility.describe () do
+            Console.WriteLine $"  {line}"
+
+        Console.WriteLine "Compatibility requirements:"
+
+        for requirement in Compatibility.requirements do
+            Console.WriteLine $"  {requirement.Subject} -> {requirement.Requires}: {requirement.Reason}"
+
+    0
+
 let private printPresets () =
     Console.WriteLine "Built-in Conditor presets:"
 
@@ -383,6 +432,8 @@ let main (args: string array) =
 
         if command = "presets" then
             printPresets ()
+        elif command = "compatibility" then
+            printCompatibility (hasFlag "--json" args)
         else
             let target =
                 optionValue "--target" args
