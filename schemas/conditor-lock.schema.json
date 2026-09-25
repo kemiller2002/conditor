@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://echelonfoundry.com/schemas/conditor-lock/v2",
+  "$id": "https://echelonfoundry.com/schemas/conditor-lock/v3",
   "title": "Conditor Lock",
   "type": "object",
   "additionalProperties": false,
@@ -14,7 +14,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 2
+      "const": 3
     },
     "project": {
       "type": "string",
@@ -32,7 +32,13 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "version", "distribution", "package"],
+        "required": [
+          "id",
+          "version",
+          "distribution",
+          "package",
+          "descriptorSha256"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -43,7 +49,11 @@
             "minLength": 1
           },
           "distribution": {
-            "enum": ["lifecycle-npm", "npm", "nuget"]
+            "enum": [
+              "lifecycle-npm",
+              "npm",
+              "nuget"
+            ]
           },
           "package": {
             "type": "string",
@@ -52,6 +62,10 @@
           "sourceReference": {
             "type": "string",
             "minLength": 1
+          },
+          "descriptorSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
           }
         }
       }
@@ -61,7 +75,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "sourceReference", "targetPath"],
+        "required": [
+          "id",
+          "sourceReference",
+          "targetPath"
+        ],
         "properties": {
           "id": {
             "type": "string",
