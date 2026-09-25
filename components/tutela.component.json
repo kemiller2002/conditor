@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "tutela",
+  "displayName": "Tutela Security Engineering",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/tutela",
+  "defaultVersion": "0.1.0",
+  "qualifiedVersions": [
+    "0.1.0"
+  ],
+  "lifecycleSource": {
+    "kind": "github",
+    "repository": "kemiller2002/tutela",
+    "commit": "1acf421e7d940665c134012f11b082a502e17537",
+    "entrypoint": {
+      "kind": "node-script",
+      "path": "bin/tutela.mjs"
+    }
+  },
+  "command": "tutela",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
