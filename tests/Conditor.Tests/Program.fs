@@ -324,7 +324,7 @@ withManifest
                 check
                     "tutela package source is immutable"
                     (plan.Components[0].SourceReference =
-                        Some "github:kemiller2002/tutela#5e9dcc56948d30f616659c8c2a4f0b7826aded8d|node:bin/tutela.mjs"))
+                        Some "github:kemiller2002/tutela#1acf421e7d940665c134012f11b082a502e17537|node:bin/tutela.mjs"))
 
 withManifest
     """{"schemaVersion":1,"name":"requirements-demo","components":[],"requirements":[{"id":"spec","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/SPEC.md"}]}"""
