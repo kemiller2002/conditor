@@ -70,7 +70,7 @@ module Doctor =
 
     let private lifecycleDoctorFindings target manifest =
         match Planner.create target Doctor manifest with
-        | Error errors ->
+        | Result.Error errors ->
             errors
             |> List.map (fun error ->
                 { Code = "COND-DOC-LIFECYCLE-PLAN"
