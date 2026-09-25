@@ -507,6 +507,55 @@ withTarget
                      && second.Contains("Read kickoff/project-v2.json first.")
                      && not (second.Contains("Read kickoff/project.json first."))))
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"ordo-baseline-demo","components":[{"id":"ordo","version":"1.3.0"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.md"}],"execution":{"enabled":false,"contractPath":"requirements/contract.md"},"scaffold":{"kind":"fsharp-limen-web","name":"ordo-baseline-demo"}}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"Ordo baseline manifest parses: {details}" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"Ordo baseline plans: {details}" false
+                    | Ok plan ->
+                        let semanticMap =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("SDE-MAP.md", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        let currentState =
+                            plan.Actions
+                            |> List.tryPick (fun action ->
+                                match action.Execution with
+                                | EnsureFile("context/CURRENT-STATE.md", fileContent) -> Some fileContent
+                                | _ -> None)
+
+                        check "Ordo semantic map is initialized" semanticMap.IsSome
+                        check "Ordo current-state baseline is initialized" currentState.IsSome
+
+                        check
+                            "Ordo baseline routes to accepted requirements without inventing semantics"
+                            (semanticMap
+                             |> Option.exists (fun text ->
+                                 text.Contains("requirements/contract.md")
+                                 && text.Contains("intentionally unknown")
+                                 && text.Contains("not established yet")))
+
+                        check
+                            "Ordo baseline preserves unknowns and obligations"
+                            (currentState
+                             |> Option.exists (fun text ->
+                                 text.Contains("Application domain concepts have not yet been derived")
+                                 && text.Contains("legal state and illegal states have not yet been identified")
+                                 && text.Contains("Preserve unknowns explicitly")))))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
