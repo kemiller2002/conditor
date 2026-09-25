@@ -101,6 +101,8 @@ module Planner =
         let actions = ResizeArray<PlanAction>()
         let mutable sequence = 1
 
+        Compatibility.validate manifest |> List.iter errors.Add
+
         for requirement in manifest.Requirements do
             validateRequirement target requirement |> List.iter errors.Add
 
