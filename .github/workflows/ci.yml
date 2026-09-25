@@ -23,6 +23,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-plan"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target "$RUNNER_TEMP/conditor-plan" --manifest examples/clean-room.conditor.json
+      - name: Indy Init preset plan smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/conditor-indy-plan"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --target "$RUNNER_TEMP/conditor-indy-plan" --manifest examples/indy-init.conditor.json
 
   empty-repository-smoke:
     if: github.event_name == 'push'
