@@ -32,19 +32,62 @@ dotnet build Conditor.slnx
 dotnet run --project tests/Conditor.Tests
 ```
 
+## Empty-repository quick start
+
+Built-in presets are embedded in the native Conditor executable, so a target repository does not need a Conditor source checkout or a manually copied manifest.
+
+```bash
+mkdir indy-demo
+cd indy-demo
+git init
+
+conditor start --preset indy-init
+```
+
+That single `start` command establishes an uninitialized repository when necessary, writes the exact preset to `conditor.json`, installs and verifies the declared Echelon environment, materializes pinned governing artifacts, creates the Ordo baseline and Praxis mission, checks execution readiness, activates the mission, and invokes the configured provider.
+
+The Indy Init preset defaults to Codex. The same initialized repository can be handed to Claude without editing its governing manifest:
+
+```bash
+conditor start --preset indy-init --launcher claude
+```
+
+Use `conditor start --check --preset indy-init` only after initialization when you want a read-only readiness check.
+
 ## CLI
 
 ```bash
+conditor presets
+conditor plan   --preset indy-init --target .
+conditor init   --preset indy-init --target .
+conditor start  --preset indy-init --target .
+
 conditor plan   --target . --manifest ./conditor.json
 conditor init   --target . --manifest ./conditor.json
 conditor verify --target . --manifest ./conditor.json
 conditor doctor --target . --manifest ./conditor.json
+conditor start  --check --target . --manifest ./conditor.json
 ```
 
-The committed Indy Init preset is at `examples/indy-init.conditor.json`. It is execution-enabled with Codex as its default launcher. Use `conditor start --launcher claude` to select Claude for the same initialized repository without editing the manifest.
+The committed source form of the Indy Init preset remains at `examples/indy-init.conditor.json`; release binaries embed that exact content.
 
 See `docs/architecture.md`, `docs/component-contract.md`, and `docs/roadmap.md`.
 
+
+
+## Private pinned sources
+
+A preset may reference an exact commit in a private GitHub repository. Conditor never writes source credentials into `conditor.json`, `.conditor/lock.json`, generated files, or command diagnostics.
+
+Git fetches can use an existing Git credential helper. For non-interactive environments, Conditor also recognizes these environment variables, in priority order:
+
+1. `CONDITOR_GITHUB_TOKEN`
+2. `GH_TOKEN`
+3. `GITHUB_TOKEN`
+
+The token is passed to the child Git process only as an in-memory HTTP authorization header and is not placed in the Git command line.
+
+For the private Indy Init governing repository, authenticate Git or set a token with read access before the first `init` or `start --preset indy-init`.
 
 ## Canonical execution contract
 
