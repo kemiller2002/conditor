@@ -25,6 +25,9 @@ Implemented:
 - SHA-256 release checksum generation
 - checksum-verifying Unix and PowerShell installers
 - native Linux CLI smoke execution
+- embedded named presets available directly from the self-contained binary
+- `plan --preset`, `init --preset`, and one-command `start --preset` bootstrap
+- external private-source Git authentication without persisting credentials
 - `fsharp-limen-web` scaffold
 - explicit package binding for Forma, Folio, Aegis, and Limen
 - foundation and Aegis boundary manifests
@@ -77,20 +80,21 @@ Implemented:
 - launch only after lock, requirement, contract, verification, and mission gates pass
 - Praxis activation before provider invocation
 - provider exit does not imply project completion
-- fake-Codex end-to-end CI path
+- safe `--launcher codex|claude` override that cannot enable disabled execution
+- fake Codex and fake Claude readiness coverage in public CI
+- authenticated fresh-agent rehearsal script kept outside public CI
 
 Remaining:
 
 - resumable provider execution metadata and explicit `resume`
-- provider selection/override policy for reusable presets
 - richer provider telemetry handoff into Praxis
-- release-level tests for actual authenticated launch kept separate from public CI
+- actual authenticated fresh-agent trial evidence for both providers
 
 ## Indy Init competition preset
 
-Status: governed preset assembled and execution-enabled after the reusable clean-room gate passed.
+Status: governed preset assembled, embedded in release binaries, and execution-enabled after the reusable clean-room gate passed.
 
-The preset defaults to Codex and can be started with Claude through the safe launcher override. It currently pins:
+The target command is `conditor start --preset indy-init`. The preset defaults to Codex and can be started with Claude through the safe launcher override. It currently pins:
 
 - Praxis, Ordo, Visual Engineering, Communication Engineering, Limen, Forma, Folio, Aegis, and Tutela;
 - the Indy Init kickoff contract and normative requirements to an exact Indy Init commit; and
