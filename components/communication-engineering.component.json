@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "communication-engineering",
+  "displayName": "Communication Engineering",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/communication-engineering",
+  "defaultVersion": "1.0.0",
+  "qualifiedVersions": [
+    "1.0.0"
+  ],
+  "lifecycleSource": {
+    "kind": "github",
+    "repository": "kemiller2002/communication-engineering",
+    "commit": "4590d2fe6f7e80b339117d3fbee5803f2dd39122",
+    "entrypoint": {
+      "kind": "node-script",
+      "path": "bin/communication-engineering.mjs"
+    }
+  },
+  "command": "communication-engineering",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
