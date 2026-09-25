@@ -53,16 +53,17 @@ module Presets =
             let temporary = $"{path}.{Guid.NewGuid():N}.tmp"
 
             try
-                File.WriteAllText(temporary, content, UTF8Encoding(false))
+                try
+                    File.WriteAllText(temporary, content, UTF8Encoding(false))
 
-                if File.Exists path then
-                    File.Move(temporary, path, true)
-                else
-                    File.Move(temporary, path)
+                    if File.Exists path then
+                        File.Move(temporary, path, true)
+                    else
+                        File.Move(temporary, path)
 
-                Ok()
-            with ex ->
-                Error [ $"Unable to stage built-in Conditor preset: {ex.Message}" ]
+                    Ok()
+                with ex ->
+                    Error [ $"Unable to stage built-in Conditor preset: {ex.Message}" ]
             finally
                 if File.Exists temporary then
                     File.Delete temporary
