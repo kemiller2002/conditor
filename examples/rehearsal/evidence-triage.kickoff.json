@@ -42,7 +42,8 @@
     "responsive workspace evidence",
     "provider boundary test",
     "AI proposal boundary test",
-    "report generation evidence"
+    "report generation evidence",
+    "machine-readable completion evidence at rehearsal/completion-evidence.json"
   ],
   "stopTheLine": [
     "UI owns transition legality",
@@ -50,5 +51,10 @@
     "provider-specific types enter Domain",
     "blocking unknown is hidden",
     "original source statement is overwritten"
-  ]
+  ],
+  "completionEvidence": {
+    "schema": "kickoff/completion-evidence.schema.json",
+    "target": "rehearsal/completion-evidence.json",
+    "rule": "The agent must record all seven evidence categories as verified, failed, or not-run; verified entries must reference repository paths that actually exist."
+  }
 }
