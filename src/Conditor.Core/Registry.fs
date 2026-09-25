@@ -110,7 +110,10 @@ module Registry =
               "tutela"
               "Tutela Security Engineering"
               "@echelon-foundry/tutela"
-              RegistryPackage
+              (githubSource
+                  "kemiller2002/tutela"
+                  "5e9dcc56948d30f616659c8c2a4f0b7826aded8d"
+                  "bin/tutela.mjs")
               "tutela"
               "0.1.0"
               [ "init" ] ]
