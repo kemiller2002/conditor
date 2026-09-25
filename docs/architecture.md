@@ -145,7 +145,7 @@ Private GitHub sources may use an existing Git credential helper or process-scop
 
 ## Reproducibility and clean-room proof
 
-Competition and production presets pin component versions and immutable requirement sources. The generated lock records resolved component/distribution identity and a SHA-256 of the manifest.
+Competition and production presets pin component versions and immutable requirement sources. The generated lock records resolved component/distribution identity, the SHA-256 identity of each embedded component descriptor, the governing manifest snapshot, and a SHA-256 of the manifest.
 
 CI exercises:
 
