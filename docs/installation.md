@@ -35,6 +35,14 @@ A `vX.Y.Z` tag must match the version in `Directory.Build.props`. The release wo
 
 Installers refuse a binary whose SHA-256 does not match the release checksum.
 
+Each native release binary also receives a signed GitHub artifact attestation. The release workflow verifies every downloaded matrix artifact with `gh attestation verify` before creating the GitHub Release, so publication is gated on both checksum generation and repository-bound build provenance.
+
+A downloaded binary can be independently verified with:
+
+```bash
+gh attestation verify ./conditor-linux-x64 --repo kemiller2002/conditor
+```
+
 
 ## Built-in presets
 
