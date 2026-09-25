@@ -4,30 +4,79 @@
   "title": "Conditor Component Inventory",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "components"],
+  "required": [
+    "schemaVersion",
+    "components"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": {
+      "const": 1
+    },
     "components": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "displayName", "distribution", "package", "defaultVersion", "qualifiedVersions"],
+        "required": [
+          "id",
+          "displayName",
+          "distribution",
+          "package",
+          "defaultVersion",
+          "qualifiedVersions",
+          "descriptorSha256"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "displayName": { "type": "string", "minLength": 1 },
-          "distribution": { "enum": ["lifecycle-npm", "npm", "nuget"] },
-          "package": { "type": "string", "minLength": 1 },
-          "defaultVersion": { "type": "string", "minLength": 1 },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "distribution": {
+            "enum": [
+              "lifecycle-npm",
+              "npm",
+              "nuget"
+            ]
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1
+          },
+          "defaultVersion": {
+            "type": "string",
+            "minLength": 1
+          },
           "qualifiedVersions": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "lifecycleSource": { "type": "string", "minLength": 1 },
-          "applicationBinding": { "enum": ["npm", "nuget"] },
-          "command": { "type": "string", "minLength": 1 }
+          "lifecycleSource": {
+            "type": "string",
+            "minLength": 1
+          },
+          "applicationBinding": {
+            "enum": [
+              "npm",
+              "nuget"
+            ]
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "descriptorSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
         }
       }
     }
