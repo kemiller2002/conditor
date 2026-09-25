@@ -16,6 +16,11 @@ A component that owns repository lifecycle behavior remains responsible for its 
 empty repository
       |
       v
+built-in preset OR repository conditor.json
+      |
+      +--> built-in preset is materialized as target conditor.json
+      |
+      v
 conditor.json
       |
       v
@@ -83,7 +88,7 @@ Agent process success does not complete the Praxis mission. Project completion r
 
 ## State and authority boundaries
 
-Conditor owns orchestration, source/version resolution, planning, installation ordering, scaffold selection, immutable requirements materialization, Conditor lock state, readiness gating, initial mission handoff, and provider launch.
+Conditor owns orchestration, built-in preset selection, source/version resolution, planning, installation ordering, scaffold selection, immutable requirements materialization, Conditor lock state, readiness gating, initial mission handoff, and provider launch. Built-in presets are merely packaged project declarations: once selected, the exact preset content is written as the target repository's `conditor.json` and becomes ordinary repository state.
 
 Praxis owns repository work state, attribution, execution telemetry, mission lifecycle, and completion evidence.
 
@@ -115,6 +120,8 @@ A capability can currently resolve from:
 
 Moving branch names are not accepted as reproducible sources. The resolved source reference is written into Conditor lock state.
 
+Private GitHub sources may use an existing Git credential helper or process-scoped token environment. Conditor converts the token to an in-memory Git HTTP header for the fetch operation only; credentials are not part of project manifests, locks, generated files, or diagnostic command text.
+
 ## Failure semantics
 
 - Planning is read-only.
@@ -136,12 +143,13 @@ CI exercises:
 
 - build and dependency-free unit tests;
 - deterministic planning;
-- a self-contained native Conditor binary;
+- embedded preset resolution and preset-to-target manifest materialization;
+- a self-contained native Conditor binary using embedded presets without a source checkout;
 - empty-repository initialization;
 - immutable requirement materialization;
 - Ordo baseline generation;
 - Praxis mission creation and activation;
 - `start --check`;
-- a fake Codex adapter so the execution boundary is tested without model credentials;
+- fake Codex and Claude adapters so provider selection/readiness are tested without model credentials;
 - a sacrificial factory rehearsal that rejects accidental application implementation; and
 - repeated initialization with a repository snapshot comparison to prove zero unintended drift.
