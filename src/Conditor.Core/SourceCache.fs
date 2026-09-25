@@ -3,6 +3,7 @@ namespace Conditor.Core
 open System
 open System.Diagnostics
 open System.IO
+open System.Text
 open System.Text.RegularExpressions
 
 module SourceCache =
@@ -71,7 +72,7 @@ module SourceCache =
           if not entrypointOk then
               yield $"GitHub source entrypoint '{entrypoint}' must be a safe relative path." ]
 
-    let private run workingDirectory executable arguments =
+    let private runWithEnvironment environment workingDirectory executable arguments =
         try
             let info = ProcessStartInfo()
             info.FileName <- executable
@@ -82,6 +83,9 @@ module SourceCache =
 
             for argument in arguments do
                 info.ArgumentList.Add argument
+
+            for key, value in environment do
+                info.Environment[key] <- value
 
             use childProcess = new Process()
             childProcess.StartInfo <- info
@@ -108,6 +112,32 @@ module SourceCache =
                     |> Result.mapError (List.filter isNonEmpty)
         with ex ->
             Error [ $"Unable to execute '{executable}': {ex.Message}" ]
+
+    let private run workingDirectory executable arguments =
+        runWithEnvironment [] workingDirectory executable arguments
+
+    let private githubToken () =
+        [ "CONDITOR_GITHUB_TOKEN"; "GH_TOKEN"; "GITHUB_TOKEN" ]
+        |> List.tryPick environmentValue
+
+    let private gitFetchEnvironment () =
+        let baseEnvironment =
+            [ "GIT_TERMINAL_PROMPT", "0" ]
+
+        match githubToken () with
+        | None -> baseEnvironment
+        | Some token ->
+            let credentials =
+                Encoding.UTF8.GetBytes($"x-access-token:{token}")
+                |> Convert.ToBase64String
+
+            baseEnvironment
+            @ [ "GIT_CONFIG_COUNT", "1"
+                "GIT_CONFIG_KEY_0", "http.https://github.com/.extraheader"
+                "GIT_CONFIG_VALUE_0", $"AUTHORIZATION: basic {credentials}" ]
+
+    let private runGitFetch workingDirectory arguments =
+        runWithEnvironment (gitFetchEnvironment ()) workingDirectory "git" arguments
 
     let private currentHead checkout =
         match run checkout "git" [ "rev-parse"; "HEAD" ] with
@@ -165,7 +195,7 @@ module SourceCache =
                     match run temporary "git" [ "remote"; "add"; "origin"; url ] with
                     | Error errors -> Error errors
                     | Ok _ ->
-                        match run temporary "git" [ "fetch"; "--depth"; "1"; "origin"; source.Commit ] with
+                        match runGitFetch temporary [ "fetch"; "--depth"; "1"; "origin"; source.Commit ] with
                         | Error errors -> Error errors
                         | Ok _ ->
                             match run temporary "git" [ "checkout"; "--detach"; source.Commit ] with
