@@ -45,7 +45,7 @@
       "id": "kickoff",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "kickoff/indy-init.kickoff.json"
       },
       "targetPath": "kickoff/indy-init.kickoff.json"
@@ -54,7 +54,7 @@
       "id": "kickoff-schema",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "kickoff/kickoff-manifest.schema.json"
       },
       "targetPath": "kickoff/kickoff-manifest.schema.json"
@@ -63,7 +63,7 @@
       "id": "boundary",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/HACKATHON-BOUNDARIES.md"
       },
       "targetPath": "docs/HACKATHON-BOUNDARIES.md"
@@ -72,7 +72,7 @@
       "id": "product",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/PRODUCT-REQUIREMENTS.md"
       },
       "targetPath": "docs/PRODUCT-REQUIREMENTS.md"
@@ -81,7 +81,7 @@
       "id": "release",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/REQUIREMENTS.md"
       },
       "targetPath": "docs/REQUIREMENTS.md"
@@ -90,7 +90,7 @@
       "id": "semantics",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/INVESTIGATION-SEMANTICS.md"
       },
       "targetPath": "docs/INVESTIGATION-SEMANTICS.md"
@@ -99,7 +99,7 @@
       "id": "evolution",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/SEMANTIC-EVOLUTION.md"
       },
       "targetPath": "docs/SEMANTIC-EVOLUTION.md"
@@ -108,7 +108,7 @@
       "id": "decisions",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/DESIGN-DECISION-BOUNDARIES.md"
       },
       "targetPath": "docs/DESIGN-DECISION-BOUNDARIES.md"
@@ -117,7 +117,7 @@
       "id": "core",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/CORE-DOMAIN-MODEL.md"
       },
       "targetPath": "docs/CORE-DOMAIN-MODEL.md"
@@ -126,7 +126,7 @@
       "id": "commands",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/COMMAND-EVENT-CATALOG.md"
       },
       "targetPath": "docs/COMMAND-EVENT-CATALOG.md"
@@ -135,7 +135,7 @@
       "id": "transitions",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/STATE-TRANSITION-TABLES.md"
       },
       "targetPath": "docs/STATE-TRANSITION-TABLES.md"
@@ -144,7 +144,7 @@
       "id": "fsharp",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/FSHARP-TYPE-SHAPES.md"
       },
       "targetPath": "docs/FSHARP-TYPE-SHAPES.md"
@@ -153,7 +153,7 @@
       "id": "policy",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/POLICY-ENGINE.md"
       },
       "targetPath": "docs/POLICY-ENGINE.md"
@@ -162,7 +162,7 @@
       "id": "persistence",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/PERSISTENCE-CONTRACT.md"
       },
       "targetPath": "docs/PERSISTENCE-CONTRACT.md"
@@ -171,7 +171,7 @@
       "id": "ai",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/AI-ORCHESTRATION.md"
       },
       "targetPath": "docs/AI-ORCHESTRATION.md"
@@ -180,7 +180,7 @@
       "id": "workspace",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/INVESTIGATION-WORKSPACE.md"
       },
       "targetPath": "docs/INVESTIGATION-WORKSPACE.md"
@@ -189,7 +189,7 @@
       "id": "screens",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/SCREEN-CONTRACTS.md"
       },
       "targetPath": "docs/SCREEN-CONTRACTS.md"
@@ -198,7 +198,7 @@
       "id": "tests",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/DOMAIN-TEST-MATRIX.md"
       },
       "targetPath": "docs/DOMAIN-TEST-MATRIX.md"
@@ -207,7 +207,7 @@
       "id": "security",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/SECURITY-THREAT-MODEL.md"
       },
       "targetPath": "docs/SECURITY-THREAT-MODEL.md"
@@ -216,7 +216,7 @@
       "id": "slices",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/IMPLEMENTATION-SLICES.md"
       },
       "targetPath": "docs/IMPLEMENTATION-SLICES.md"
@@ -225,7 +225,7 @@
       "id": "competition",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/COMPETITION-ALIGNMENT.md"
       },
       "targetPath": "docs/COMPETITION-ALIGNMENT.md"
@@ -234,7 +234,7 @@
       "id": "build-day",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/BUILD-DAY-EXECUTION.md"
       },
       "targetPath": "docs/BUILD-DAY-EXECUTION.md"
@@ -243,7 +243,7 @@
       "id": "kickoff-packet",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/KICKOFF-EXECUTION-PACKET.md"
       },
       "targetPath": "docs/KICKOFF-EXECUTION-PACKET.md"
@@ -252,7 +252,7 @@
       "id": "fresh-agent-acceptance",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/FRESH-AGENT-FACTORY-ACCEPTANCE.md"
       },
       "targetPath": "docs/FRESH-AGENT-FACTORY-ACCEPTANCE.md"
@@ -261,7 +261,7 @@
       "id": "factory-rehearsal",
       "source": {
         "repository": "kemiller2002/Indy-init",
-        "commit": "1f31abe8a3318d2de4d9fc5d3b42c5e351182193",
+        "commit": "e075288e21f71cfea3413302e5f1f4a62d70a367",
         "path": "docs/FACTORY-REHEARSAL.md"
       },
       "targetPath": "docs/FACTORY-REHEARSAL.md"
