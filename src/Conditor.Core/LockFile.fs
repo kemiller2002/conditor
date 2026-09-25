@@ -101,7 +101,7 @@ module LockFile =
                     let locked =
                         componentsElement.EnumerateArray()
                         |> Seq.map (fun item ->
-                            let getString name =
+                            let getString (name: string) =
                                 let mutable value = Unchecked.defaultof<JsonElement>
 
                                 if item.TryGetProperty(name, &value)
