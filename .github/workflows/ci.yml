@@ -72,6 +72,12 @@ jobs:
         run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- repair --target "$RUNNER_TEMP/conditor-empty"
       - name: Re-check Conditor status after repair
         run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-empty"
+      - name: Exercise no-op lifecycle upgrade
+        run: |
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- upgrade --target "$RUNNER_TEMP/conditor-empty"
+          grep -F '"schemaVersion": 2' "$RUNNER_TEMP/conditor-empty/.conditor/lock.json"
+      - name: Re-check Conditor status after upgrade
+        run: dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-empty"
       - name: Install fake Codex adapter
         run: |
           mkdir -p "$RUNNER_TEMP/fake-bin"
