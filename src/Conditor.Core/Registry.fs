@@ -57,7 +57,8 @@ module Registry =
           DefaultVersion = version
           InitArguments = []
           VerifyArguments = []
-          DoctorArguments = [] }
+          DoctorArguments = []
+          UpgradeArguments = [] }
 
     let all =
         [ lifecycle
