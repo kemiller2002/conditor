@@ -77,6 +77,78 @@ module LockFile =
             | :? JsonException as ex -> Error [ $"Conditor lock is not valid JSON: {ex.Message}" ]
             | ex -> Error [ $"Unable to verify Conditor lock: {ex.Message}" ]
 
+    let private distributionText =
+        function
+        | LifecycleNpm -> "lifecycle-npm"
+        | NpmPackage -> "npm"
+        | NugetPackage -> "nuget"
+
+    let verifyResolvedComponents target (resolved: ResolvedComponent list) =
+        let path = Path.Combine(target, ".conditor", "lock.json")
+
+        if not (File.Exists path) then
+            Error [ $"Conditor lock is missing: {path}. Run 'conditor init' first." ]
+        else
+            try
+                use document = JsonDocument.Parse(File.ReadAllText path)
+                let root = document.RootElement
+                let mutable componentsElement = Unchecked.defaultof<JsonElement>
+
+                if not (root.TryGetProperty("components", &componentsElement))
+                   || componentsElement.ValueKind <> JsonValueKind.Array then
+                    Error [ "Conditor lock does not contain a valid components array." ]
+                else
+                    let locked =
+                        componentsElement.EnumerateArray()
+                        |> Seq.map (fun item ->
+                            let getString name =
+                                let mutable value = Unchecked.defaultof<JsonElement>
+
+                                if item.TryGetProperty(name, &value)
+                                   && value.ValueKind = JsonValueKind.String then
+                                    value.GetString() |> Option.ofObj
+                                else
+                                    None
+
+                            let id = getString "id" |> Option.defaultValue String.Empty
+
+                            id,
+                            (getString "version",
+                             getString "distribution",
+                             getString "package",
+                             getString "sourceReference"))
+                        |> Map.ofSeq
+
+                    let current =
+                        resolved
+                        |> List.map (fun component ->
+                            component.Id,
+                            (Some component.Version,
+                             Some(distributionText component.Distribution),
+                             Some component.Package,
+                             component.SourceReference))
+                        |> Map.ofList
+
+                    let errors = ResizeArray<string>()
+                    let lockedIds = locked |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+                    let currentIds = current |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+
+                    for missing in Set.difference lockedIds currentIds do
+                        errors.Add $"Locked component '{missing}' is no longer resolved by the current declaration/registry."
+
+                    for added in Set.difference currentIds lockedIds do
+                        errors.Add $"Resolved component '{added}' is not present in the Conditor lock."
+
+                    for id in Set.intersect lockedIds currentIds do
+                        if locked[id] <> current[id] then
+                            errors.Add
+                                $"Resolved identity for component '{id}' differs from the Conditor lock; Conditor will not silently substitute a different version/package/source."
+
+                    if errors.Count = 0 then Ok() else Error(List.ofSeq errors)
+            with
+            | :? JsonException as ex -> Error [ $"Conditor lock is not valid JSON: {ex.Message}" ]
+            | ex -> Error [ $"Unable to verify locked component identities: {ex.Message}" ]
+
     let write target manifestPath (plan: InstallationPlan) =
         let directory = Path.Combine(target, ".conditor")
         Directory.CreateDirectory directory |> ignore
@@ -103,10 +175,7 @@ module LockFile =
             writer.WriteString("version", resolved.Version)
             writer.WriteString(
                 "distribution",
-                match resolved.Distribution with
-                | LifecycleNpm -> "lifecycle-npm"
-                | NpmPackage -> "npm"
-                | NugetPackage -> "nuget"
+                distributionText resolved.Distribution
             )
             writer.WriteString("package", resolved.Package)
 
