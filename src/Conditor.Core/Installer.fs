@@ -28,6 +28,8 @@ module Installer =
             $"github:{source.Repository}#{source.Commit} -> {sourceEntrypointText source}{suffix}"
         | EnsureFile(relativePath, _) ->
             $"ensure {relativePath}"
+        | EnsureManagedRegion(relativePath, regionId, _) ->
+            $"ensure managed region {regionId} in {relativePath}"
         | MaterializeSourceFile(source, relativePath) ->
             $"materialize github:{source.Repository}#{source.Commit} -> {relativePath}"
         | EnsurePraxisMission mission ->
@@ -79,6 +81,78 @@ module Installer =
                 finally
                     if File.Exists temporary then
                         File.Delete temporary
+
+
+    let private managedRegionStart regionId =
+        $"<!-- conditor:{regionId}:start -->"
+
+    let private managedRegionEnd regionId =
+        $"<!-- conditor:{regionId}:end -->"
+
+    let private renderManagedRegion regionId content =
+        let body = normalize content |> fun value -> value.TrimEnd('\r', '\n')
+        $"{managedRegionStart regionId}\n{body}\n{managedRegionEnd regionId}\n"
+
+    let private writeAtomically fullPath content errorLabel =
+        ensureParent fullPath
+        let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
+
+        try
+            try
+                File.WriteAllText(temporary, content)
+
+                if File.Exists fullPath then
+                    File.Move(temporary, fullPath, true)
+                else
+                    File.Move(temporary, fullPath)
+
+                Ok()
+            with ex ->
+                Error $"{errorLabel}: {ex.Message}"
+        finally
+            if File.Exists temporary then
+                File.Delete temporary
+
+    let private ensureManagedRegion target relativePath regionId content =
+        match safePath target relativePath with
+        | None ->
+            Error $"Managed scaffold path escapes the target repository: {relativePath}"
+        | Some fullPath ->
+            let managed = renderManagedRegion regionId content
+
+            if not (File.Exists fullPath) then
+                writeAtomically fullPath managed $"Unable to create managed scaffold file '{relativePath}'"
+            else
+                let existing = File.ReadAllText fullPath
+                let normalizedExisting = normalize existing
+                let startMarker = managedRegionStart regionId
+                let endMarker = managedRegionEnd regionId
+                let startIndex = normalizedExisting.IndexOf(startMarker, StringComparison.Ordinal)
+                let endIndex = normalizedExisting.IndexOf(endMarker, StringComparison.Ordinal)
+
+                match startIndex >= 0, endIndex >= 0 with
+                | false, false ->
+                    let prefix = normalizedExisting.TrimEnd('\r', '\n')
+
+                    let combined =
+                        if String.IsNullOrWhiteSpace prefix then
+                            managed
+                        else
+                            $"{prefix}\n\n{managed}"
+
+                    writeAtomically fullPath combined $"Unable to append managed region '{regionId}' to '{relativePath}'"
+                | true, true when endIndex > startIndex ->
+                    let suffixStart = endIndex + endMarker.Length
+                    let prefix = normalizedExisting.Substring(0, startIndex)
+                    let suffix = normalizedExisting.Substring(suffixStart)
+                    let combined = prefix + managed.TrimEnd('\r', '\n') + suffix
+
+                    if normalize existing = normalize combined then
+                        Ok()
+                    else
+                        writeAtomically fullPath combined $"Unable to update managed region '{regionId}' in '{relativePath}'"
+                | _ ->
+                    Error $"Managed region '{regionId}' in '{relativePath}' is malformed; Conditor will not overwrite content outside a valid bounded region."
 
     let private filesEqual left right =
         let leftInfo = FileInfo left
@@ -164,6 +238,14 @@ module Installer =
                 match action.Execution with
                 | EnsureFile(relativePath, content) ->
                     match ensureFile target relativePath content with
+                    | Ok() -> loop remaining
+                    | Error error ->
+                        Error
+                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                              $"Command: {commandText action}"
+                              error ]
+                | EnsureManagedRegion(relativePath, regionId, content) ->
+                    match ensureManagedRegion target relativePath regionId content with
                     | Ok() -> loop remaining
                     | Error error ->
                         Error
