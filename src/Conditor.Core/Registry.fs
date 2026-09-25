@@ -112,7 +112,7 @@ module Registry =
               "@echelon-foundry/tutela"
               (githubSource
                   "kemiller2002/tutela"
-                  "5e9dcc56948d30f616659c8c2a4f0b7826aded8d"
+                  "1acf421e7d940665c134012f11b082a502e17537"
                   "bin/tutela.mjs")
               "tutela"
               "0.1.0"
