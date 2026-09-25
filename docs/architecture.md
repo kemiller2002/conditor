@@ -8,7 +8,7 @@ The core invariant is:
 
 > Conditor orchestrates capabilities; it does not absorb their implementation or ownership.
 
-A component that owns repository lifecycle behavior remains responsible for its own `init`, `verify`, `doctor`, and `upgrade` semantics. Conditor resolves the desired system, invokes those contracts deterministically, binds application dependencies only to declared scaffold targets, and refuses to launch an agent until the governed repository is execution-ready.
+A component that owns repository lifecycle behavior remains responsible for its own `init`, `verify`, `doctor`, and `upgrade` semantics. Conditor's compatibility graph determines which exact component/version combinations this build is willing to orchestrate; existence of a newer upstream release is not itself compatibility evidence. Conditor resolves the desired system, invokes those contracts deterministically, binds application dependencies only to declared scaffold targets, and refuses to launch an agent until the governed repository is execution-ready.
 
 ## Implemented pipeline
 
@@ -25,6 +25,13 @@ conditor.json
       |
       v
 manifest + source validation
+      |
+      v
+compatibility graph
+      |
+      +--> qualified exact versions
+      +--> scaffold/runtime dependencies
+      +--> execution/Praxis dependency
       |
       v
 registry/distribution resolution
@@ -132,6 +139,7 @@ Private GitHub sources may use an existing Git credential helper or process-scop
 - Existing user-owned files are not silently overwritten.
 - Shared files are modified only inside valid Conditor-managed regions.
 - Lifecycle execution stops on the first required failure.
+- Unqualified component versions and missing declared capability dependencies fail before target mutation.
 - The Conditor lock is written only after initialization, requirements materialization, readiness verification, and initial mission establishment succeed.
 - `conditor start` refuses execution when the manifest has drifted from the lock, governing requirements differ from their pinned sources, the contract is missing, verification fails, the Praxis mission cannot be launched, or provider authentication is unavailable.
 
@@ -150,6 +158,7 @@ CI exercises:
 - Ordo baseline generation;
 - Praxis mission creation and activation;
 - `start --check`;
+- machine-readable compatibility and Doctor surfaces;
 - fake Codex and Claude adapters so provider selection/readiness are tested without model credentials;
 - a sacrificial factory rehearsal that rejects accidental application implementation; and
 - repeated initialization with a repository snapshot comparison to prove zero unintended drift.
