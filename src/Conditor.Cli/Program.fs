@@ -18,6 +18,7 @@ let private usage () =
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
 let private optionValue name (args: string array) =
@@ -94,6 +95,8 @@ let private run operation shouldExecute target selection =
 let private withLauncherOverride launcherOverride (manifest: ProjectManifest) =
     match launcherOverride with
     | None -> Ok manifest
+    | Some launcher when launcher <> "codex" && launcher <> "claude" ->
+        Error [ $"Unsupported launcher override '{launcher}'. Supported launchers: codex, claude." ]
     | Some launcher ->
         match manifest.Execution with
         | None -> Error [ "--launcher requires an execution section in the Conditor manifest." ]
@@ -153,6 +156,68 @@ let private runResume launcherOverride target manifestPath =
 
                 Console.WriteLine "Launcher resume exited successfully. Praxis remains authoritative for mission completion."
                 0
+
+let private writeExternalPrompt target promptPath promptText =
+    if not (Path.IsPathRooted promptPath) then
+        Error [ "--prompt-file must be an absolute path outside the target repository." ]
+    else
+        let root = Path.GetFullPath target
+        let fullPath = Path.GetFullPath promptPath
+        let rootPrefix =
+            root.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
+
+        let comparison =
+            if OperatingSystem.IsWindows() then StringComparison.OrdinalIgnoreCase else StringComparison.Ordinal
+
+        if fullPath = root || fullPath.StartsWith(rootPrefix, comparison) then
+            Error [ "--prompt-file must be outside the target repository." ]
+        else
+            try
+                let parent = Path.GetDirectoryName fullPath
+
+                if not (String.IsNullOrWhiteSpace parent) then
+                    Directory.CreateDirectory parent |> ignore
+
+                let temporary = $"{fullPath}.conditor-{Guid.NewGuid():N}.tmp"
+
+                try
+                    File.WriteAllText(temporary, promptText)
+                    File.Move(temporary, fullPath, true)
+                    Ok fullPath
+                finally
+                    if File.Exists temporary then
+                        File.Delete temporary
+            with ex ->
+                Error [ $"Unable to write external provider prompt: {ex.Message}" ]
+
+let private runHandoff resumeOnly launcherOverride promptPath target manifestPath =
+    match promptPath with
+    | None ->
+        writeErrors [ "handoff requires --prompt-file with an absolute path outside the target repository." ]
+        11
+    | Some requestedPath ->
+        match Manifest.load manifestPath with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok loadedManifest ->
+            match withLauncherOverride launcherOverride loadedManifest with
+            | Error errors ->
+                writeErrors errors
+                5
+            | Ok manifest ->
+                match Execution.handoff resumeOnly target manifestPath manifest with
+                | Error errors ->
+                    writeErrors errors
+                    11
+                | Ok(ready, promptText) ->
+                    match writeExternalPrompt target requestedPath promptText with
+                    | Error errors ->
+                        writeErrors errors
+                        11
+                    | Ok fullPath ->
+                        Console.WriteLine $"External provider handoff ready: launcher={ready.Launcher}; mission={ready.Mission.Id}; state=active; prompt={fullPath}"
+                        0
 
 let private presetTargetState target (preset: ResolvedPreset) =
     let targetManifest = Path.Combine(target, "conditor.json")
@@ -338,6 +403,13 @@ let main (args: string array) =
                 | "repair" -> runRepair target selection.ManifestPath
                 | "upgrade" -> runUpgrade (hasFlag "--check" args) target selection.ManifestPath
                 | "resume" -> runResume (optionValue "--launcher" args) target selection.ManifestPath
+                | "handoff" ->
+                    runHandoff
+                        (hasFlag "--resume" args)
+                        (optionValue "--launcher" args)
+                        (optionValue "--prompt-file" args)
+                        target
+                        selection.ManifestPath
                 | "start" ->
                     runStart
                         (hasFlag "--check" args)
