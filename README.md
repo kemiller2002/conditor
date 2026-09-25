@@ -67,8 +67,9 @@ conditor init   --target . --manifest ./conditor.json
 conditor verify --target . --manifest ./conditor.json
 conditor doctor --target . --manifest ./conditor.json
 conditor status --target . --manifest ./conditor.json
-conditor repair --target . --manifest ./conditor.json
-conditor start  --check --target . --manifest ./conditor.json
+conditor repair  --target . --manifest ./conditor.json
+conditor upgrade --target . --manifest ./conditor.json
+conditor start   --check --target . --manifest ./conditor.json
 ```
 
 The committed source form of the Indy Init preset remains at `examples/indy-init.conditor.json`; release binaries embed that exact content.
@@ -102,6 +103,30 @@ For the private Indy Init governing repository, authenticate Git or set a token 
 - and, when execution is enabled, whether the Praxis mission and canonical contract are execution-ready.
 
 `conditor repair` is intentionally narrower than upgrade. It reconciles only the exact manifest already recorded by the lock. Missing tool-owned/generated state may be restored through the component and scaffold contracts, but Conditor refuses repair when `conditor.json` has changed since the lock was written. A declaration/version change is governance work and must not be smuggled through a repair command.
+
+
+## Upgrade
+
+Conditor lock schema v2 stores the complete governing declaration that produced the installed state. `conditor upgrade` compares that prior declaration with the current `conditor.json` before any mutation.
+
+The initial upgrade implementation deliberately supports one change class:
+
+- an explicit version change for an existing registry-distributed lifecycle component that has no application-package binding.
+
+It currently rejects, before mutation:
+
+- component addition or removal;
+- required/optional policy changes;
+- scaffold changes;
+- requirement-source or target changes;
+- execution-policy/mission/contract changes;
+- Forma, Folio, Aegis, Limen, or other application-bound version changes;
+- fixed-source lifecycle version changes without an immutable mapping;
+- repositories that still have a lock schema older than v2.
+
+For a v1 lock, run `conditor repair` against the unchanged manifest first. Repair proves the current declaration still matches the old hash and rewrites the lock in v2 form.
+
+A successful lifecycle upgrade runs the target component's own `upgrade` contract using the newly declared exact version, verifies the resulting lifecycle environment, verifies pinned requirements, and writes a new lock snapshot.
 
 ## Canonical execution contract
 
