@@ -2,13 +2,18 @@ open System
 open System.IO
 open Conditor.Core
 
+type private ManifestSelection =
+    { ManifestPath: string
+      Preset: ResolvedPreset option }
+
 let private usage () =
     Console.WriteLine "Conditor"
-    Console.WriteLine "  conditor plan   [--target PATH] [--manifest PATH]"
-    Console.WriteLine "  conditor init   [--target PATH] [--manifest PATH]"
-    Console.WriteLine "  conditor verify [--target PATH] [--manifest PATH]"
-    Console.WriteLine "  conditor doctor [--target PATH] [--manifest PATH]"
-    Console.WriteLine "  conditor start  [--check] [--launcher codex|claude] [--target PATH] [--manifest PATH]"
+    Console.WriteLine "  conditor presets"
+    Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
 
 let private optionValue name (args: string array) =
     args
@@ -22,13 +27,44 @@ let private hasFlag name (args: string array) =
 let private writeErrors (errors: string list) =
     errors |> List.iter (fun (error: string) -> Console.Error.WriteLine error)
 
-let private run operation shouldExecute target manifestPath =
-    match Manifest.load manifestPath with
+let private resolveManifestSelection command target (args: string array) =
+    let presetName = optionValue "--preset" args
+    let manifestPath = optionValue "--manifest" args
+
+    match presetName, manifestPath with
+    | Some _, Some _ ->
+        Error [ "Choose either --preset or --manifest, not both." ]
+    | Some presetName, None ->
+        if command <> "plan" && command <> "init" && command <> "start" then
+            Error [ $"--preset is supported by plan, init, and start; '{command}' uses the repository's conditor.json." ]
+        else
+            Presets.resolve presetName
+            |> Result.map (fun preset ->
+                { ManifestPath = preset.ManifestPath
+                  Preset = Some preset })
+    | None, Some manifestPath ->
+        Ok
+            { ManifestPath = Path.GetFullPath manifestPath
+              Preset = None }
+    | None, None ->
+        Ok
+            { ManifestPath = Path.Combine(target, "conditor.json") |> Path.GetFullPath
+              Preset = None }
+
+let private createPlan operation target selection manifest =
+    Planner.create target operation manifest
+    |> Result.map (fun plan ->
+        match operation, selection.Preset with
+        | Init, Some preset -> Presets.bindToTarget preset plan
+        | _ -> plan)
+
+let private run operation shouldExecute target selection =
+    match Manifest.load selection.ManifestPath with
     | Error errors ->
         writeErrors errors
         2
     | Ok manifest ->
-        match Planner.create target operation manifest with
+        match createPlan operation target selection manifest with
         | Error errors ->
             writeErrors errors
             3
@@ -39,7 +75,7 @@ let private run operation shouldExecute target manifestPath =
             if not shouldExecute then
                 0
             else
-                match Installer.execute target manifestPath plan with
+                match Installer.execute target selection.ManifestPath plan with
                 | Ok(Some lockPath) ->
                     Console.WriteLine $"Conditor completed successfully. Lock file: {lockPath}"
                     0
@@ -61,7 +97,7 @@ let private withLauncherOverride launcherOverride (manifest: ProjectManifest) =
         | Some execution ->
             Ok { manifest with Execution = Some { execution with Launcher = Some launcher } }
 
-let private runStart checkOnly launcherOverride target manifestPath =
+let private runEstablishedStart checkOnly launcherOverride target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
         writeErrors errors
@@ -91,33 +127,86 @@ let private runStart checkOnly launcherOverride target manifestPath =
                 Console.WriteLine "Launcher exited successfully. Praxis remains authoritative for mission completion."
                 0
 
+let private presetTargetState target (preset: ResolvedPreset) =
+    let targetManifest = Path.Combine(target, "conditor.json")
+    let lockPath = Path.Combine(target, ".conditor", "lock.json")
+
+    if File.Exists targetManifest then
+        let existing = File.ReadAllText targetManifest
+
+        if existing <> preset.Content then
+            Error
+                [ $"Target conditor.json does not match built-in preset '{preset.Id}'."
+                  "Conditor will not replace a different project declaration during start." ]
+        else
+            Ok(File.Exists lockPath, targetManifest)
+    else
+        Ok(false, targetManifest)
+
+let private runStart checkOnly launcherOverride target selection =
+    match selection.Preset with
+    | None ->
+        runEstablishedStart checkOnly launcherOverride target selection.ManifestPath
+    | Some preset ->
+        match presetTargetState target preset with
+        | Error errors ->
+            writeErrors errors
+            5
+        | Ok(true, targetManifest) ->
+            runEstablishedStart checkOnly launcherOverride target targetManifest
+        | Ok(false, _) when checkOnly ->
+            writeErrors
+                [ $"Preset '{preset.Id}' has not established this repository yet."
+                  "start --check is read-only. Run 'conditor init --preset <name>' first, or run 'conditor start --preset <name>' to initialize and launch." ]
+            5
+        | Ok(false, targetManifest) ->
+            let initialization = run Init true target selection
+
+            if initialization <> 0 then
+                initialization
+            else
+                runEstablishedStart false launcherOverride target targetManifest
+
+let private printPresets () =
+    Console.WriteLine "Built-in Conditor presets:"
+
+    for name in Presets.names do
+        Console.WriteLine $"  {name}"
+
+    0
+
 [<EntryPoint>]
 let main (args: string array) =
     if args.Length = 0 then
         usage ()
         1
     else
-        let target =
-            optionValue "--target" args
-            |> Option.defaultValue (Directory.GetCurrentDirectory())
-            |> Path.GetFullPath
+        let command = args[0].Trim().ToLowerInvariant()
 
-        let manifestPath =
-            optionValue "--manifest" args
-            |> Option.defaultValue (Path.Combine(target, "conditor.json"))
-            |> Path.GetFullPath
+        if command = "presets" then
+            printPresets ()
+        else
+            let target =
+                optionValue "--target" args
+                |> Option.defaultValue (Directory.GetCurrentDirectory())
+                |> Path.GetFullPath
 
-        match args[0].Trim().ToLowerInvariant() with
-        | "plan" -> run Init false target manifestPath
-        | "init" -> run Init true target manifestPath
-        | "verify" -> run Verify true target manifestPath
-        | "doctor" -> run Doctor true target manifestPath
-        | "start" ->
-            runStart
-                (hasFlag "--check" args)
-                (optionValue "--launcher" args)
-                target
-                manifestPath
-        | _ ->
-            usage ()
-            1
+            match resolveManifestSelection command target args with
+            | Error errors ->
+                writeErrors errors
+                1
+            | Ok selection ->
+                match command with
+                | "plan" -> run Init false target selection
+                | "init" -> run Init true target selection
+                | "verify" -> run Verify true target selection
+                | "doctor" -> run Doctor true target selection
+                | "start" ->
+                    runStart
+                        (hasFlag "--check" args)
+                        (optionValue "--launcher" args)
+                        target
+                        selection
+                | _ ->
+                    usage ()
+                    1
