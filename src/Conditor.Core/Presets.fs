@@ -23,13 +23,16 @@ module Presets =
 
     let private assembly = typeof<ProjectManifest>.Assembly
 
-    let private readResource resourceName =
-        use stream = assembly.GetManifestResourceStream(resourceName)
+    let private readResource (resourceName: string) =
+        let stream =
+            assembly.GetManifestResourceStream(resourceName)
+            |> Option.ofObj
 
-        if isNull stream then
+        match stream with
+        | None ->
             Error [ $"Embedded Conditor preset resource is missing: {resourceName}" ]
-        else
-            use reader = new StreamReader(stream, Encoding.UTF8, true)
+        | Some value ->
+            use reader = new StreamReader(value, Encoding.UTF8, true)
             Ok(reader.ReadToEnd())
 
     let private contentHash (content: string) =
@@ -68,7 +71,7 @@ module Presets =
                 if File.Exists temporary then
                     File.Delete temporary
 
-    let resolve id =
+    let resolve (id: string) =
         let normalized = id.Trim().ToLowerInvariant()
 
         match Map.tryFind normalized definitions with
