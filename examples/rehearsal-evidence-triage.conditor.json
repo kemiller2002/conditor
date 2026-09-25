@@ -45,10 +45,19 @@
       "id": "rehearsal-contract",
       "source": {
         "repository": "kemiller2002/conditor",
-        "commit": "b9afc6bee887421be4602ccb404611ff2f06ba2b",
+        "commit": "0295314f0e8a2ecd81bc58118ce4bc2a46579066",
         "path": "examples/rehearsal/evidence-triage.kickoff.json"
       },
       "targetPath": "kickoff/evidence-triage.kickoff.json"
+    },
+    {
+      "id": "rehearsal-evidence-schema",
+      "source": {
+        "repository": "kemiller2002/conditor",
+        "commit": "0295314f0e8a2ecd81bc58118ce4bc2a46579066",
+        "path": "examples/rehearsal/completion-evidence.schema.json"
+      },
+      "targetPath": "kickoff/completion-evidence.schema.json"
     }
   ],
   "execution": {
