@@ -57,6 +57,7 @@ fi
 test -f "$TARGET/.conditor/lock.json"
 test -f "$TARGET/AGENTS.md"
 test -f "$TARGET/kickoff/evidence-triage.kickoff.json"
+test -f "$TARGET/kickoff/completion-evidence.schema.json"
 test -f "$TARGET/src/engine/App.Engine.fsproj"
 test -f "$TARGET/src/engine/Domain.fs"
 test -f "$TARGET/src/kernel/package.json"
