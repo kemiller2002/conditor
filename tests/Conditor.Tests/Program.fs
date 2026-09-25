@@ -556,6 +556,38 @@ withTarget
                                  && text.Contains("legal state and illegal states have not yet been identified")
                                  && text.Contains("Preserve unknowns explicitly")))))
 
+
+withTarget
+    (fun target ->
+        withManifest
+            """{"schemaVersion":1,"name":"praxis-reconcile-demo","components":[{"id":"praxis","version":"3.1.4"}],"scaffold":{"kind":"fsharp-limen-web","name":"praxis-reconcile-demo"}}"""
+            (fun path ->
+                match Manifest.load path with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"Praxis reconciliation manifest parses: {details}" false
+                | Ok manifest ->
+                    match Planner.create target Init manifest with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"Praxis reconciliation plan succeeds: {details}" false
+                    | Ok plan ->
+                        let praxisActions =
+                            plan.Actions
+                            |> List.filter (fun action -> action.ComponentId = "praxis")
+
+                        let lastScaffoldSequence =
+                            plan.Actions
+                            |> List.filter (fun action -> action.Kind = ScaffoldFile)
+                            |> List.map _.Sequence
+                            |> List.max
+
+                        check "Praxis reconciliation adds second init and verify" (praxisActions.Length = 4)
+                        check
+                            "Praxis reconciliation runs after shared scaffold integration"
+                            (praxisActions[2].Sequence > lastScaffoldSequence
+                             && praxisActions[3].Sequence > praxisActions[2].Sequence)))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
