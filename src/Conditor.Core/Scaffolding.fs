@@ -197,6 +197,40 @@ module Scaffolding =
                 "AGENTS.md",
                 $"# Agent Entry\n\nThis repository was initialized by Conditor.\n\n## Canonical execution contract\n\nRead and obey `{contractPath}` before implementation.\n\n## Mission\n\n{mission}\n\n## Rules\n\n- Treat the contract and its referenced normative documents as authoritative.\n- Do not invent architecture decisions that the contract classifies as locked, experimental, or deferred.\n- Use installed lifecycle/component tooling rather than copying framework implementations.\n- Completion requires deterministic verification and repository evidence, not an agent completion statement.\n" ))
 
+    let private markdownRequirementList (manifest: ProjectManifest) =
+        match manifest.Requirements with
+        | [] -> "- none declared"
+        | requirements ->
+            requirements
+            |> List.map (fun requirement -> $"- `{requirement.Id}`: `{requirement.TargetPath}`")
+            |> String.concat "\n"
+
+    let private contractPathText (manifest: ProjectManifest) =
+        manifest.Execution
+        |> Option.bind _.ContractPath
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.defaultValue "none declared"
+
+    let private ordoBaselineFiles (manifest: ProjectManifest) =
+        let hasOrdo =
+            manifest.Components
+            |> List.exists (fun request -> request.Id = "ordo" && request.Required)
+
+        if not hasOrdo then
+            []
+        else
+            let contractPath = contractPathText manifest
+            let requirements = markdownRequirementList manifest
+
+            let semanticMap =
+                $"# Repository Semantic Map\n\nThis initial routing map was established by Conditor from accepted governing inputs. It does not infer application semantics.\n\n## Governing inputs\n\n- Canonical execution contract: `{contractPath}`\n- Accepted requirement artifacts:\n{requirements}\n\n## Semantic areas\n\n| Semantic area / feature | Purpose | Location | Manifest | Notes |\n|---|---|---|---|---|\n| Initial application mission | Establish the smallest semantic model required by the accepted contract | `src/engine/` | not established yet | Domain concepts, legal state, transitions, invariants, and guards are intentionally unknown until the governing inputs are interpreted. |\n\n## Repository-wide composition\n\n- Composition/root entry point: `src/kernel/bootstrap.ts`\n- Shared contracts: see the governing inputs above.\n- Architecture checks: installed Ordo/Praxis verification plus repository build/tests.\n- Boundary checks: installed Limen and Aegis contracts where required.\n\n## Areas without separate manifests\n\nNo feature manifest is generated merely to satisfy structure. Create one when the initial mission establishes a real semantic ownership boundary.\n"
+
+            let currentState =
+                $"# Current State — Conditor Baseline\n\nThis is the initial greenfield baseline. It records what Conditor can prove before application implementation begins.\n\n## Established facts\n\n- The declared Echelon capabilities were planned and installed through their supported lifecycle contracts.\n- Accepted requirement artifacts were materialized from immutable sources declared by `conditor.json`.\n- Canonical execution contract: `{contractPath}`.\n- The generated `src/engine/Domain.fs` state is a scaffold placeholder, not a claim that the application domain has been modeled.\n\n## Accepted requirement artifacts\n\n{requirements}\n\n## Unknowns\n\n- Application domain concepts have not yet been derived.\n- Important legal state and illegal states have not yet been identified.\n- Legal transitions, invariants, guards, capabilities, and effect obligations have not yet been established.\n- Semantic feature boundaries and ownership are not yet known.\n\n## Obligations before implementation expands\n\n1. Read the canonical execution contract and its normative references.\n2. Identify the smallest domain concepts and legal state required by the first meaningful vertical behavior.\n3. Establish legal transitions, invariants, guards, capabilities, and explicit effects required by that behavior.\n4. Update `SDE-MAP.md` and create feature manifests only when real semantic ownership is known.\n5. Preserve unknowns explicitly rather than converting missing knowledge into assumptions.\n\n## Next action\n\nExecute the initial Praxis mission using the accepted governing inputs and establish the first evidence-backed Ordo semantic slice.\n"
+
+            [ "SDE-MAP.md", semanticMap
+              "context/CURRENT-STATE.md", currentState ]
+
     let private desiredFiles (manifest: ProjectManifest) (scaffold: ScaffoldRequest) =
         let projectName =
             scaffold.Name
@@ -228,9 +262,11 @@ module Scaffolding =
                   "src/kernel/print.html",
                   "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <link rel=\"stylesheet\" href=\"./node_modules/@echelon-foundry/print-components/src/styles/print.css\">\n  <script type=\"module\" src=\"./node_modules/@echelon-foundry/print-components/src/components/register.js\"></script>\n  <title>Printable document</title>\n</head>\n<body>\n  <ef-print-document><main><h1>Printable document</h1></main></ef-print-document>\n</body>\n</html>\n" ]
 
+            let filesWithOrdoBaseline = files @ ordoBaselineFiles manifest
+
             match agentEntryFile manifest with
-            | Some agentFile -> Ok(agentFile :: files)
-            | None -> Ok files
+            | Some agentFile -> Ok(agentFile :: filesWithOrdoBaseline)
+            | None -> Ok filesWithOrdoBaseline
         | unknown ->
             Error [ $"Unsupported scaffold kind '{unknown}'." ]
 
