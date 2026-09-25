@@ -1,5 +1,6 @@
 open System
 open System.IO
+open System.Text.Json
 open Conditor.Core
 
 type private ManifestSelection =
@@ -13,7 +14,7 @@ let private usage () =
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor doctor [--manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor status [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
@@ -204,27 +205,59 @@ let private runRepair target manifestPath =
             writeErrors errors
             8
 
-let private runStatus target manifestPath =
+let private writeStatusJson (report: Status.ProjectStatus) =
+    use stream = Console.OpenStandardOutput()
+    let mutable options = JsonWriterOptions()
+    options.Indented <- true
+    use writer = new Utf8JsonWriter(stream, options)
+    writer.WriteStartObject()
+    writer.WriteNumber("schemaVersion", 1)
+    writer.WriteString("project", report.Project)
+    writer.WriteBoolean("healthy", Status.isHealthy report)
+    writer.WriteStartArray("components")
+
+    for componentText in report.Components do
+        writer.WriteStringValue componentText
+
+    writer.WriteEndArray()
+    writer.WriteStartArray("checks")
+
+    for check in report.Checks do
+        writer.WriteStartObject()
+        writer.WriteString("name", check.Name)
+        writer.WriteString("state", Status.stateText check.State)
+        writer.WriteString("detail", check.Detail)
+        writer.WriteEndObject()
+
+    writer.WriteEndArray()
+    writer.WriteEndObject()
+    writer.Flush()
+
+let private runStatus json target manifestPath =
     match Manifest.load manifestPath with
     | Error errors ->
         writeErrors errors
         2
     | Ok manifest ->
         let report = Status.inspect target manifestPath manifest
-        Console.WriteLine $"Project: {report.Project}"
 
-        if report.Components.IsEmpty then
-            Console.WriteLine "Components: none"
+        if json then
+            writeStatusJson report
         else
-            Console.WriteLine "Components:"
+            Console.WriteLine $"Project: {report.Project}"
 
-            for componentText in report.Components do
-                Console.WriteLine $"  {componentText}"
+            if report.Components.IsEmpty then
+                Console.WriteLine "Components: none"
+            else
+                Console.WriteLine "Components:"
 
-        Console.WriteLine "Checks:"
+                for componentText in report.Components do
+                    Console.WriteLine $"  {componentText}"
 
-        for check in report.Checks do
-            Console.WriteLine $"  [{Status.stateText check.State}] {check.Name}: {check.Detail}"
+            Console.WriteLine "Checks:"
+
+            for check in report.Checks do
+                Console.WriteLine $"  [{Status.stateText check.State}] {check.Name}: {check.Detail}"
 
         if Status.isHealthy report then 0 else 7
 
@@ -262,7 +295,7 @@ let main (args: string array) =
                 | "init" -> run Init true target selection
                 | "verify" -> run Verify true target selection
                 | "doctor" -> run Doctor true target selection
-                | "status" -> runStatus target selection.ManifestPath
+                | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
                 | "repair" -> runRepair target selection.ManifestPath
                 | "upgrade" -> runUpgrade target selection.ManifestPath
                 | "start" ->
