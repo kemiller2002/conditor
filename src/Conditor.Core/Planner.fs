@@ -216,9 +216,12 @@ module Planner =
 
                 for relativePath, fileContent in scaffoldFiles do
                     let execution =
-                        if relativePath = "AGENTS.md" then
+                        match relativePath with
+                        | "AGENTS.md" ->
                             EnsureManagedRegion(relativePath, "agent-entry", fileContent)
-                        else
+                        | "context/CURRENT-STATE.md" ->
+                            EnsureManagedRegion(relativePath, "ordo-baseline", fileContent)
+                        | _ ->
                             EnsureFile(relativePath, fileContent)
 
                     actions.Add
