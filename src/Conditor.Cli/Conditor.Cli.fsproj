@@ -7,6 +7,9 @@
     <ProjectReference Include="../Conditor.Core/Conditor.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="EchelonFoundry.Aegis.Core" Version="1.0.0" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>
