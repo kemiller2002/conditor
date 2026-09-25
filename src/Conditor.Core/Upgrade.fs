@@ -3,6 +3,10 @@ namespace Conditor.Core
 open System
 
 module Upgrade =
+    type UpgradePreview =
+        { ChangedComponents: string list
+          Plan: InstallationPlan }
+
     type UpgradeResult =
         { ChangedComponents: string list
           LockPath: string }
@@ -99,22 +103,31 @@ module Upgrade =
                         [ $"Repository scaffold is not already at the declared state: {paths}."
                           "Run 'conditor repair' before upgrade; upgrade will not combine repair and version migration." ]
 
-    let private executeChanged target manifest (changedIds: string list) =
-        if changedIds.IsEmpty then
-            Ok()
-        else
-            match Planner.create target Upgrade manifest with
+    let private upgradePlan target manifest changedIds =
+        match Planner.create target Upgrade manifest with
+        | Error errors -> Error errors
+        | Ok plan ->
+            let changed = Set.ofList changedIds
+
+            let actions =
+                plan.Actions
+                |> List.filter (fun action -> changed.Contains action.ComponentId)
+
+            Ok { plan with Actions = actions }
+
+    let preview target manifest =
+        match analyze target manifest with
+        | Error errors -> Error errors
+        | Ok changedIds ->
+            match ensureScaffoldAlreadyEstablished target manifest with
             | Error errors -> Error errors
-            | Ok plan ->
-                let changed = Set.ofList changedIds
-
-                let actions =
-                    plan.Actions
-                    |> List.filter (fun action ->
-                        changed.Contains action.ComponentId)
-
-                Installer.execute target String.Empty { plan with Actions = actions }
-                |> Result.map ignore
+            | Ok() ->
+                match upgradePlan target manifest changedIds with
+                | Error errors -> Error errors
+                | Ok plan ->
+                    Ok
+                        { ChangedComponents = changedIds
+                          Plan = plan }
 
     let private verifyAfterUpgrade target manifestPath manifest =
         match Requirements.verify target manifest with
@@ -126,23 +139,20 @@ module Upgrade =
                 Installer.execute target manifestPath plan |> Result.map ignore
 
     let apply target manifestPath manifest =
-        match analyze target manifest with
+        match preview target manifest with
         | Error errors -> Error errors
-        | Ok changedIds ->
-            match ensureScaffoldAlreadyEstablished target manifest with
+        | Ok preview ->
+            match Installer.execute target String.Empty preview.Plan with
             | Error errors -> Error errors
-            | Ok() ->
-                match executeChanged target manifest changedIds with
+            | Ok _ ->
+                match verifyAfterUpgrade target manifestPath manifest with
                 | Error errors -> Error errors
                 | Ok() ->
-                    match verifyAfterUpgrade target manifestPath manifest with
+                    match Planner.create target Init manifest with
                     | Error errors -> Error errors
-                    | Ok() ->
-                        match Planner.create target Init manifest with
-                        | Error errors -> Error errors
-                        | Ok lockPlan ->
-                            let lockPath = LockFile.write target manifestPath lockPlan
+                    | Ok lockPlan ->
+                        let lockPath = LockFile.write target manifestPath lockPlan
 
-                            Ok
-                                { ChangedComponents = changedIds
-                                  LockPath = lockPath }
+                        Ok
+                            { ChangedComponents = preview.ChangedComponents
+                              LockPath = lockPath }
