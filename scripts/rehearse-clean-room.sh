@@ -28,6 +28,34 @@ dotnet run --project src/Conditor.Cli --configuration Release -- init   --target
 
 popd >/dev/null
 
+snapshot_tree() {
+  find "$TARGET" -type f ! -path "$TARGET/.git/*" -print0 \
+    | sort -z \
+    | while IFS= read -r -d '' file; do
+        relative="${file#"$TARGET"/}"
+        printf '%s  %s\n' "$(sha256sum "$file" | awk '{print $1}')" "$relative"
+      done
+}
+
+FIRST_SNAPSHOT="$(mktemp)"
+SECOND_SNAPSHOT="$(mktemp)"
+trap 'rm -f "$FIRST_SNAPSHOT" "$SECOND_SNAPSHOT"; finish' EXIT
+
+snapshot_tree > "$FIRST_SNAPSHOT"
+
+pushd "$ROOT" >/dev/null
+dotnet run --project src/Conditor.Cli --configuration Release -- init \
+  --target "$TARGET" \
+  --manifest "$MANIFEST"
+popd >/dev/null
+
+snapshot_tree > "$SECOND_SNAPSHOT"
+
+if ! diff -u "$FIRST_SNAPSHOT" "$SECOND_SNAPSHOT"; then
+  echo "Second Conditor initialization produced repository drift." >&2
+  exit 1
+fi
+
 test -f "$TARGET/.conditor/lock.json"
 test -f "$TARGET/AGENTS.md"
 test -f "$TARGET/kickoff/evidence-triage.kickoff.json"
