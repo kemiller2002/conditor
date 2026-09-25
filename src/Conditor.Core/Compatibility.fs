@@ -13,34 +13,29 @@ module Compatibility =
           Requires: string
           Reason: string }
 
+    let private notes =
+        Map.ofList
+            [ "praxis", "3.1.4 is the current Conditor default; 3.1.3 is retained as the proven lifecycle-upgrade source fixture."
+              "ordo", "Qualified with the current Conditor greenfield Ordo baseline."
+              "visual-engineering", "Qualified lifecycle release."
+              "communication-engineering", "Pinned immutable-source lifecycle release."
+              "limen", "Qualified lifecycle and application binding used by the current web scaffold."
+              "forma", "Qualified application binding."
+              "folio", "Qualified application binding."
+              "aegis", "Qualified NuGet application binding."
+              "tutela", "Qualified pinned immutable-source lifecycle release." ]
+
     let supported =
-        [ { Id = "praxis"
-            Versions = Set.ofList [ "3.1.3"; "3.1.4" ]
-            Notes = "3.1.4 is the current Conditor default; 3.1.3 is retained as the proven lifecycle-upgrade source fixture." }
-          { Id = "ordo"
-            Versions = Set.ofList [ "1.3.0" ]
-            Notes = "Qualified with the current Conditor greenfield Ordo baseline." }
-          { Id = "visual-engineering"
-            Versions = Set.ofList [ "1.0.0" ]
-            Notes = "Qualified lifecycle release." }
-          { Id = "communication-engineering"
-            Versions = Set.ofList [ "1.0.0" ]
-            Notes = "Pinned immutable-source lifecycle release." }
-          { Id = "limen"
-            Versions = Set.ofList [ "0.6.1" ]
-            Notes = "Qualified lifecycle and application binding used by the current web scaffold." }
-          { Id = "forma"
-            Versions = Set.ofList [ "0.2.0" ]
-            Notes = "Qualified application binding." }
-          { Id = "folio"
-            Versions = Set.ofList [ "0.3.0" ]
-            Notes = "Qualified application binding." }
-          { Id = "aegis"
-            Versions = Set.ofList [ "1.0.0" ]
-            Notes = "Qualified NuGet application binding." }
-          { Id = "tutela"
-            Versions = Set.ofList [ "0.1.0" ]
-            Notes = "Qualified pinned immutable-source lifecycle release." } ]
+        Registry.descriptors
+        |> List.map (fun descriptor ->
+            let id = descriptor.Definition.Id
+
+            { Id = id
+              Versions = descriptor.QualifiedVersions
+              Notes =
+                notes
+                |> Map.tryFind id
+                |> Option.defaultValue "Qualified by the embedded Conditor component descriptor." })
 
     let requirements =
         [ { Subject = "scaffold:fsharp-limen-web"
