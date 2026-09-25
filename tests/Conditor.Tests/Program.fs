@@ -910,6 +910,54 @@ withManifest
         | Ok _ ->
             check "enabled execution requires canonical contract during manifest load" false)
 
+
+withManifest
+    """{"schemaVersion":1,"name":"unsupported-version","components":[{"id":"praxis","version":"3.4.0"}],"requirements":[],"execution":{"enabled":false}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "unsupported compatibility version manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/compatibility-version" Init manifest with
+            | Error errors ->
+                check
+                    "compatibility graph rejects unqualified component version"
+                    (errors
+                     |> List.exists (fun error ->
+                         error.Contains("not qualified by this Conditor compatibility graph")))
+            | Ok _ ->
+                check "compatibility graph rejects unqualified component version" false)
+
+withManifest
+    """{"schemaVersion":1,"name":"missing-limen","components":[],"requirements":[],"execution":{"enabled":false},"scaffold":{"kind":"fsharp-limen-web"}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "missing Limen compatibility manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/compatibility-limen" Init manifest with
+            | Error errors ->
+                check
+                    "fsharp-limen-web requires Limen"
+                    (errors |> List.exists (fun error -> error.Contains("requires component 'limen'")))
+            | Ok _ ->
+                check "fsharp-limen-web requires Limen" false)
+
+withManifest
+    """{"schemaVersion":1,"name":"missing-praxis","components":[],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.md"}],"execution":{"enabled":true,"launcher":"codex","contractPath":"requirements/contract.md"}}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ ->
+            check "missing Praxis compatibility manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/compatibility-praxis" Init manifest with
+            | Error errors ->
+                check
+                    "enabled execution requires Praxis through compatibility graph"
+                    (errors |> List.exists (fun error -> error.Contains("requires component 'praxis'")))
+            | Ok _ ->
+                check "enabled execution requires Praxis through compatibility graph" false)
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
