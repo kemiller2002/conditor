@@ -99,7 +99,7 @@ module Upgrade =
                         [ $"Repository scaffold is not already at the declared state: {paths}."
                           "Run 'conditor repair' before upgrade; upgrade will not combine repair and version migration." ]
 
-    let private executeChanged target manifest changedIds =
+    let private executeChanged target manifest (changedIds: string list) =
         if changedIds.IsEmpty then
             Ok()
         else
