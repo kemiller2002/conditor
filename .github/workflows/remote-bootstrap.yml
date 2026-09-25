@@ -1,0 +1,147 @@
+name: remote-bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repository:
+        description: Empty repository name under this GitHub owner
+        required: true
+        type: string
+      preset:
+        description: Built-in Conditor preset
+        required: true
+        default: indy-init
+        type: choice
+        options:
+          - indy-init
+          - clean-room
+          - evidence-triage-rehearsal
+      branch:
+        description: Initial branch to create
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conditor-remote-bootstrap-${{ inputs.target_repository }}
+  cancel-in-progress: false
+
+jobs:
+  establish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate inputs
+        env:
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_REPOSITORY" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "target_repository must be a repository name under ${{ github.repository_owner }}" >&2
+            exit 2
+          fi
+          if [[ ! "$TARGET_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "$TARGET_BRANCH" == -* ]] || [[ "$TARGET_BRANCH" == *..* ]]; then
+            echo "branch contains unsupported characters" >&2
+            exit 2
+          fi
+
+      - name: Checkout Conditor
+        uses: actions/checkout@v4
+        with:
+          path: conditor-source
+          persist-credentials: false
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.CONDITOR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CONDITOR_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+
+      - name: Verify target exists and is empty
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$OWNER/$TARGET_REPOSITORY" --silent
+          gh auth setup-git
+          refs="$(git ls-remote "https://github.com/$OWNER/$TARGET_REPOSITORY.git")"
+          if [[ -n "$refs" ]]; then
+            echo "Remote bootstrap v1 only accepts a truly empty repository. '$OWNER/$TARGET_REPOSITORY' already has refs." >&2
+            exit 3
+          fi
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build self-contained Conditor
+        working-directory: conditor-source
+        run: |
+          set -euo pipefail
+          dotnet restore Conditor.slnx
+          dotnet publish src/Conditor.Cli/Conditor.Cli.fsproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:DebugType=None \
+            -p:PublishTrimmed=false \
+            --output "$RUNNER_TEMP/conditor-native"
+          chmod +x "$RUNNER_TEMP/conditor-native/conditor"
+
+      - name: Establish target repository
+        env:
+          CONDITOR_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+          PRESET: ${{ inputs.preset }}
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/conditor-target"
+          mkdir -p "$target"
+          git -C "$target" init -q
+          git -C "$target" checkout -q -b "$TARGET_BRANCH"
+
+          "$RUNNER_TEMP/conditor-native/conditor" init --preset "$PRESET" --target "$target"
+          "$RUNNER_TEMP/conditor-native/conditor" verify --target "$target"
+          "$RUNNER_TEMP/conditor-native/conditor" status --json --target "$target" > "$RUNNER_TEMP/conditor-status.json"
+          grep -F '"healthy": true' "$RUNNER_TEMP/conditor-status.json"
+
+      - name: Commit and push governed repository
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OWNER: ${{ github.repository_owner }}
+          TARGET_REPOSITORY: ${{ inputs.target_repository }}
+          TARGET_BRANCH: ${{ inputs.branch }}
+        run: |
+          set -euo pipefail
+          target="$RUNNER_TEMP/conditor-target"
+          user_id="$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)"
+
+          git -C "$target" config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git -C "$target" config user.email "$user_id+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git -C "$target" remote add origin "https://github.com/$OWNER/$TARGET_REPOSITORY.git"
+          gh auth setup-git
+
+          git -C "$target" add -A
+          git -C "$target" commit -m "Establish repository with Conditor preset ${{ inputs.preset }}"
+          git -C "$target" push --set-upstream origin "$TARGET_BRANCH"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Conditor remote bootstrap"
+            echo
+            echo "- Repository: `${{ github.repository_owner }}/${{ inputs.target_repository }}`"
+            echo "- Preset: `${{ inputs.preset }}`"
+            echo "- Branch: `${{ inputs.branch }}`"
+            echo "- Result: initialized, verified, committed, and pushed"
+          } >> "$GITHUB_STEP_SUMMARY"
