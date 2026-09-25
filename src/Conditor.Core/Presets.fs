@@ -87,3 +87,17 @@ module Presets =
                         { Id = normalized
                           Content = content
                           ManifestPath = path }
+
+    let bindToTarget (preset: ResolvedPreset) (plan: InstallationPlan) =
+        let manifestAction =
+            { Sequence = 1
+              ComponentId = $"conditor:preset:{preset.Id}"
+              ComponentVersion = contentHash preset.Content
+              Kind = ManifestFile
+              Execution = EnsureFile("conditor.json", preset.Content) }
+
+        let shifted =
+            plan.Actions
+            |> List.map (fun action -> { action with Sequence = action.Sequence + 1 })
+
+        { plan with Actions = manifestAction :: shifted }
