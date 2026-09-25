@@ -7,6 +7,9 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   validate:
@@ -63,6 +66,10 @@ jobs:
             cp "$RUNNER_TEMP/publish/conditor" "$RUNNER_TEMP/asset/conditor-$RID"
             chmod +x "$RUNNER_TEMP/asset/conditor-$RID"
           fi
+      - name: Attest binary provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ runner.temp }}/asset/*
       - uses: actions/upload-artifact@v4
         with:
           name: conditor-${{ matrix.rid }}
@@ -78,6 +85,13 @@ jobs:
           pattern: conditor-*
           path: assets
           merge-multiple: true
+      - name: Verify binary provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for asset in assets/*; do
+            gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY"
+          done
       - name: Create checksums
         run: |
           (cd assets && sha256sum *) > checksums.txt
