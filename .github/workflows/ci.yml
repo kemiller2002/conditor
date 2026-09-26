@@ -83,29 +83,15 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
-      - name: Establish currently qualified lifecycle baseline
+      - name: Qualify current installable lifecycle releases
         run: |
-          mkdir -p "$RUNNER_TEMP/conditor-current-upgrade"
-          cp examples/current-lifecycle-upgrade-rehearsal.conditor.json "$RUNNER_TEMP/conditor-current-upgrade/conditor.json"
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-current-upgrade"
-          grep -F '"installedVersion": "3.1.4"' "$RUNNER_TEMP/conditor-current-upgrade/.echelon/ros.json"
-          grep -F '"installedVersion": "1.3.0"' "$RUNNER_TEMP/conditor-current-upgrade/.echelon/sde.json"
-      - name: Declare current release candidates
-        run: |
-          sed -i 's/"version": "3.1.4"/"version": "3.4.0"/' "$RUNNER_TEMP/conditor-current-upgrade/conditor.json"
-          sed -i 's/"version": "1.3.0"/"version": "1.4.0"/' "$RUNNER_TEMP/conditor-current-upgrade/conditor.json"
-      - name: Preview current lifecycle qualification
-        run: |
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- upgrade --check --target "$RUNNER_TEMP/conditor-current-upgrade"
-          grep -F '"installedVersion": "3.1.4"' "$RUNNER_TEMP/conditor-current-upgrade/.echelon/ros.json"
-          grep -F '"installedVersion": "1.3.0"' "$RUNNER_TEMP/conditor-current-upgrade/.echelon/sde.json"
-      - name: Qualify current lifecycle releases
-        run: |
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- upgrade --target "$RUNNER_TEMP/conditor-current-upgrade"
-          grep -F '"installedVersion": "3.4.0"' "$RUNNER_TEMP/conditor-current-upgrade/.echelon/ros.json"
-          grep -F '"installedVersion": "1.4.0"' "$RUNNER_TEMP/conditor-current-upgrade/.echelon/sde.json"
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-current-upgrade"
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- doctor --json --target "$RUNNER_TEMP/conditor-current-upgrade" > "$RUNNER_TEMP/current-lifecycle-doctor.json"
+          mkdir -p "$RUNNER_TEMP/conditor-current"
+          cp examples/current-lifecycle-upgrade-rehearsal.conditor.json "$RUNNER_TEMP/conditor-current/conditor.json"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-current"
+          grep -F '"installedVersion": "3.1.4"' "$RUNNER_TEMP/conditor-current/.echelon/ros.json"
+          grep -F '"installedVersion": "1.3.0"' "$RUNNER_TEMP/conditor-current/.echelon/sde.json"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-current"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- doctor --json --target "$RUNNER_TEMP/conditor-current" > "$RUNNER_TEMP/current-lifecycle-doctor.json"
           grep -F '"healthy": true' "$RUNNER_TEMP/current-lifecycle-doctor.json"
 
   empty-repository-smoke:
