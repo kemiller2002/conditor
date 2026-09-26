@@ -275,6 +275,22 @@ module Planner =
                 sequence <- sequence + 1
             | _ -> ()
 
+        if errors.Count = 0 then
+            match operation, resolved |> Seq.tryFind (fun resolvedComponent -> resolvedComponent.Id = "praxis") with
+            | (Init | Verify | Upgrade), Some praxis ->
+                match PraxisProvenance.gateFor praxis.Id praxis.Version with
+                | PraxisProvenance.Capable _ ->
+                    actions.Add
+                        { Sequence = sequence
+                          ComponentId = "praxis:provenance"
+                          ComponentVersion = praxis.Version
+                          Kind = ProvenanceVerify
+                          Execution = VerifyPraxisProvenance }
+
+                    sequence <- sequence + 1
+                | _ -> ()
+            | _ -> ()
+
         if errors.Count = 0 && operation = Init then
             match plannedMission with
             | None -> ()

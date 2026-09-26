@@ -44,7 +44,7 @@ git init
 conditor start --preset indy-init
 ```
 
-That single `start` command establishes an uninitialized repository when necessary, writes the exact preset to `conditor.json`, installs and verifies the declared Echelon environment, materializes pinned governing artifacts, creates the Ordo baseline and Praxis mission, checks execution readiness, activates the mission, and invokes the configured provider.
+That single `start` command establishes an uninitialized repository when necessary, writes the exact preset to `conditor.json`, installs and verifies the declared Echelon environment, materializes pinned governing artifacts, creates the Ordo baseline and Praxis mission, checks execution readiness, and invokes the configured provider, which begins the mission in its own Praxis execution.
 
 The Indy Init preset defaults to Codex. The same initialized repository can be handed to Claude without editing its governing manifest:
 
@@ -98,13 +98,13 @@ For the private Indy Init governing repository, authenticate Git or set a token 
 
 ## Start versus resume
 
-`conditor start` owns the ready-to-active transition. It verifies the environment, activates the deterministic Praxis mission when it is `ready`, and then launches the selected provider.
+`conditor start` verifies the environment and launches the selected provider against the deterministic Praxis mission when it is `ready` (or already `active`). Conditor does not perform the ready-to-active transition itself: it captures the mission as automation (`--actor-kind automation --actor conditor`) and the launch instruction tells the agent to begin its own execution with `./ros work start`, check `./ros provenance identity`, and attribute the records it creates with `./ros provenance record`. This keeps the agent's work keyed to the agent's own Praxis execution rather than to one Conditor started (CON-065 to CON-067).
 
-`conditor resume` never performs that transition. It requires the Praxis mission to already be `active`, re-runs the same readiness/provider checks, and invokes the selected provider against the existing work context. This makes provider handoff explicit:
+`conditor resume` never performs a state transition either. It requires the Praxis mission to already be `active`, re-runs the same readiness/provider checks, and invokes the selected provider against the existing work context. This makes provider handoff explicit:
 
 ```bash
 conditor start
-# Codex session exits while work remains active
+# the agent began its own execution; its session exits while work remains active
 conditor resume --launcher claude
 ```
 

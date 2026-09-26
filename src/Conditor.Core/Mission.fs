@@ -113,31 +113,37 @@ module Mission =
               "--occurred-at"
               occurredAt () ]
 
+    /// Conditor's own Praxis identity: deterministic automation, never an agent
+    /// or a human (CON-065). Declared explicitly on every Praxis transition
+    /// Conditor performs so Praxis never infers it from the environment.
+    let conditorIdentityArguments = [ "--actor-kind"; "automation"; "--actor"; "conditor" ]
+
+    /// Arguments for capturing the Conditor mission as a Praxis work item.
+    let captureArguments (mission: PraxisMission) (occurredAt: string) =
+        [ "work"
+          "capture"
+          "--title"
+          mission.Title
+          "--occurred-at"
+          occurredAt
+          "--id"
+          mission.Id
+          "--priority"
+          "high"
+          "--description"
+          mission.Description
+          "--tag"
+          "conditor"
+          "--tag"
+          "mission"
+          "--source"
+          "conditor"
+          "--source-reference"
+          mission.ContractPath ]
+        @ conditorIdentityArguments
+
     let private create target (mission: PraxisMission) =
-        runRos
-            target
-            [ "work"
-              "capture"
-              "--title"
-              mission.Title
-              "--occurred-at"
-              occurredAt ()
-              "--id"
-              mission.Id
-              "--priority"
-              "high"
-              "--description"
-              mission.Description
-              "--tag"
-              "conditor"
-              "--tag"
-              "mission"
-              "--source"
-              "conditor"
-              "--source-reference"
-              mission.ContractPath
-              "--actor"
-              "conditor" ]
+        runRos target (captureArguments mission (occurredAt ()))
 
     let private validateExisting (mission: PraxisMission) (existing: ExistingMission) =
         [ if existing.Title <> mission.Title then
@@ -207,24 +213,3 @@ module Mission =
                     Error [ $"Praxis mission '{mission.Id}' was abandoned; Conditor will not resurrect it automatically." ]
                 | state ->
                     Error [ $"Praxis mission '{mission.Id}' has unsupported state '{state}'." ]
-
-    let activate target (mission: PraxisMission) =
-        match launchState target mission with
-        | Error errors -> Error errors
-        | Ok "active" -> Ok()
-        | Ok "ready" ->
-            runRos
-                target
-                [ "work"
-                  "start"
-                  "--id"
-                  mission.Id
-                  "--occurred-at"
-                  occurredAt ()
-                  "--type"
-                  "feature"
-                  "--actor"
-                  "conditor" ]
-        | Ok state ->
-            Error [ $"Praxis mission '{mission.Id}' cannot be activated from state '{state}'." ]
-

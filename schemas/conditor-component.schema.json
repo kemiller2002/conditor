@@ -66,9 +66,23 @@
     "initArguments": { "$ref": "#/$defs/stringArray" },
     "verifyArguments": { "$ref": "#/$defs/stringArray" },
     "doctorArguments": { "$ref": "#/$defs/stringArray" },
-    "upgradeArguments": { "$ref": "#/$defs/stringArray" }
+    "upgradeArguments": { "$ref": "#/$defs/stringArray" },
+    "capabilities": {
+      "description": "Named capabilities the component gains at a known version (CON-068). A capability whose status is 'unreleased' must not be satisfied by any qualified version.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/capability" }
+    }
   },
   "$defs": {
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["since", "status"],
+      "properties": {
+        "since": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$" },
+        "status": { "enum": ["released", "unreleased"] }
+      }
+    },
     "stringArray": {
       "type": "array",
       "items": { "type": "string" }
