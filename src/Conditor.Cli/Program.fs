@@ -84,11 +84,20 @@ let private run operation shouldExecute target selection =
             if not shouldExecute then
                 0
             else
+                let reportProvenance () =
+                    match PraxisProvenance.inspect target plan.Components with
+                    | Some readiness ->
+                        Console.WriteLine
+                            $"Praxis provenance: {PraxisProvenance.statusText readiness.Status}. {readiness.Detail}"
+                    | None -> ()
+
                 match Installer.execute target selection.ManifestPath plan with
                 | Ok(Some lockPath) ->
+                    reportProvenance ()
                     Console.WriteLine $"Conditor completed successfully. Lock file: {lockPath}"
                     0
                 | Ok None ->
+                    reportProvenance ()
                     Console.WriteLine "Conditor completed successfully."
                     0
                 | Error errors ->

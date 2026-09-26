@@ -40,7 +40,11 @@ type ExecutionRequest =
     { Enabled: bool
       Launcher: string option
       Mission: string option
-      ContractPath: string option }
+      ContractPath: string option
+      /// Operator-configured model for the launched agent CLI. When set,
+      /// Conditor passes it to the CLI and declares it to Praxis; when absent the
+      /// model is unknown and never guessed (CON-131).
+      Model: string option }
 
 type PraxisMission =
     { Id: string
@@ -119,3 +123,19 @@ type ProcessResult =
     { ExitCode: int
       StandardOutput: string
       StandardError: string }
+
+/// Praxis provenance contract 1.2 rule 2: "blank" is judged over ASCII
+/// whitespace only (tab, LF, VT, FF, CR, space). .NET `Trim`/`IsNullOrWhiteSpace`,
+/// JavaScript `trim`, and Python `strip` disagree about Unicode whitespace
+/// (U+0085, U+FEFF, U+001C, U+00A0), so every other character is content and
+/// every reader of an identity or provenance value reaches the same verdict.
+[<RequireQualifiedAccess>]
+module AsciiText =
+    let private whitespace = [| '\t'; '\n'; '\011'; '\012'; '\r'; ' ' |]
+
+    let trim (value: string) = value.Trim whitespace
+
+    let isBlank (value: string | null) =
+        match value with
+        | null -> true
+        | text -> (trim text).Length = 0

@@ -8,7 +8,8 @@ module Readiness =
         { Mission: PraxisMission
           Launcher: string
           ContractPath: string
-          MissionState: string }
+          MissionState: string
+          Model: string option }
 
     let private missionFor (manifest: ProjectManifest) contractPath =
         let description =
@@ -118,4 +119,5 @@ module Readiness =
                     { Mission = mission
                       Launcher = launcher |> Option.get
                       ContractPath = resolvedContract
-                      MissionState = missionState }
+                      MissionState = missionState
+                      Model = execution |> Option.bind _.Model }

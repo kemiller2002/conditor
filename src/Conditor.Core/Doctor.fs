@@ -104,6 +104,34 @@ module Doctor =
                       Remediation =
                         Some $"Run the {action.ComponentId} lifecycle remediation named above, then run 'conditor repair' and 'conditor status'." })
 
+    /// Maps provenance readiness to a doctor finding: enabled is informational,
+    /// a Praxis version that predates provenance is a visible warning (never a
+    /// silent pass), and missing-when-expected is an error (CON-128, CON-129).
+    let provenanceFinding (readiness: PraxisProvenance.Readiness) =
+        let severity, remediation =
+            match readiness.Status with
+            | PraxisProvenance.Enabled -> Info, None
+            | PraxisProvenance.NotSupportedByInstalledVersion ->
+                Warning,
+                Some "Upgrade to a qualified Praxis release that provides provenance once Conditor qualifies one ('conditor compatibility')."
+            | PraxisProvenance.MissingWhenExpected ->
+                Error,
+                Some "Run the Praxis lifecycle upgrade or doctor to restore Praxis-owned provenance files, then 'conditor verify'."
+
+        { Code = "COND-DOC-PROVENANCE"
+          Severity = severity
+          Area = "provenance"
+          Detail = $"[{PraxisProvenance.statusText readiness.Status}] {readiness.Detail}"
+          Remediation = remediation }
+
+    let private provenanceFindings target manifest =
+        match Planner.create target Verify manifest with
+        | Result.Error _ -> []
+        | Ok plan ->
+            PraxisProvenance.inspect target plan.Components
+            |> Option.map provenanceFinding
+            |> Option.toList
+
     let inspect target manifestPath manifest =
         let findings = ResizeArray<Finding>()
 
@@ -113,6 +141,9 @@ module Doctor =
         addStatusFindings findings status
 
         lifecycleDoctorFindings target manifest
+        |> List.iter findings.Add
+
+        provenanceFindings target manifest
         |> List.iter findings.Add
 
         let result = List.ofSeq findings

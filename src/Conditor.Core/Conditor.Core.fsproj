@@ -8,6 +8,8 @@
     <Compile Include="Manifest.fs" />
     <Compile Include="ComponentDescriptors.fs" />
     <Compile Include="Registry.fs" />
+    <Compile Include="PraxisProvenance.fs" />
+    <Compile Include="AgentIdentity.fs" />
     <Compile Include="Compatibility.fs" />
     <Compile Include="SourceCache.fs" />
     <Compile Include="Requirements.fs" />
@@ -29,6 +31,7 @@
     <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />
     <EmbeddedResource Include="../../examples/clean-room.conditor.json" LogicalName="Conditor.Presets.clean-room.json" />
     <EmbeddedResource Include="../../examples/rehearsal-evidence-triage.conditor.json" LogicalName="Conditor.Presets.evidence-triage-rehearsal.json" />
+    <EmbeddedResource Include="../../components/praxis.capabilities.json" LogicalName="Conditor.Capabilities.praxis.json" />
     <EmbeddedResource Include="../../components/*.component.json">
       <LogicalName>Conditor.Components.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>

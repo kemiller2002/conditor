@@ -228,12 +228,7 @@ module Installer =
 
         let rec loop actions =
             match actions with
-            | [] ->
-                if plan.Operation = Init then
-                    let lockPath = LockFile.write target manifestPath plan
-                    Ok(Some lockPath)
-                else
-                    Ok None
+            | [] -> Ok()
             | action :: remaining ->
                 match action.Execution with
                 | EnsureFile(relativePath, content) ->
@@ -283,4 +278,31 @@ module Installer =
                               result.StandardError.Trim() ]
                         |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
 
-        loop plan.Actions
+        // Provenance readiness is checked after every lifecycle verify
+        // succeeded and before lock state is written (CON-010, CON-128).
+        let provenanceGate () =
+            match PraxisProvenance.inspect target plan.Components with
+            | Some readiness when readiness.Status = PraxisProvenance.MissingWhenExpected ->
+                Error
+                    [ "Conditor post-install verification failed: Praxis provenance is missing."
+                      readiness.Detail ]
+            | _ -> Ok()
+
+        match loop plan.Actions with
+        | Error errors -> Error errors
+        | Ok() ->
+            let gate =
+                match plan.Operation with
+                | Doctor -> Ok()
+                | Init
+                | Verify
+                | Upgrade -> provenanceGate ()
+
+            match gate with
+            | Error errors -> Error errors
+            | Ok() ->
+                if plan.Operation = Init then
+                    let lockPath = LockFile.write target manifestPath plan
+                    Ok(Some lockPath)
+                else
+                    Ok None
