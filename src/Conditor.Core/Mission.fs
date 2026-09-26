@@ -42,7 +42,6 @@ module Mission =
                     |> Option.bind (fun item ->
                         optionalString "semanticState" item
                         |> Option.orElseWith (fun () -> optionalString "state" item))
-                    |> Some
                     |> Ok
                 | _ -> Ok None
             with ex ->
