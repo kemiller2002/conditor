@@ -76,17 +76,37 @@ module Launcher =
 
 Read AGENTS.md first. Then read the canonical execution contract at {ready.ContractPath} and every normative document it references. Run the repository Praxis work-context command for {ready.Mission.Id} and obey the installed Ordo, Praxis, Aegis, Limen, Forma, Folio, security, visual, and communication constraints.
 
+Identify yourself to Praxis truthfully as the agent you are: your environment declares ROS_ACTOR_KIND=agent and the provider/runtime of this CLI. Never record work under Conditor's identity or another actor's execution, and never fabricate a model or version.
+
 Implement the mission in the repository. Use repository-native lifecycle and verification commands as evidence. If blocked, record the block through Praxis. Do not treat your own statement that the work is finished as completion. Complete the Praxis work item only when its required implementation, tests, runtime/verification evidence, and governing requirements are satisfied."""
+
+    /// Launcher command line (pure). A configured model is passed to the CLI so
+    /// the model declared to Praxis is the one actually used.
+    let commandLine (launcher: string) (model: string option) (instruction: string) =
+        let modelArguments =
+            model
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.map (fun value -> [ "--model"; value.Trim() ])
+            |> Option.defaultValue []
+
+        match launcher.Trim().ToLowerInvariant() with
+        | "codex" -> Some("codex", [ "exec"; "--full-auto" ] @ modelArguments @ [ instruction ])
+        | "claude" -> Some("claude", [ "-p"; "--output-format"; "text" ] @ modelArguments @ [ instruction ])
+        | _ -> None
 
     let launch target (ready: Readiness.ReadyExecution) =
         let instruction = instruction ready
 
-        match ready.Launcher.Trim().ToLowerInvariant() with
-        | "codex" ->
-            ProcessRunner.runProcess target "codex" [ "exec"; "--full-auto"; instruction ]
-        | "claude" ->
-            ProcessRunner.runProcess target "claude" [ "-p"; "--output-format"; "text"; instruction ]
-        | unsupported ->
+        match commandLine ready.Launcher ready.Model instruction with
+        | Some(executable, arguments) ->
+            ProcessRunner.runProcessWithEnvironment
+                target
+                executable
+                arguments
+                (AgentIdentity.agentEnvironment ready.Launcher ready.Model)
+        | None ->
+            let unsupported = ready.Launcher.Trim().ToLowerInvariant()
+
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = $"Unsupported execution launcher '{unsupported}'." }

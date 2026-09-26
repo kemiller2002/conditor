@@ -96,3 +96,7 @@ Provider process success is not project completion. The workflow records and pus
 - The GitHub App token is process-scoped and never written into Conditor lock state.
 - The OpenAI federation rule ID and WIF audience are identifiers, not bearer credentials.
 - Repository writes use the GitHub App bot identity.
+
+## Agent identity
+
+The workflow needs no identity variables of its own. Conditor starts `codex` with `ROS_ACTOR_KIND=agent`, `ROS_TELEMETRY_PROVIDER=openai`, and `ROS_TELEMETRY_RUNTIME=codex`, plus `ROS_TELEMETRY_MODEL` only when `execution.model` is configured. It removes any inherited `ROS_ACTOR`/`ROS_EXECUTION_ID`, so the agent begins its own Praxis execution and is never recorded as Conditor or as the GitHub Actions run. Conditor's own `ros` calls declare `ROS_ACTOR_KIND=automation` and `ROS_ACTOR=conditor` (CON-130, CON-131). None of these values are credentials.

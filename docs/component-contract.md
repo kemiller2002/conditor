@@ -62,3 +62,9 @@ Conditor must first know which generated application/project owns the dependency
 Qualified component versions now come from the descriptors. Conditor also maintains orchestration-level dependency rules that are not owned by any single component, such as `fsharp-limen-web -> limen` and `execution:enabled -> praxis`.
 
 Planning rejects an unqualified version or missing required capability before mutation. Future descriptor revisions should carry component-owned compatibility constraints such as minimum runtime or peer-capability versions.
+
+## Capability tables
+
+Some capabilities arrive with a component release rather than with Conditor. `components/<id>.capabilities.json` (schema `schemas/conditor-capabilities.schema.json`) maps them to the first component version that provides them. It is kept outside the component descriptor so that changing a threshold does not change the descriptor digest recorded in target locks.
+
+`components/praxis.capabilities.json` declares `provenance` (Praxis agent identity and provenance, CON-128/CON-129). Its `minimumVersion` is `null` because no published Praxis release (latest qualified: 3.1.4) contains the provenance commits yet, so post-install verification reports `not-supported-by-installed-version` as a doctor warning and a verify/init output line. **Follow-up:** when Praxis publishes the release that contains provenance, qualify it in `praxis.component.json` and set `minimumVersion` to that version. Repositories on that version then report `enabled`, or fail verification with `missing-when-expected` if the Praxis-owned policy, guidance, or `docs/agent-provenance.md` is absent.

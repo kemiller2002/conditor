@@ -65,6 +65,11 @@
         "contractPath": {
           "type": "string",
           "minLength": 1
+        },
+        "model": {
+          "description": "Optional model identifier passed to the launcher CLI and declared to Praxis as ROS_TELEMETRY_MODEL. Omit it to let the CLI choose; the model is then recorded as unknown.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$"
         }
       }
     },

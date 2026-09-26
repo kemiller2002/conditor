@@ -40,7 +40,11 @@ type ExecutionRequest =
     { Enabled: bool
       Launcher: string option
       Mission: string option
-      ContractPath: string option }
+      ContractPath: string option
+      /// Operator-configured model for the launched agent CLI. When set,
+      /// Conditor passes it to the CLI and declares it to Praxis; when absent the
+      /// model is unknown and never guessed (CON-131).
+      Model: string option }
 
 type PraxisMission =
     { Id: string

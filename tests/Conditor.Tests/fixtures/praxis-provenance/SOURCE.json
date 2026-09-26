@@ -1,0 +1,9 @@
+{
+  "repository": "kemiller2002/praxis",
+  "commit": "a42c44e8ae0e6e16fdd513141460b700e5fa6648",
+  "note": "Copied unchanged. ros.json is starter/greenfield/ros.json; AGENTS.md is the repository-root AGENTS.md that starter/greenfield/manifest.json installs as the greenfield AGENTS.md. Used only as a provenance-enabled Praxis install fixture; tests recompute these hashes to detect local edits.",
+  "files": {
+    "ros.json": {"source": "starter/greenfield/ros.json", "sha256": "a40c5ec0eb7c969b7f257492a076b923d58f6a85b2ecb8c6c4ab26be4c248f8b"},
+    "AGENTS.md": {"source": "AGENTS.md", "sha256": "5fc2bb9fd5eed578217d274938653cb36f2abfa2f3c8e7ff80453b79d518f6cb"}
+  }
+}

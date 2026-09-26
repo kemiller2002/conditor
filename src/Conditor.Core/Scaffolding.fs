@@ -195,7 +195,7 @@ module Scaffolding =
                     |> Option.defaultValue "Execute the project contract and prove completion through repository evidence."
 
                 "AGENTS.md",
-                $"# Agent Entry\n\nThis repository was initialized by Conditor.\n\n## Canonical execution contract\n\nRead and obey `{contractPath}` before implementation.\n\n## Mission\n\n{mission}\n\n## Rules\n\n- Treat the contract and its referenced normative documents as authoritative.\n- Do not invent architecture decisions that the contract classifies as locked, experimental, or deferred.\n- Use installed lifecycle/component tooling rather than copying framework implementations.\n- Completion requires deterministic verification and repository evidence, not an agent completion statement.\n" ))
+                $"# Agent Entry\n\nThis repository was initialized by Conditor.\n\n## Canonical execution contract\n\nRead and obey `{contractPath}` before implementation.\n\n## Mission\n\n{mission}\n\n## Rules\n\n- Treat the contract and its referenced normative documents as authoritative.\n- Do not invent architecture decisions that the contract classifies as locked, experimental, or deferred.\n- Use installed lifecycle/component tooling rather than copying framework implementations.\n- Completion requires deterministic verification and repository evidence, not an agent completion statement.\n- Identify yourself to Praxis as the agent you are and follow the installed Praxis \"Agent Identity and Provenance\" guidance when present; never record work as Conditor or another actor.\n" ))
 
     let private markdownRequirementList (manifest: ProjectManifest) =
         match manifest.Requirements with
