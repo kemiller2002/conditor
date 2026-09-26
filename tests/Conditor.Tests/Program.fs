@@ -1086,6 +1086,53 @@ match ComponentDescriptors.loadAll () with
                  && source.Entrypoint = NodeScript "bin/tutela.mjs"
              | _ -> false))
 
+
+withTarget
+    (fun target ->
+        let queueDirectory = Path.Combine(target, ".ros", "work")
+        let contextDirectory = Path.Combine(target, ".ros", "context")
+        Directory.CreateDirectory queueDirectory |> ignore
+        Directory.CreateDirectory contextDirectory |> ignore
+
+        File.WriteAllText(
+            Path.Combine(queueDirectory, "queue.json"),
+            """{
+  "items": [
+    {
+      "id": "COND-MISSION-001",
+      "title": "Build the governed application.",
+      "description": "Build the governed application.",
+      "status": "ready",
+      "source": "conditor",
+      "sourceReference": "requirements/contract.md"
+    }
+  ]
+}"""
+        )
+
+        File.WriteAllText(
+            Path.Combine(contextDirectory, "current.json"),
+            """{
+  "workItems": [
+    {
+      "id": "COND-MISSION-001",
+      "state": "active",
+      "semanticState": "active"
+    }
+  ]
+}"""
+        )
+
+        let mission =
+            { Id = "COND-MISSION-001"
+              Title = "Build the governed application."
+              Description = "Build the governed application."
+              ContractPath = "requirements/contract.md" }
+
+        check
+            "Praxis active execution context overrides ready backlog projection"
+            (Mission.launchState target mission = Ok "active"))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."
