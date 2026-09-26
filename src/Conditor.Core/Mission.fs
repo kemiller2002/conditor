@@ -25,6 +25,29 @@ module Mission =
     let private requiredString name (element: JsonElement) =
         optionalString name element |> Option.defaultValue String.Empty
 
+    let private readExecutionState target missionId =
+        let contextPath = Path.Combine(target, ".ros", "context", "current.json")
+
+        if not (File.Exists contextPath) then
+            Ok None
+        else
+            try
+                use document = JsonDocument.Parse(File.ReadAllText contextPath)
+                let root = document.RootElement
+
+                match tryProperty "workItems" root with
+                | Some items when items.ValueKind = JsonValueKind.Array ->
+                    items.EnumerateArray()
+                    |> Seq.tryFind (fun item -> requiredString "id" item = missionId)
+                    |> Option.bind (fun item ->
+                        optionalString "semanticState" item
+                        |> Option.orElseWith (fun () -> optionalString "state" item))
+                    |> Some
+                    |> Ok
+                | _ -> Ok None
+            with ex ->
+                Error [ $"Unable to inspect Praxis execution context: {ex.Message}" ]
+
     let private readExisting target missionId =
         let queuePath = Path.Combine(target, ".ros", "work", "queue.json")
 
@@ -164,19 +187,27 @@ module Mission =
         match conflictsFor target mission with
         | Error errors -> Error errors
         | Ok existing ->
-            match existing.Status with
-            | "ready" -> Ok "ready"
-            | "active" -> Ok "active"
-            | "captured" ->
-                Error [ $"Praxis mission '{mission.Id}' has not been marked ready." ]
-            | "blocked" ->
+            match readExecutionState target mission.Id with
+            | Error errors -> Error errors
+            | Ok(Some "active") -> Ok "active"
+            | Ok(Some "blocked") ->
                 Error [ $"Praxis mission '{mission.Id}' is blocked and cannot be launched." ]
-            | "complete" ->
+            | Ok(Some "complete") ->
                 Error [ $"Praxis mission '{mission.Id}' is already complete." ]
-            | "abandoned" ->
-                Error [ $"Praxis mission '{mission.Id}' was abandoned." ]
-            | state ->
-                Error [ $"Praxis mission '{mission.Id}' has unsupported state '{state}'." ]
+            | Ok _ ->
+                match existing.Status with
+                | "ready" -> Ok "ready"
+                | "active" -> Ok "active"
+                | "captured" ->
+                    Error [ $"Praxis mission '{mission.Id}' has not been marked ready." ]
+                | "blocked" ->
+                    Error [ $"Praxis mission '{mission.Id}' is blocked and cannot be launched." ]
+                | "complete" ->
+                    Error [ $"Praxis mission '{mission.Id}' is already complete." ]
+                | "abandoned" ->
+                    Error [ $"Praxis mission '{mission.Id}' was abandoned; Conditor will not resurrect it automatically." ]
+                | state ->
+                    Error [ $"Praxis mission '{mission.Id}' has unsupported state '{state}'." ]
 
     let activate target (mission: PraxisMission) =
         match launchState target mission with
