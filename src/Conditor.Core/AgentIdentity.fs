@@ -16,9 +16,12 @@ module AgentIdentity =
     [<Literal>]
     let ConditorActorId = "conditor"
 
-    /// Identity variables an outer process may have exported for itself. A
-    /// child with a different identity must not inherit them: they would make
-    /// it record under another actor's execution, session, or run.
+    /// Every variable Praxis identity discovery reads (Praxis contract revision
+    /// 1.1, `identity-environment.json`; pinned by a test against the vendored
+    /// fixture). A child acting as a different actor must not inherit any of
+    /// them: runtime session ids, CI run markers, and local-model hosts would
+    /// put the operator's session or run on the child's execution, and Praxis
+    /// could merge different runs.
     let inheritedIdentityVariables =
         [ "ROS_ACTOR"
           "ROS_ACTOR_KIND"
@@ -30,7 +33,15 @@ module AgentIdentity =
           "ROS_TELEMETRY_RUNTIME_VERSION"
           "ROS_TELEMETRY_SESSION_ID"
           "ROS_TELEMETRY_CONVERSATION_ID"
-          "ROS_TELEMETRY_RUN_ID" ]
+          "ROS_TELEMETRY_RUN_ID"
+          "CLAUDE_CODE_SESSION_ID"
+          "CODEX_SESSION_ID"
+          "CODEX_THREAD_ID"
+          "GEMINI_SESSION_ID"
+          "COPILOT_SESSION_ID"
+          "GITHUB_ACTIONS"
+          "GITHUB_RUN_ID"
+          "OLLAMA_HOST" ]
 
     let private clearInherited: EnvironmentChange list =
         inheritedIdentityVariables |> List.map (fun name -> name, None)
@@ -43,8 +54,9 @@ module AgentIdentity =
 
     /// Environment for Conditor's own `ros` invocations: Conditor is
     /// deterministic automation with the stable id `conditor` and runtime
-    /// `conditor`. Provider and model are not declared (Conditor has no model;
-    /// Praxis records them as unknown or from its CI detection).
+    /// `conditor`. Provider and model are not declared: Conditor has no model,
+    /// and because CI and local-model signals (`GITHUB_ACTIONS`, `OLLAMA_HOST`)
+    /// are cleared first, Praxis records both as `unknown` instead of inferring them.
     let conditorRosEnvironment: EnvironmentChange list =
         merge (
             clearInherited

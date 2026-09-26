@@ -1150,7 +1150,7 @@ do
 
     check
         "vendored Praxis fixture records the contract commit"
-        (source.RootElement.GetProperty("commit").GetString() = "a42c44e8ae0e6e16fdd513141460b700e5fa6648")
+        (source.RootElement.GetProperty("commit").GetString() = "c2657efb4d54f11d0fd0617cc1bcd5b8418601d5")
 
     for file in files.EnumerateObject() do
         let expected = file.Value.GetProperty("sha256").GetString() |> Option.ofObj |> Option.defaultValue String.Empty
@@ -1184,6 +1184,7 @@ check "qualified Praxis 3.1.4 does not support provenance" (not (PraxisProvenanc
 check "version at threshold supports" (PraxisProvenance.supports (Some "3.2.0") (Some "3.2.0"))
 check "version below threshold does not support" (not (PraxisProvenance.supports (Some "3.2.0") (Some "3.1.4")))
 check "versions compare numerically" (PraxisProvenance.supports (Some "3.2.0") (Some "3.10"))
+check "version with a trailing newline never counts as supporting" (not (PraxisProvenance.supports (Some "3.2.0") (Some "3.2.0\n")))
 check "prerelease never counts as supporting" (not (PraxisProvenance.supports (Some "3.2.0") (Some "3.3.0-beta.1")))
 check "unknown installed version never supports" (not (PraxisProvenance.supports (Some "3.2.0") None))
 
@@ -1245,6 +1246,27 @@ withProvenanceTarget false (fun target ->
     check "doctor reports unsupported provenance as a warning" (warning.Severity = Doctor.Warning && warning.Code = "COND-DOC-PROVENANCE" && warning.Remediation.IsSome)
     check "doctor reports missing provenance as an error" (error.Severity = Doctor.Error))
 
+let guidanceVariants =
+    [ "exact Praxis heading", "# Guide\n\n## Agent Identity and Provenance\n\nText.\n", true
+      "reworded heading", "# Guide\n\n### Agent identity & provenance rules\n", true
+      "CRLF heading", "# Guide\r\n\r\n## Identity and Provenance\r\n", true
+      "stable marker", "# Guide\n\n<!-- praxis:agent-identity-provenance -->\n## Who you are\n", true
+      "key phrases", "# Guide\n\nDeclare ROS_ACTOR_KIND; see docs/agent-provenance.md.\n", true
+      "no guidance", "# Guide\n\n## Work Protocol\n\nRecord provenance of records.\n", false
+      "provenance document only", "# Guide\n\nSee docs/agent-provenance.md.\n", false ]
+
+for name, text, expected in guidanceVariants do
+    check $"agent guidance detection tolerates wording: {name}" (PraxisProvenance.hasAgentGuidance (Some text) = expected)
+
+withProvenanceTarget true (fun target ->
+    File.WriteAllText(
+        Path.Combine(target, "AGENTS.md"),
+        File.ReadAllText(Path.Combine(target, "AGENTS.md")).Replace("## Agent Identity and Provenance", "## Agent identity & provenance")
+    )
+
+    let reworded = PraxisProvenance.assess (Some "3.2.0") (Some "3.2.0") (PraxisProvenance.observe target)
+    check "reworded Praxis heading does not fail verification at a supporting version" (reworded.Status = PraxisProvenance.Enabled))
+
 withTarget (fun target ->
     let readiness = PraxisProvenance.assess None (Some "3.1.4") (PraxisProvenance.observe target)
     check "empty target without Praxis files is not-supported for 3.1.4" (readiness.Status = PraxisProvenance.NotSupportedByInstalledVersion)
@@ -1266,7 +1288,23 @@ let ambient =
           "ROS_ACTOR_KIND", "automation"
           "ROS_EXECUTION_ID", "EXE-20260926T000000000Z-deadbeef"
           "ROS_TELEMETRY_MODEL", "some-outer-model"
-          "ROS_TELEMETRY_SESSION_ID", "outer-session" ]
+          "ROS_TELEMETRY_SESSION_ID", "outer-session"
+          "CLAUDE_CODE_SESSION_ID", "operator-claude-session"
+          "CODEX_SESSION_ID", "outer-codex-session"
+          "CODEX_THREAD_ID", "outer-thread"
+          "GEMINI_SESSION_ID", "outer-gemini"
+          "COPILOT_SESSION_ID", "outer-copilot"
+          "GITHUB_ACTIONS", "true"
+          "GITHUB_RUN_ID", "ci-run-77"
+          "OLLAMA_HOST", "127.0.0.1:11434" ]
+
+let identityFixture =
+    use document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(provenanceFixture, "identity-environment.json")))
+    document.RootElement.GetProperty("variables").EnumerateArray()
+    |> Seq.map (fun item -> item.GetString() |> Option.ofObj |> Option.defaultValue "")
+    |> List.ofSeq
+
+check "Conditor clears exactly the Praxis identity-environment variables" (AgentIdentity.inheritedIdentityVariables = identityFixture)
 
 do
     let conditor = AgentIdentity.apply AgentIdentity.conditorRosEnvironment ambient
@@ -1275,6 +1313,11 @@ do
     check "Conditor ros calls declare the conditor runtime" (conditor.TryFind "ROS_TELEMETRY_RUNTIME" = Some "conditor")
     check "Conditor ros calls do not inherit an outer execution or model" (not (conditor.ContainsKey "ROS_EXECUTION_ID") && not (conditor.ContainsKey "ROS_TELEMETRY_MODEL"))
     check "Conditor ros environment adds no secrets" (AgentIdentity.conditorRosEnvironment |> List.forall (secretLike >> not))
+
+    let conditorExplicit = Map [ "ROS_ACTOR_KIND", "automation"; "ROS_ACTOR", "conditor"; "ROS_TELEMETRY_RUNTIME", "conditor" ]
+    check
+        "Conditor ros calls carry no inherited session, CI run, or local-model signal"
+        (identityFixture |> List.forall (fun name -> conditor.TryFind name = conditorExplicit.TryFind name))
 
     for launcher, provider, runtime in [ "codex", "openai", "codex"; "claude", "anthropic", "claude-code" ] do
         let changes = AgentIdentity.agentEnvironment launcher None
@@ -1286,6 +1329,12 @@ do
         check $"{launcher} agent model is unknown unless configured" (not (child.ContainsKey "ROS_TELEMETRY_MODEL"))
         check $"{launcher} agent environment adds no secrets" (changes |> List.forall (secretLike >> not))
         check $"{launcher} agent keeps inherited launcher credentials untouched" (child.TryFind "OPENAI_API_KEY" = ambient.TryFind "OPENAI_API_KEY")
+
+        let agentExplicit =
+            Map [ "ROS_ACTOR_KIND", "agent"; "ROS_TELEMETRY_PROVIDER", provider; "ROS_TELEMETRY_RUNTIME", runtime ]
+        check
+            $"{launcher} agent receives no identity variable except its explicit declaration"
+            (identityFixture |> List.forall (fun name -> child.TryFind name = agentExplicit.TryFind name))
 
     let configured = AgentIdentity.apply (AgentIdentity.agentEnvironment "claude" (Some "claude-opus-4-1")) ambient
     check "configured model is declared" (configured.TryFind "ROS_TELEMETRY_MODEL" = Some "claude-opus-4-1")

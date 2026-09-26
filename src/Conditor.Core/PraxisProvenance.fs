@@ -63,7 +63,7 @@ module PraxisProvenance =
         let mutable value = Unchecked.defaultof<JsonElement>
         if element.TryGetProperty(name, &value) then Some value else None
 
-    let private versionPattern = Regex("^[0-9]+(\\.[0-9]+)*$", RegexOptions.CultureInvariant)
+    let private versionPattern = Regex("^[0-9]+(\\.[0-9]+)*\\z", RegexOptions.CultureInvariant)
 
     /// Parses a capability table and returns each capability's minimum version
     /// (`None` when no qualified release provides it yet).
@@ -187,13 +187,36 @@ module PraxisProvenance =
             with :? JsonException as ex ->
                 PolicyInvalid $"ros.json is invalid JSON: {ex.Message}"
 
-    let private guidancePattern =
-        Regex($"^#{{1,6}}\\s+{Regex.Escape AgentGuidanceHeading}\\s*$", RegexOptions.Multiline ||| RegexOptions.CultureInvariant)
+    /// Stable marker a Praxis release may place in AGENTS.md to identify the section.
+    [<Literal>]
+    let AgentGuidanceMarker = "praxis:agent-identity-provenance"
 
-    /// True when AGENTS.md carries the Praxis "Agent Identity and Provenance" section.
+    let private headingPattern =
+        Regex("^#{1,6}[ \t]+(?<title>[^\n]*)$", RegexOptions.Multiline ||| RegexOptions.CultureInvariant)
+
+    let private contains (text: string) (phrase: string) =
+        text.Contains(phrase, StringComparison.OrdinalIgnoreCase)
+
+    /// True when AGENTS.md carries the Praxis agent identity/provenance guidance.
+    /// Detection is deliberately tolerant of wording and heading changes across
+    /// Praxis releases (it gates verification once a threshold is set): any of
+    /// a stable marker, a heading naming both identity and provenance, or the
+    /// key phrases (a reference to the provenance document together with the
+    /// identity declaration variable `ROS_ACTOR_KIND`).
     let hasAgentGuidance (agentsMarkdown: string option) =
         agentsMarkdown
-        |> Option.exists (fun text -> guidancePattern.IsMatch(text.Replace("\r\n", "\n")))
+        |> Option.exists (fun raw ->
+            let text = raw.Replace("\r\n", "\n")
+
+            let heading =
+                headingPattern.Matches text
+                |> Seq.exists (fun found ->
+                    let title = found.Groups["title"].Value
+                    contains title "identity" && contains title "provenance")
+
+            contains text AgentGuidanceMarker
+            || heading
+            || (contains text "agent-provenance.md" && text.Contains "ROS_ACTOR_KIND"))
 
     /// Pure readiness decision. The installed repository content wins over the
     /// version table: a repository that already carries the complete contract is
