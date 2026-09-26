@@ -80,6 +80,7 @@ let private run operation shouldExecute target selection =
         | Ok plan ->
             Console.WriteLine $"Conditor plan for '{plan.ProjectName}'"
             Installer.describe plan |> List.iter (fun (line: string) -> Console.WriteLine line)
+            PraxisProvenance.planDiagnostics plan |> writeErrors
 
             if not shouldExecute then
                 0
@@ -219,7 +220,7 @@ let private runHandoff resumeOnly launcherOverride promptPath target manifestPat
                         writeErrors errors
                         11
                     | Ok fullPath ->
-                        Console.WriteLine $"External provider handoff ready: launcher={ready.Launcher}; mission={ready.Mission.Id}; state=active; prompt={fullPath}"
+                        Console.WriteLine $"External provider handoff ready: launcher={ready.Launcher}; mission={ready.Mission.Id}; state={ready.MissionState}; prompt={fullPath}"
                         0
 
 let private presetTargetState target (preset: ResolvedPreset) =
@@ -281,6 +282,8 @@ let private runUpgrade checkOnly target manifestPath =
 
             Installer.describe preview.Plan
             |> List.iter (fun line -> Console.WriteLine $"  {line}")
+
+            PraxisProvenance.planDiagnostics preview.Plan |> writeErrors
 
             0
     | Ok manifest ->

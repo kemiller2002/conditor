@@ -131,6 +131,31 @@ jobs:
           grep -F "requirements/contract.md" "$RUNNER_TEMP/conditor-empty/AGENTS.md"
           grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
           grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
+      - name: Verify Praxis provenance policy when the selected Praxis is provenance-capable
+        # Guarded (CON-069): runs its checks only when the Praxis version in the lock is at
+        # or after capabilities.provenance.since in components/praxis.component.json.
+        # With Praxis 3.1.4 (the qualified default today) the guard reports a skip.
+        run: |
+          target="$RUNNER_TEMP/conditor-empty"
+          capable="$(node -e '
+            const fs = require("fs");
+            const lock = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const descriptor = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+            const praxis = (lock.components || []).find((c) => c.id === "praxis");
+            const since = descriptor.capabilities && descriptor.capabilities.provenance && descriptor.capabilities.provenance.since;
+            const parse = (v) => /^(\d+)\.(\d+)\.(\d+)$/.exec(v || "");
+            const a = parse(praxis && praxis.version), b = parse(since);
+            if (!a || !b) { console.log("no"); process.exit(0); }
+            const cmp = [1, 2, 3].map((i) => Number(a[i]) - Number(b[i])).find((d) => d !== 0) || 0;
+            console.log(cmp >= 0 ? "yes" : "no");
+          ' "$target/.conditor/lock.json" components/praxis.component.json)"
+          if [[ "$capable" != "yes" ]]; then
+            echo "Selected Praxis predates the provenance capability; provenance policy check skipped (Conditor warned during planning)."
+            exit 0
+          fi
+          grep -F '"provenance"' "$target/ros.json"
+          node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); if (!r.provenance || r.provenance.enforce !== true) { console.error("ros.json provenance.enforce is not true"); process.exit(1); }' "$target/ros.json"
+          grep -F 'Agent Identity and Provenance' "$target/AGENTS.md"
       - name: Inspect Conditor status
         run: |
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-empty"
@@ -172,6 +197,11 @@ jobs:
             exit 0
           fi
           if [[ "${1:-}" == "exec" && "${2:-}" == "--full-auto" ]]; then
+            # Behave like an agent that follows the launch instruction: Conditor
+            # never activates the mission, so the agent begins its own execution.
+            grep -F -- './ros work start --id COND-MISSION-001' <<<"${3:-}" >/dev/null
+            grep -F -- './ros provenance record' <<<"${3:-}" >/dev/null
+            node ./ros work start --id COND-MISSION-001 --occurred-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --type feature >/dev/null
             echo "fake Codex execution accepted"
             exit 0
           fi
@@ -227,6 +257,18 @@ jobs:
           test -f "$prompt_path"
           grep -F 'COND-MISSION-001' "$prompt_path"
           grep -F 'canonical execution contract' "$prompt_path"
+          grep -F './ros work start --id COND-MISSION-001' "$prompt_path"
+          grep -F './ros provenance identity' "$prompt_path"
+          grep -F './ros provenance record' "$prompt_path"
+          # Conditor does not activate the mission on the external agent's behalf.
+          grep -F '"status": "ready"' "$handoff_target/.ros/work/queue.json"
+          if grep -F '"semanticState": "active"' "$handoff_target/.ros/context/current.json" 2>/dev/null; then
+            echo "handoff unexpectedly activated the mission for the agent" >&2
+            exit 1
+          fi
+
+          # The external provider begins its own Praxis execution.
+          (cd "$handoff_target" && node ./ros work start --id COND-MISSION-001 --occurred-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --type feature >/dev/null)
           grep -F '"semanticState": "active"' "$handoff_target/.ros/context/current.json"
 
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
@@ -246,7 +288,7 @@ jobs:
           grep -F '"status": "ready"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
       - name: Start through fake Codex adapter
         run: PATH="$RUNNER_TEMP/fake-bin:$PATH" dotnet run --project src/Conditor.Cli --configuration Release --no-build -- start --target "$RUNNER_TEMP/conditor-empty"
-      - name: Verify execution handoff remains Praxis-owned
+      - name: Verify the agent, not Conditor, activated the mission
         run: |
           grep -F '"id": "COND-MISSION-001"' "$RUNNER_TEMP/conditor-empty/.ros/work/queue.json"
           test -f "$RUNNER_TEMP/conditor-empty/.ros/context/current.json"

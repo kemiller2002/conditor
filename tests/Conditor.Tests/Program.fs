@@ -1133,6 +1133,229 @@ withTarget
             "Praxis active execution context overrides ready backlog projection"
             (Mission.launchState target mission = Ok "active"))
 
+// CON-065 / CON-066: Conditor's own Praxis transitions are declared automation,
+// and establishing the mission never starts an execution on the agent's behalf.
+withTarget
+    (fun target ->
+        let logPath = Path.Combine(target, "ros-invocations.log")
+
+        File.WriteAllText(
+            Path.Combine(target, "ros"),
+            "const fs = require('fs');\n"
+            + "fs.appendFileSync(" + System.Text.Json.JsonSerializer.Serialize(logPath) + ", JSON.stringify(process.argv.slice(2)) + '\\n');\n"
+        )
+
+        let queueDirectory = Path.Combine(target, ".ros", "work")
+        Directory.CreateDirectory queueDirectory |> ignore
+        File.WriteAllText(Path.Combine(queueDirectory, "queue.json"), """{"items":[]}""")
+
+        let mission =
+            { Id = "COND-MISSION-001"
+              Title = "Build demo from the Conditor execution contract"
+              Description = "Build the governed application."
+              ContractPath = "requirements/contract.md" }
+
+        let captured = Mission.captureArguments mission "2026-09-26T00:00:00Z"
+        let pairs = captured |> List.pairwise |> Set.ofList
+
+        check "mission capture declares automation actor kind" (pairs.Contains("--actor-kind", "automation"))
+        check "mission capture declares conditor actor" (pairs.Contains("--actor", "conditor"))
+        check "mission capture never declares an agent" (not (captured |> List.contains "agent"))
+
+        match Mission.ensure target mission with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"mission ensure runs against recording ros launcher: {details}" false
+        | Ok() ->
+            let invocations =
+                File.ReadAllLines logPath
+                |> Array.map (fun line ->
+                    System.Text.Json.JsonSerializer.Deserialize<string array> line
+                    |> Option.ofObj
+                    |> Option.map List.ofArray
+                    |> Option.defaultValue [])
+                |> List.ofArray
+
+            let subcommands =
+                invocations |> List.map (fun arguments -> arguments |> List.truncate 2 |> String.concat " ")
+
+            check "mission establishment captures then marks ready" (subcommands = [ "work capture"; "work backlog-transition" ])
+            check
+                "mission establishment never starts or begins an execution"
+                (subcommands |> List.forall (fun command -> command <> "work start" && command <> "work begin"))
+            check
+                "recorded capture carries automation identity"
+                (invocations
+                 |> List.head
+                 |> List.pairwise
+                 |> List.contains ("--actor-kind", "automation")))
+
+// CON-067: the launch instruction tells the agent to own its execution and provenance.
+let readyExecution state =
+    ({ Mission =
+        { Id = "COND-MISSION-001"
+          Title = "Build demo"
+          Description = "Build the governed application."
+          ContractPath = "requirements/contract.md" }
+       Launcher = "claude"
+       ContractPath = "requirements/contract.md"
+       MissionState = state }: Readiness.ReadyExecution)
+
+let readyInstruction = Launcher.instruction (readyExecution "ready")
+let activeInstruction = Launcher.instruction (readyExecution "active")
+
+let contains (text: string) (value: string) = text.Contains(value, StringComparison.Ordinal)
+
+check "ready instruction tells agent to begin its own execution" (contains readyInstruction "./ros work start --id COND-MISSION-001")
+check "ready instruction says Conditor did not start the mission" (contains readyInstruction "did not start it for you")
+check "instruction asks agent to check provenance identity" (contains readyInstruction "./ros provenance identity")
+check "instruction asks agent to record provenance" (contains readyInstruction "./ros provenance record --path")
+check "instruction forbids invented model identity" (contains readyInstruction "never invent a provider, model, or runtime")
+check "instruction keeps completion evidence rule" (contains readyInstruction "Do not treat your own statement that the work is finished as completion")
+check "active instruction does not ask for a second start" (not (contains activeInstruction "./ros work start"))
+check "active instruction forbids recording into another run's execution" (contains activeInstruction "Do not record your work into another run's execution")
+check "active instruction keeps provenance guidance" (contains activeInstruction "./ros provenance record --path")
+
+// CON-068: descriptor capability parsing and consistency.
+let descriptorJson (capabilities: string) (qualified: string) =
+    $$"""{"schemaVersion":1,"id":"praxis-test","displayName":"Praxis test","distribution":"lifecycle-npm","package":"@example/ros","defaultVersion":"3.1.4","qualifiedVersions":[{{qualified}}],"lifecycleSource":{"kind":"registry"},"command":"ros","initArguments":["init"],"verifyArguments":["verify"],"doctorArguments":["doctor"],"upgradeArguments":["upgrade"]{{capabilities}}}"""
+
+match ComponentDescriptors.parse "test" (descriptorJson ""","capabilities":{"provenance":{"since":"3.5.0","status":"unreleased"}}""" "\"3.1.4\"") with
+| Ok descriptor ->
+    check
+        "descriptor parses provenance capability"
+        (descriptor.Capabilities = [ { Name = "provenance"; Since = "3.5.0"; Status = CapabilityUnreleased } ])
+| Error errors ->
+    let details = String.concat "; " errors
+    check $"descriptor parses provenance capability: {details}" false
+
+check
+    "descriptor without capabilities parses with none"
+    (ComponentDescriptors.parse "test" (descriptorJson "" "\"3.1.4\"")
+     |> Result.map _.Capabilities = Ok [])
+
+check
+    "descriptor rejects unknown capability status"
+    (ComponentDescriptors.parse "test" (descriptorJson ""","capabilities":{"provenance":{"since":"3.5.0","status":"soon"}}""" "\"3.1.4\"")
+     |> Result.isError)
+
+check
+    "descriptor rejects capability without since"
+    (ComponentDescriptors.parse "test" (descriptorJson ""","capabilities":{"provenance":{"status":"released"}}""" "\"3.1.4\"")
+     |> Result.isError)
+
+check
+    "descriptor refuses an unreleased capability satisfied by a qualified version"
+    (match ComponentDescriptors.parse "test" (descriptorJson ""","capabilities":{"provenance":{"since":"3.5.0","status":"unreleased"}}""" "\"3.1.4\",\"3.5.0\"") with
+     | Error errors -> errors |> List.exists (fun error -> contains error "still marked unreleased")
+     | Ok _ -> false)
+
+check
+    "embedded Praxis descriptor declares the first provenance-capable version"
+    (Registry.descriptors
+     |> List.tryFind (fun descriptor -> descriptor.Definition.Id = "praxis")
+     |> Option.exists (fun descriptor ->
+         descriptor.Capabilities
+         |> List.exists (fun capability -> capability.Name = PraxisProvenance.CapabilityName && capability.Since = "3.5.0")))
+
+// CON-068: version gate diagnostics.
+let provenanceCapability status =
+    [ { Name = "provenance"; Since = "3.5.0"; Status = status } ]
+
+check "Praxis 3.1.4 predates provenance" (PraxisProvenance.gate (provenanceCapability CapabilityUnreleased) "3.1.4" = PraxisProvenance.Predates("3.5.0", CapabilityUnreleased))
+check "Praxis 3.5.0 is provenance-capable" (PraxisProvenance.gate (provenanceCapability CapabilityReleased) "3.5.0" = PraxisProvenance.Capable "3.5.0")
+check "Praxis 3.10.0 is provenance-capable" (PraxisProvenance.gate (provenanceCapability CapabilityReleased) "3.10.0" = PraxisProvenance.Capable "3.5.0")
+check "Praxis 3.5.0 prerelease predates provenance" (PraxisProvenance.gate (provenanceCapability CapabilityReleased) "3.5.0-rc.1" = PraxisProvenance.Predates("3.5.0", CapabilityReleased))
+check "undeclared capability produces no gate" (PraxisProvenance.gate [] "3.1.4" = PraxisProvenance.NotDeclared)
+check "non-semantic version is incomparable" (PraxisProvenance.gate (provenanceCapability CapabilityReleased) "latest" = PraxisProvenance.Incomparable "3.5.0")
+check "capable version produces no diagnostic" (PraxisProvenance.diagnostic "3.5.0" (PraxisProvenance.Capable "3.5.0") = None)
+check
+    "incomparable version produces a warning"
+    (PraxisProvenance.diagnostic "latest" (PraxisProvenance.Incomparable "3.5.0")
+     |> Option.exists (fun text -> text.StartsWith("WARNING", StringComparison.Ordinal)))
+
+withManifest
+    """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis","version":"3.1.4"}]}"""
+    (fun path ->
+        match Manifest.load path |> Result.bind (Planner.create "/tmp/demo" Init) with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"Praxis 3.1.4 plan still succeeds: {details}" false
+        | Ok plan ->
+            let diagnostics = PraxisProvenance.planDiagnostics plan
+
+            check "Praxis 3.1.4 plan is not refused for lacking provenance" true
+            check "Praxis 3.1.4 plan warns once about provenance" (diagnostics.Length = 1)
+            check
+                "Praxis 3.1.4 warning names versions and consequence"
+                (diagnostics
+                 |> List.exists (fun text ->
+                     text.StartsWith("WARNING Praxis 3.1.4", StringComparison.Ordinal)
+                     && contains text "3.5.0"
+                     && contains text PraxisProvenance.AgentsSection))
+            check
+                "Praxis 3.1.4 plan does not schedule provenance verification"
+                (plan.Actions |> List.forall (fun action -> action.Kind <> ProvenanceVerify)))
+
+withManifest
+    """{"schemaVersion":1,"name":"demo","components":[{"id":"ordo"}]}"""
+    (fun path ->
+        match Manifest.load path |> Result.bind (Planner.create "/tmp/demo" Init) with
+        | Error _ -> check "plan without Praxis succeeds" false
+        | Ok plan -> check "plan without Praxis has no provenance diagnostic" (PraxisProvenance.planDiagnostics plan = []))
+
+// CON-069: installed-policy verification over temporary target repositories.
+let provenanceRosJson enforce =
+    """{"version":"1.0.0","provenance":{"version":"1.0.0","enforce":"""
+    + enforce
+    + ""","requiredFrom":"2026-09-25","requireOriginator":["RQ"]}}"""
+
+let agentsWithSection = "# Agents\n\n## Agent Identity and Provenance\n\nRecord provenance.\n"
+
+let verifyTargetWith (rosJson: string option) (agents: string option) =
+    let mutable result = []
+
+    withTarget (fun target ->
+        rosJson |> Option.iter (fun text -> File.WriteAllText(Path.Combine(target, "ros.json"), text))
+        agents |> Option.iter (fun text -> File.WriteAllText(Path.Combine(target, "AGENTS.md"), text))
+        result <- PraxisProvenance.verifyTarget target)
+
+    result
+
+check "installed provenance policy and guidance verify" (verifyTargetWith (Some(provenanceRosJson "true")) (Some agentsWithSection) = [])
+check "unenforced provenance policy fails verification" (verifyTargetWith (Some(provenanceRosJson "false")) (Some agentsWithSection) |> List.exists (fun error -> contains error "enforce"))
+check "missing provenance policy fails verification" (verifyTargetWith (Some """{"version":"1.0.0"}""") (Some agentsWithSection) |> List.exists (fun error -> contains error "no \"provenance\" policy"))
+check "missing ros.json fails verification" (verifyTargetWith None (Some agentsWithSection) |> List.exists (fun error -> contains error "ros.json is missing"))
+check "invalid ros.json fails verification" (verifyTargetWith (Some "{not json") (Some agentsWithSection) |> List.exists (fun error -> contains error "not valid JSON"))
+check "missing agent provenance section fails verification" (verifyTargetWith (Some(provenanceRosJson "true")) (Some "# Agents\n") |> List.exists (fun error -> contains error PraxisProvenance.AgentsSection))
+check "missing AGENTS.md fails verification" (verifyTargetWith (Some(provenanceRosJson "true")) None |> List.exists (fun error -> contains error "AGENTS.md is missing"))
+
+withTarget
+    (fun target ->
+        let plan =
+            { ProjectName = "provenance-verify-test"
+              Operation = Verify
+              Components = []
+              Actions =
+                [ { Sequence = 1
+                    ComponentId = "praxis:provenance"
+                    ComponentVersion = "3.5.0"
+                    Kind = ProvenanceVerify
+                    Execution = VerifyPraxisProvenance } ] }
+
+        check
+            "installer stops on failed provenance verification"
+            (match Installer.execute target (Path.Combine(target, "conditor.json")) plan with
+             | Error errors -> errors |> List.exists (fun error -> contains error "praxis:provenance")
+             | Ok _ -> false)
+
+        File.WriteAllText(Path.Combine(target, "ros.json"), provenanceRosJson "true")
+        File.WriteAllText(Path.Combine(target, "AGENTS.md"), agentsWithSection)
+
+        check
+            "installer passes provenance verification once Praxis installed the policy"
+            (Installer.execute target (Path.Combine(target, "conditor.json")) plan = Ok None))
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."

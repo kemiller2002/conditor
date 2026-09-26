@@ -81,7 +81,7 @@ The workflow clones the target, verifies Conditor status, launches through the C
 
 ## State semantics
 
-`start` is allowed to perform the Praxis ready-to-active transition.
+`start` launches the provider against a ready mission; the provider performs the Praxis ready-to-active transition in its own execution (`./ros work start`). Conditor never activates the mission on the agent's behalf (CON-066).
 
 `resume` requires the mission to already be active and never performs that transition.
 

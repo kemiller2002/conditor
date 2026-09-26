@@ -43,6 +43,8 @@ The resolved source is written to the Conditor lock so the installation can be r
 
 The v1 descriptor schema is published at `schemas/conditor-component.schema.json`. A descriptor carries component identity, qualified versions, distribution source, executable name, supported lifecycle arguments, and application binding. Built-in descriptors are embedded in the native binary through a wildcard resource rule and discovered dynamically, so adding a built-in descriptor does not require editing Registry code.
 
+A descriptor may also declare `capabilities`: named behaviors a component gains at a known version, for example `"capabilities": {"provenance": {"since": "3.5.0", "status": "unreleased"}}` for Praxis agent identity and provenance. `status` says whether that first version is released; a descriptor that qualifies a version at or after `since` while the capability is still `unreleased` is rejected. Planning warns (it does not fail) when the selected version predates a declared capability, and once a capable Praxis version is selected, `init`, `verify`, and `upgrade` add a `praxis:provenance` step that verifies the Praxis-owned `ros.json` provenance policy (`enforce: true`) and the AGENTS.md "Agent Identity and Provenance" section (CON-068, CON-069). Conditor never writes those files itself.
+
 The remaining evolution is to make descriptors release-bound and externally publishable, with signed integrity metadata and compatibility constraints that can be verified independently of a Conditor source release.
 
 ## Application dependency

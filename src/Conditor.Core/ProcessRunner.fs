@@ -76,3 +76,7 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = "EnsurePraxisMission must be executed by the Conditor installer, not the process runner." }
+        | VerifyPraxisProvenance ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = "VerifyPraxisProvenance must be executed by the Conditor installer, not the process runner." }

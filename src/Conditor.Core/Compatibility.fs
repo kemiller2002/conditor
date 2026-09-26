@@ -43,7 +43,7 @@ module Compatibility =
             Reason = "The scaffold's browser boundary is Limen by definition." }
           { Subject = "execution:enabled"
             Requires = "praxis"
-            Reason = "Conditor establishes and activates execution through a Praxis mission." } ]
+            Reason = "Conditor establishes execution through a Praxis mission that the launched agent activates in its own execution." } ]
 
     let private supportedMap =
         supported |> List.map (fun item -> item.Id, item) |> Map.ofList

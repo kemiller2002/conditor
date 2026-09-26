@@ -86,7 +86,7 @@ Implemented:
 - Claude Code adapter
 - executable/authentication probing
 - launch only after lock, requirement, contract, verification, and mission gates pass
-- Praxis activation before provider invocation
+- agent-owned Praxis activation in the agent's own execution (Conditor captures as automation)
 - provider exit does not imply project completion
 - safe `--launcher codex|claude` override that cannot enable disabled execution
 - explicit `resume` that requires an already-active Praxis mission and never activates ready work

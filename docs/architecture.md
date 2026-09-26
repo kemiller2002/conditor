@@ -82,7 +82,7 @@ conditor start --check
       +--> provider executable/authentication
       |
       v
-Praxis mission activation
+Agent-owned Praxis activation (agent runs ./ros work start in its own execution)
       |
       v
 Codex / Claude launcher adapter
@@ -156,7 +156,7 @@ CI exercises:
 - empty-repository initialization;
 - immutable requirement materialization;
 - Ordo baseline generation;
-- Praxis mission creation and activation;
+- Praxis mission creation (automation identity) and agent-owned activation;
 - `start --check`;
 - machine-readable compatibility and Doctor surfaces;
 - fake Codex and Claude adapters so provider selection/readiness are tested without model credentials;

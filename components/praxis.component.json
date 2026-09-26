@@ -25,5 +25,11 @@
   ],
   "upgradeArguments": [
     "upgrade"
-  ]
+  ],
+  "capabilities": {
+    "provenance": {
+      "since": "3.5.0",
+      "status": "unreleased"
+    }
+  }
 }

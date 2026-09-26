@@ -39,8 +39,7 @@ Conditor then:
 7. creates the deterministic Praxis mission;
 8. writes the Conditor lock;
 9. re-verifies lock, requirements, contract, components, mission, and provider authentication;
-10. activates the Praxis mission; and
-11. launches the selected provider.
+10. launches the selected provider, which activates the Praxis mission in its own execution.
 
 After the provider returns, the rehearsal requires the live Praxis item to be `complete` and runs repository validation. Provider process exit alone is not success.
 

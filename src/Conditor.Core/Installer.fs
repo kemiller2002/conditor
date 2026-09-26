@@ -34,6 +34,8 @@ module Installer =
             $"materialize github:{source.Repository}#{source.Commit} -> {relativePath}"
         | EnsurePraxisMission mission ->
             $"praxis mission {mission.Id} -> ready"
+        | VerifyPraxisProvenance ->
+            $"verify Praxis provenance policy (ros.json provenance.enforce) and AGENTS.md '{PraxisProvenance.AgentsSection}'"
 
     let private safePath target relativePath =
         let root = Path.GetFullPath target
@@ -264,6 +266,14 @@ module Installer =
                     match Mission.ensure target mission with
                     | Ok() -> loop remaining
                     | Error errors ->
+                        Error
+                            ([ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                               $"Command: {commandText action}" ]
+                             @ errors)
+                | VerifyPraxisProvenance ->
+                    match PraxisProvenance.verifyTarget target with
+                    | [] -> loop remaining
+                    | errors ->
                         Error
                             ([ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
                                $"Command: {commandText action}" ]

@@ -10,6 +10,7 @@ open System.Text.Json
 type ComponentDescriptor =
     { Definition: ComponentDefinition
       QualifiedVersions: Set<string>
+      Capabilities: ComponentCapability list
       Sha256: string }
 
 module ComponentDescriptors =
@@ -107,6 +108,64 @@ module ComponentDescriptors =
             | Ok other -> Error $"Unknown lifecycleSource kind '{other}'."
         | Some _ -> Error "'lifecycleSource' must be an object."
 
+    let private parseCapability (name: string, value: JsonElement) =
+        if value.ValueKind <> JsonValueKind.Object then
+            Error [ $"'capabilities.{name}' must be an object." ]
+        else
+            let since = requiredString "since" value |> Result.mapError (fun error -> $"'capabilities.{name}': {error}")
+
+            let status =
+                match optionalString "status" value with
+                | Some "released" -> Ok CapabilityReleased
+                | Some "unreleased" -> Ok CapabilityUnreleased
+                | Some other -> Error $"'capabilities.{name}.status' has unknown value '{other}'."
+                | None -> Error $"'capabilities.{name}.status' must be 'released' or 'unreleased'."
+
+            let errorOf result =
+                match result with
+                | Error error -> Some error
+                | Ok _ -> None
+
+            match since, status with
+            | Ok sinceVersion, Ok parsedStatus ->
+                Ok
+                    { Name = name
+                      Since = sinceVersion
+                      Status = parsedStatus }
+            | _ -> Error([ errorOf since; errorOf status ] |> List.choose id)
+
+    /// Parses the optional `capabilities` object: `{ "<name>": { "since": "<version>",
+    /// "status": "released" | "unreleased" } }`, ordered by name.
+    let private parseCapabilities (element: JsonElement) =
+        match tryProperty "capabilities" element with
+        | None -> Ok []
+        | Some value when value.ValueKind = JsonValueKind.Object ->
+            let parsed =
+                value.EnumerateObject()
+                |> Seq.map (fun property -> property.Name, property.Value)
+                |> Seq.sortBy fst
+                |> Seq.map parseCapability
+                |> List.ofSeq
+
+            match parsed |> List.collect (function Error errors -> errors | Ok _ -> []) with
+            | [] -> parsed |> List.choose (function Ok capability -> Some capability | Error _ -> None) |> Ok
+            | errors -> Error errors
+        | Some _ -> Error [ "'capabilities' must be an object." ]
+
+    /// A capability still marked unreleased must not be satisfied by any qualified
+    /// version: once a version at or after `since` is qualified, the descriptor
+    /// must say the capability is released.
+    let private capabilityConsistency (id: string) (qualifiedVersions: Set<string>) (capability: ComponentCapability) =
+        match capability.Status with
+        | CapabilityReleased -> []
+        | CapabilityUnreleased ->
+            qualifiedVersions
+            |> Seq.filter (fun version -> SemanticVersion.isAtLeast capability.Since version = Some true)
+            |> Seq.sort
+            |> Seq.map (fun version ->
+                $"Component '{id}' qualifies version '{version}' but capability '{capability.Name}' (since '{capability.Since}') is still marked unreleased.")
+            |> List.ofSeq
+
     let private readResource resourceName =
         match assembly.GetManifestResourceStream(resourceName) |> Option.ofObj with
         | None -> Error [ $"Embedded component descriptor is missing: {resourceName}" ]
@@ -115,7 +174,9 @@ module ComponentDescriptors =
             use reader = new StreamReader(value)
             Ok(reader.ReadToEnd())
 
-    let private parse (resourceName: string) (text: string) =
+    /// Parses one descriptor document. Public so tests can exercise descriptor
+    /// validation without an embedded resource.
+    let parse (resourceName: string) (text: string) =
         try
             use document = JsonDocument.Parse(text)
             let root = document.RootElement
@@ -181,6 +242,17 @@ module ComponentDescriptors =
             let doctorArguments = collectArray "doctorArguments"
             let upgradeArguments = collectArray "upgradeArguments"
 
+            let capabilities =
+                match parseCapabilities root with
+                | Ok values -> values
+                | Error capabilityErrors ->
+                    capabilityErrors |> List.iter errors.Add
+                    []
+
+            capabilities
+            |> List.collect (capabilityConsistency id qualifiedVersions)
+            |> List.iter errors.Add
+
             if not (String.IsNullOrWhiteSpace defaultVersion)
                && not (qualifiedVersions.Contains defaultVersion) then
                 errors.Add $"defaultVersion '{defaultVersion}' is not present in qualifiedVersions for '{id}'."
@@ -223,6 +295,7 @@ module ComponentDescriptors =
                           DoctorArguments = doctorArguments
                           UpgradeArguments = upgradeArguments }
                       QualifiedVersions = qualifiedVersions
+                      Capabilities = capabilities
                       Sha256 = descriptorSha256 }
         with
         | :? JsonException as ex -> Error [ $"Component descriptor '{resourceName}' is invalid JSON: {ex.Message}" ]

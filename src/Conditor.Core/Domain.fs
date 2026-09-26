@@ -22,6 +22,19 @@ type ApplicationBinding =
     | NpmDependency
     | NugetReference
 
+/// Whether the first component version that provides a capability has been
+/// released (and can therefore be qualified) or is still unreleased upstream.
+type CapabilityStatus =
+    | CapabilityReleased
+    | CapabilityUnreleased
+
+/// A named capability a component gains at a known version, declared in the
+/// component descriptor's `capabilities` object (CON-068).
+type ComponentCapability =
+    { Name: string
+      Since: string
+      Status: CapabilityStatus }
+
 type ComponentRequest =
     { Id: string
       Version: string option
@@ -85,6 +98,7 @@ type PlanActionKind =
     | ReadinessVerify
     | RequirementFile
     | MissionWorkItem
+    | ProvenanceVerify
     | ManifestFile
 
 type ActionExecution =
@@ -94,6 +108,7 @@ type ActionExecution =
     | EnsureManagedRegion of relativePath: string * regionId: string * content: string
     | MaterializeSourceFile of source: GitHubSource * relativePath: string
     | EnsurePraxisMission of mission: PraxisMission
+    | VerifyPraxisProvenance
 
 type PlanAction =
     { Sequence: int
