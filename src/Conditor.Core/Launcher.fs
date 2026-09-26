@@ -84,12 +84,11 @@ Implement the mission in the repository. Use repository-native lifecycle and ver
     /// the model declared to Praxis is the one actually used.
     let commandLine (launcher: string) (model: string option) (instruction: string) =
         let modelArguments =
-            model
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-            |> Option.map (fun value -> [ "--model"; value.Trim() ])
+            AgentIdentity.configuredModel model
+            |> Option.map (fun value -> [ "--model"; value ])
             |> Option.defaultValue []
 
-        match launcher.Trim().ToLowerInvariant() with
+        match (AsciiText.trim launcher).ToLowerInvariant() with
         | "codex" -> Some("codex", [ "exec"; "--full-auto" ] @ modelArguments @ [ instruction ])
         | "claude" -> Some("claude", [ "-p"; "--output-format"; "text" ] @ modelArguments @ [ instruction ])
         | _ -> None

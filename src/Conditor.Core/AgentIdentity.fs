@@ -65,18 +65,21 @@ module AgentIdentity =
                 "ROS_TELEMETRY_RUNTIME", Some "conditor" ]
         )
 
+    /// The model a launcher is given and declares (contract 1.2 rule 2: blank is
+    /// ASCII-blank only), so the model passed to the CLI and the model declared
+    /// to Praxis are always the same value.
+    let configuredModel (value: string option) =
+        value
+        |> Option.filter (AsciiText.isBlank >> not)
+        |> Option.map AsciiText.trim
+
     /// Provider and runtime facts Conditor knows for a launcher because it
     /// chose the CLI it starts. Unsupported launchers have no known identity.
     let launcherIdentity (launcher: string) =
-        match launcher.Trim().ToLowerInvariant() with
+        match (AsciiText.trim launcher).ToLowerInvariant() with
         | "codex" -> Some("openai", "codex")
         | "claude" -> Some("anthropic", "claude-code")
         | _ -> None
-
-    let private configured (value: string option) =
-        value
-        |> Option.map _.Trim()
-        |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
     /// Environment for a launched agent. It carries only true, known identity:
     /// kind `agent`, the launched CLI's provider/runtime, and the model only when
@@ -93,7 +96,7 @@ module AgentIdentity =
             | None -> [ "ROS_ACTOR_KIND", Some "agent" ]
 
         let modelChange =
-            match configured model with
+            match configuredModel model with
             | Some value -> [ "ROS_TELEMETRY_MODEL", Some value ]
             | None -> []
 

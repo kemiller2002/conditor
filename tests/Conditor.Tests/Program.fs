@@ -1150,7 +1150,7 @@ do
 
     check
         "vendored Praxis fixture records the contract commit"
-        (source.RootElement.GetProperty("commit").GetString() = "c2657efb4d54f11d0fd0617cc1bcd5b8418601d5")
+        (source.RootElement.GetProperty("commit").GetString() = "b0037183389c8b9392919f58521b9487d1b4d5c6")
 
     for file in files.EnumerateObject() do
         let expected = file.Value.GetProperty("sha256").GetString() |> Option.ofObj |> Option.defaultValue String.Empty
@@ -1346,6 +1346,69 @@ do
     check "codex command line is unchanged without a model" (Launcher.commandLine "codex" None "go" = Some("codex", [ "exec"; "--full-auto"; "go" ]))
     check "claude command line is unchanged without a model" (Launcher.commandLine "claude" None "go" = Some("claude", [ "-p"; "--output-format"; "text"; "go" ]))
     check "configured model is passed to the launched CLI" (Launcher.commandLine "codex" (Some "gpt-5-codex") "go" = Some("codex", [ "exec"; "--full-auto"; "--model"; "gpt-5-codex"; "go" ]))
+
+// --- Lifecycle identity scrub (CON-130, Praxis contract 1.1/1.2) ------------
+
+do
+    // `ros init`, `ros verify`, `ros doctor`, and `ros upgrade` run as component
+    // lifecycle actions through ProcessRunner.run (Installer.execute, Doctor).
+    check "lifecycle processes use Conditor's scrubbed ros environment" (ProcessRunner.lifecycleEnvironment = AgentIdentity.conditorRosEnvironment)
+    check
+        "lifecycle environment removes every identity-environment.json variable before declaring Conditor"
+        (identityFixture |> List.forall (fun name -> ProcessRunner.lifecycleEnvironment |> List.exists (fun (changed, _) -> changed = name)))
+
+    if File.Exists "/bin/sh" then
+        let names = identityFixture
+        let previous = names |> List.map (fun name -> name, Environment.GetEnvironmentVariable name)
+        let marker = "CONDITOR_TEST_INHERITED"
+        let previousMarker = Environment.GetEnvironmentVariable marker
+
+        try
+            names |> List.iter (fun name -> Environment.SetEnvironmentVariable(name, $"outer-{name}"))
+            Environment.SetEnvironmentVariable(marker, "kept")
+
+            let action =
+                { Sequence = 1
+                  ComponentId = "praxis"
+                  ComponentVersion = "1"
+                  Kind = VerifyLifecycle
+                  Execution = ExternalProcess("/bin/sh", [ "-c"; "env" ]) }
+
+            let result = ProcessRunner.run (Path.GetTempPath()) action
+            let child =
+                result.StandardOutput.Split('\n')
+                |> Array.choose (fun line ->
+                    match line.IndexOf '=' with
+                    | index when index > 0 -> Some(line.Substring(0, index), line.Substring(index + 1))
+                    | _ -> None)
+                |> Map.ofArray
+
+            let explicitValues = Map [ "ROS_ACTOR_KIND", "automation"; "ROS_ACTOR", "conditor"; "ROS_TELEMETRY_RUNTIME", "conditor" ]
+            check "lifecycle process ran" (result.ExitCode = 0)
+            check
+                "lifecycle process (ros init/verify/upgrade) inherits no identity variable"
+                (names |> List.forall (fun name -> child.TryFind name = explicitValues.TryFind name))
+            check "lifecycle process keeps the rest of the inherited environment" (child.TryFind marker = Some "kept")
+        finally
+            previous |> List.iter (fun (name, value) -> Environment.SetEnvironmentVariable(name, value))
+            Environment.SetEnvironmentVariable(marker, previousMarker)
+
+// --- ASCII whitespace (Praxis contract 1.2 rule 2) -------------------------
+
+do
+    for content in [ "\u0085"; "\uFEFF"; "\u001C"; "\u00A0" ] do
+        check $"U+{int content[0]:X4} is content, not blank" (not (AsciiText.isBlank content))
+
+    check "ASCII whitespace is blank" (AsciiText.isBlank " \t\n\r\011\012" && AsciiText.isBlank "" && AsciiText.isBlank null)
+    check "ASCII trim keeps NEL" (AsciiText.trim " \u0085 " = "\u0085")
+    check "ASCII-blank model is not declared" (AgentIdentity.configuredModel (Some " \t") = None)
+    check "model declared is the model passed to the CLI" (AgentIdentity.configuredModel (Some " example-model\t") = Some "example-model")
+
+    let declared = AgentIdentity.apply (AgentIdentity.agentEnvironment "codex" (Some " example-model ")) Map.empty
+    check
+        "launcher command line and declared model agree"
+        (Launcher.commandLine "codex" (Some " example-model ") "go" = Some("codex", [ "exec"; "--full-auto"; "--model"; "example-model"; "go" ])
+         && declared.TryFind "ROS_TELEMETRY_MODEL" = Some "example-model")
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis"}],"execution":{"enabled":false,"launcher":"claude","model":"claude-opus-4-1"}}"""

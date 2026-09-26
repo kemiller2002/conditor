@@ -1,7 +1,7 @@
 {
   "repository": "kemiller2002/praxis",
-  "commit": "c2657efb4d54f11d0fd0617cc1bcd5b8418601d5",
-  "note": "Copied unchanged. ros.json is starter/greenfield/ros.json; AGENTS.md is the repository-root AGENTS.md that starter/greenfield/manifest.json installs as the greenfield AGENTS.md; identity-environment.json is the contract 1.1 list of identity variables a launcher must clear. Tests recompute these hashes to detect local edits.",
+  "commit": "b0037183389c8b9392919f58521b9487d1b4d5c6",
+  "note": "Copied unchanged. ros.json is starter/greenfield/ros.json; AGENTS.md is the repository-root AGENTS.md that starter/greenfield/manifest.json installs as the greenfield AGENTS.md; identity-environment.json is the contract 1.1 list (unchanged in 1.2) of identity variables a launcher must clear. Tests recompute these hashes to detect local edits.",
   "files": {
     "ros.json": {
       "source": "starter/greenfield/ros.json",

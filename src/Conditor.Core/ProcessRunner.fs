@@ -46,10 +46,20 @@ module ProcessRunner =
     let runProcess workingDirectory executable arguments =
         runProcessWithEnvironment workingDirectory executable arguments []
 
+    /// Environment for every component lifecycle process (install, verify,
+    /// doctor, upgrade: for Praxis `ros init`, `ros verify`, `ros doctor`,
+    /// `ros upgrade`). Conditor runs them as itself, deterministic automation,
+    /// on behalf of the operator whose environment it inherited, so every
+    /// variable in Praxis `identity-environment.json` is removed first and only
+    /// Conditor's explicit identity is set (Praxis contract 1.1, CON-130). An
+    /// operator's agent session, CI run, or outer `ROS_EXECUTION_ID` never
+    /// reaches a lifecycle command. Credentials are inherited unchanged.
+    let lifecycleEnvironment = AgentIdentity.conditorRosEnvironment
+
     let run workingDirectory (action: PlanAction) =
         match action.Execution with
         | ExternalProcess(executable, arguments) ->
-            runProcess workingDirectory executable arguments
+            runProcessWithEnvironment workingDirectory executable arguments lifecycleEnvironment
         | GitHubSourceProcess(source, arguments) ->
             match source.Entrypoint with
             | FileArtifact _ ->
@@ -69,7 +79,7 @@ module ProcessRunner =
                           StandardOutput = String.Empty
                           StandardError = String.Join(Environment.NewLine, errors) }
                     | Ok entrypoint ->
-                        runProcess workingDirectory "node" (entrypoint :: arguments)
+                        runProcessWithEnvironment workingDirectory "node" (entrypoint :: arguments) lifecycleEnvironment
         | EnsureFile _ ->
             { ExitCode = -1
               StandardOutput = String.Empty

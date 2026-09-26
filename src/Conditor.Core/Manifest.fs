@@ -151,7 +151,7 @@ module Manifest =
             let errors = ResizeArray<string>()
 
             match model with
-            | Some text when not (Regex.IsMatch(text, "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}\\z")) ->
+            | Some text when not (Regex.IsMatch(text, "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}\\z", RegexOptions.CultureInvariant)) ->
                 errors.Add "'execution.model' must be a model identifier (letters, digits, '.', '_', ':', '/', '@', '-')."
             | _ -> ()
 

@@ -177,7 +177,7 @@ module PraxisProvenance =
                         let requiredFrom =
                             match tryProperty "requiredFrom" policy with
                             | Some value when value.ValueKind = JsonValueKind.String ->
-                                value.GetString() |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                                value.GetString() |> Option.ofObj |> Option.filter (AsciiText.isBlank >> not)
                             | _ -> None
 
                         match enforced, requiredFrom with
