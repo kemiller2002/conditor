@@ -3,6 +3,7 @@ namespace Conditor.Core
 open System
 open System.IO
 open System.Text.Json
+open System.Text.RegularExpressions
 
 module Manifest =
     let private tryProperty (name: string) (element: JsonElement) =
@@ -146,7 +147,13 @@ module Manifest =
             let launcher = optionalString "launcher" value
             let mission = optionalString "mission" value
             let contractPath = optionalString "contractPath" value
+            let model = optionalString "model" value
             let errors = ResizeArray<string>()
+
+            match model with
+            | Some text when not (Regex.IsMatch(text, "^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}\\z")) ->
+                errors.Add "'execution.model' must be a model identifier (letters, digits, '.', '_', ':', '/', '@', '-')."
+            | _ -> ()
 
             match launcher with
             | Some provider when provider <> "codex" && provider <> "claude" ->
@@ -167,7 +174,8 @@ module Manifest =
                         { Enabled = enabled
                           Launcher = launcher
                           Mission = mission
-                          ContractPath = contractPath }
+                          ContractPath = contractPath
+                          Model = model }
                 )
         | Some _ -> Error "'execution' must be an object."
 

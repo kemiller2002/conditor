@@ -4,7 +4,9 @@ open System
 open System.Diagnostics
 
 module ProcessRunner =
-    let runProcess workingDirectory executable arguments =
+    /// Runs a process that inherits Conditor's environment with explicit
+    /// changes applied (`Some value` sets, `None` removes a variable).
+    let runProcessWithEnvironment workingDirectory executable arguments (environment: (string * string option) list) =
         try
             let info = ProcessStartInfo()
             info.FileName <- executable
@@ -15,6 +17,11 @@ module ProcessRunner =
 
             for argument in arguments do
                 info.ArgumentList.Add argument
+
+            for name, value in environment do
+                match value with
+                | Some text -> info.Environment[name] <- text
+                | None -> info.Environment.Remove name |> ignore
 
             use childProcess = new Process()
             childProcess.StartInfo <- info
@@ -35,6 +42,9 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = $"Unable to execute '{executable}': {ex.Message}" }
+
+    let runProcess workingDirectory executable arguments =
+        runProcessWithEnvironment workingDirectory executable arguments []
 
     let run workingDirectory (action: PlanAction) =
         match action.Execution with

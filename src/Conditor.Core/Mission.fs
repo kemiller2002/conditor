@@ -85,7 +85,12 @@ module Mission =
         if not (File.Exists launcher) then
             Error [ $"Praxis repository launcher is missing: {launcher}" ]
         else
-            let result = ProcessRunner.runProcess target "node" (launcher :: arguments)
+            let result =
+                ProcessRunner.runProcessWithEnvironment
+                    target
+                    "node"
+                    (launcher :: arguments)
+                    AgentIdentity.conditorRosEnvironment
 
             if result.ExitCode = 0 then
                 Ok()
@@ -137,7 +142,7 @@ module Mission =
               "--source-reference"
               mission.ContractPath
               "--actor"
-              "conditor" ]
+              AgentIdentity.ConditorActorId ]
 
     let private validateExisting (mission: PraxisMission) (existing: ExistingMission) =
         [ if existing.Title <> mission.Title then
@@ -224,7 +229,7 @@ module Mission =
                   "--type"
                   "feature"
                   "--actor"
-                  "conditor" ]
+                  AgentIdentity.ConditorActorId ]
         | Ok state ->
             Error [ $"Praxis mission '{mission.Id}' cannot be activated from state '{state}'." ]
 

@@ -1,0 +1,25 @@
+{
+  "$schema": "../schemas/conditor-capabilities.schema.json",
+  "schemaVersion": 1,
+  "component": "praxis",
+  "capabilities": {
+    "provenance": {
+      "minimumVersion": null,
+      "description": "Agent identity and provenance: ros.json 'provenance' policy (enforce, requiredFrom), AGENTS.md 'Agent Identity and Provenance' guidance, and docs/agent-provenance.md installed by 'ros init'.",
+      "introducedBy": {
+        "repository": "kemiller2002/praxis",
+        "commits": [
+          "a718546817403ab897fbcc8e1693660ffff285af",
+          "a42c44e8ae0e6e16fdd513141460b700e5fa6648"
+        ]
+      },
+      "requirements": [
+        "RQ-ROS-2026-A007",
+        "RQ-ROS-2026-A012",
+        "RQ-ROS-2026-A016",
+        "DF-ROS-2026-A037"
+      ],
+      "followUp": "minimumVersion is null because no published Praxis release contains provenance yet (latest qualified: 3.1.4). When Praxis publishes the first release containing the commits above, set minimumVersion to that version and add it to qualifiedVersions in praxis.component.json after qualification (CON-129)."
+    }
+  }
+}
