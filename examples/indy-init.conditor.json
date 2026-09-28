@@ -38,6 +38,10 @@
     {
       "id": "tutela",
       "version": "0.1.0"
+    },
+    {
+      "id": "percepta",
+      "version": "0.1.0"
     }
   ],
   "requirements": [
