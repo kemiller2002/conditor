@@ -141,3 +141,208 @@ Tracked by GitHub issue #3.
 - **CON-139** Host bootstrap SHALL record whether each prerequisite was created
   by Conditor, already present and reused, or externally installed outside
   Conditor so later repair and uninstall do not infer ownership.
+
+
+## Complete workstation profile
+
+Tracked by GitHub issue #5.
+
+- **CON-160** Conditor SHALL support a versioned workstation profile that can
+  establish the declared Echelon engineering environment before repository
+  initialization begins.
+- **CON-161** A standard Echelon engineering workstation profile SHALL be able
+  to declare Conditor, Praxis, Ordo, Git prerequisite checks, GitHub
+  authentication/readiness checks, and explicitly selected agent/provider
+  tooling without requiring unrelated Echelon products.
+- **CON-162** Workstation profiles SHALL be declarative, versioned, and
+  deterministic with respect to the profile, platform, resolved immutable
+  component identities, and observed pre-existing host state.
+- **CON-163** Conditor SHALL NOT install an agent provider, shell integration,
+  local daemon/control plane, or other host tool merely because it is commonly
+  used; it must be declared by the selected profile or explicit user request.
+- **CON-164** A profile MAY request the Praxis local control plane and its
+  supporting UI/runtime capabilities, but Conditor SHALL treat those as
+  installable components and SHALL NOT own their workflow semantics.
+- **CON-165** Workstation bootstrap SHALL distinguish host readiness from
+  repository execution readiness so a healthy workstation cannot be mistaken
+  for an initialized project.
+- **CON-166** A workstation profile SHALL be composable enough to support a
+  minimal profile, a standard Echelon profile, and project-specific additions
+  without forking Conditor logic.
+
+## Host prerequisite discovery
+
+- **CON-170** Conditor SHALL discover prerequisite state before planning host
+  mutation and SHALL classify each prerequisite as already satisfied,
+  installable by Conditor, installable only through an external provider,
+  unsupported, or unknown.
+- **CON-171** Git readiness checks SHALL include executable availability and the
+  minimum version/capabilities required by the selected profile.
+- **CON-172** GitHub readiness checks SHALL distinguish Git transport
+  authentication, GitHub API/CLI authentication where required, and repository
+  authorization; one SHALL NOT be inferred from another.
+- **CON-173** Authentication checks SHALL verify capability without persisting
+  secrets into Conditor manifests, locks, receipts, logs, or generated files.
+- **CON-174** A missing optional provider SHALL NOT block workstation
+  bootstrap unless the selected profile or requested launcher makes it
+  required.
+- **CON-175** A missing required prerequisite SHALL produce a typed refusal or
+  actionable plan item rather than causing Conditor to guess an installation
+  path.
+
+## Plan-before-authorization contract
+
+- **CON-180** Before any host-level mutation, Conditor SHALL expose a complete
+  planned effect set covering files/directories, shell/profile edits, PATH
+  changes, startup registrations, downloads, external installers, binaries,
+  provider tooling, and other persistent resources.
+- **CON-181** For every executable plan step, the plan SHALL identify the
+  operation, source/artifact identity, expected effect, expected receipt,
+  ownership classification to be recorded on success, and whether explicit
+  authorization is required.
+- **CON-182** External installers or scripts SHALL be shown by exact artifact
+  identity or exact command invocation when known before authorization is
+  requested.
+- **CON-183** Conditor SHALL clearly identify which external operations are
+  independently integrity-verified, publisher/release-bound, transport-only
+  trusted, or otherwise not fully reproducible.
+- **CON-184** Unknown trust properties SHALL remain explicit unknowns and SHALL
+  NOT be converted into a generic success/green status because the user
+  authorized execution.
+- **CON-185** Authorization SHALL apply only to the disclosed operation/effect
+  set. A materially different external command, artifact identity, or durable
+  effect SHALL require a new plan/authorization decision.
+- **CON-186** Repeated interactive approval SHALL NOT be interpreted as blanket
+  authority for undisclosed future host mutations.
+
+## Bootstrap step ledger and resume
+
+- **CON-190** Workstation and repository bootstrap SHALL persist a durable
+  step ledger sufficient to resume after interruption without relying on the
+  original terminal or agent conversation.
+- **CON-191** Each step record SHALL retain the requested action, relevant
+  component/source identity, expected receipt, observed receipt, comparison
+  result, ownership effect, and time.
+- **CON-192** Receipt comparison SHALL preserve at least match, mismatch, and
+  indeterminate/unknown-effect outcomes.
+- **CON-193** A matching receipt MAY permit a completed step to be skipped on
+  resume when its inputs and dependencies remain valid.
+- **CON-194** A mismatched required receipt SHALL block dependent steps until
+  repaired or replanned.
+- **CON-195** An indeterminate step whose retry could duplicate a host,
+  repository, network, or external-system effect SHALL require reconciliation
+  before retry.
+- **CON-196** Reconciliation SHALL determine whether the attempted effect
+  occurred, did not occur, or remains unknown and SHALL append the result
+  rather than rewriting the original observation.
+- **CON-197** Bootstrap resume SHALL derive the next operation from durable
+  plan/receipt state and current host observation rather than an agent's prose
+  statement about prior progress.
+- **CON-198** A resumed bootstrap SHALL preserve historical receipts and
+  authorization records so the final installation can be audited across
+  multiple sessions/providers.
+
+## Resource ownership ledger
+
+- **CON-200** Conditor SHALL maintain a durable resource ownership ledger for
+  host and repository resources that participate in bootstrap, repair,
+  upgrade, or uninstall.
+- **CON-201** At minimum, each relevant resource SHALL be classifiable as
+  created by Conditor, adopted/reused pre-existing state, created by another
+  Echelon component, externally installed outside Conditor, shared, or
+  user-owned.
+- **CON-202** Ownership classification SHALL be based on observed evidence and
+  installation history rather than inferred solely from the resource's current
+  path or name.
+- **CON-203** Conditor SHALL record the prior state needed to reverse its own
+  shell/profile or startup-registration edits without deleting unrelated user
+  content from the same file or mechanism.
+- **CON-204** Conditor SHALL NOT claim ownership of an existing Git, GitHub CLI,
+  provider CLI, runtime, or shell configuration merely because bootstrap
+  validated and reused it.
+- **CON-205** Repair SHALL preserve the distinction between adopted state and
+  Conditor-created state so a repair does not silently convert a pre-existing
+  resource into Conditor-owned state.
+- **CON-206** Upgrade SHALL preserve or explicitly migrate ownership metadata
+  before a new version may rely on it for destructive actions.
+
+## Deterministic uninstall plan
+
+- **CON-210** `conditor uninstall --plan` or an equivalent read-only operation
+  SHALL calculate the exact proposed removal/restoration actions from durable
+  lock, ownership, and receipt state.
+- **CON-211** The uninstall plan SHALL categorize resources as remove, restore,
+  detach/unregister, retain because shared, retain because adopted,
+  retain because user-owned, or unresolved.
+- **CON-212** Uninstall SHALL refuse destructive action for an unresolved
+  ownership state until evidence or explicit user authorization resolves it.
+- **CON-213** Removal of a Conditor-added line or block from a shared shell/
+  profile/configuration file SHALL be surgical and SHALL preserve unrelated
+  user content.
+- **CON-214** Uninstall SHALL be idempotent: rerunning it after successful
+  removal SHALL not create new mutations or fail merely because owned
+  resources are already absent.
+- **CON-215** Uninstall SHALL produce a final receipt set describing what was
+  removed, restored, detached, retained, or left unresolved.
+- **CON-216** Uninstall receipts SHALL retain enough source/version/ownership
+  identity to explain why each resource was acted upon or retained.
+- **CON-217** Project source and user-owned repository work SHALL remain outside
+  automatic workstation uninstall even when the repository was originally
+  created by a Conditor workflow, unless a separate explicit project-deletion
+  operation is designed and authorized.
+
+## Partial-failure rollback
+
+- **CON-220** A failed bootstrap SHALL use the recorded step/effect ledger to
+  determine which completed effects are eligible for rollback.
+- **CON-221** Conditor SHALL NOT roll back an indeterminate external effect as
+  though it were known to have completed; it SHALL reconcile first or leave an
+  explicit unresolved obligation.
+- **CON-222** Automatic rollback SHALL be limited to effects with sufficient
+  ownership and reversal evidence to make rollback safe.
+- **CON-223** When rollback cannot safely restore the prior state, Conditor
+  SHALL preserve the partial state, receipts, and precise remediation needed
+  rather than hiding the failure behind cleanup.
+- **CON-224** A successful rollback SHALL itself produce receipts proving the
+  resulting state.
+- **CON-225** Failure of a rollback step SHALL be represented separately from
+  the original bootstrap failure.
+
+## Provider and external-tool trust
+
+- **CON-230** Conditor SHALL model provider/runtime installation as an explicit
+  trust boundary independent from Echelon component installation.
+- **CON-231** For each external provider/tool bootstrap, Conditor SHALL record
+  the publisher/source, requested version or release identity when available,
+  integrity mechanism, authorization status, and ownership classification.
+- **CON-232** A live `curl | sh`-style installer whose exact executed bytes
+  cannot be pinned or independently verified SHALL NOT be represented as
+  equivalent to an immutable checksum-verified release artifact.
+- **CON-233** When an external ecosystem offers signed or checksummed release
+  artifacts, a reproducible profile SHOULD prefer those over moving installer
+  endpoints.
+- **CON-234** External provider credentials SHALL remain outside Conditor's
+  durable state unless a future credential component explicitly owns secure
+  storage; Conditor MAY record only non-secret capability/readiness facts.
+- **CON-235** An externally managed provider/tool MAY be adopted as a
+  prerequisite without Conditor assuming uninstall authority over it.
+
+## Praxis and Ordo handoff
+
+- **CON-240** Conditor SHALL use Ordo/Praxis contracts to establish the initial
+  governed execution context when a selected project profile requests agent
+  execution.
+- **CON-241** Conditor SHALL NOT redefine execution roles, legal work
+  transitions, evaluator independence, receipt semantics, or ongoing work
+  state that belong to Ordo/Praxis.
+- **CON-242** After successful handoff, ongoing work execution SHALL remain
+  governed by Praxis/Ordo even if Conditor originally launched the provider.
+- **CON-243** Conditor SHALL be able to include the initialized Praxis execution
+  identity and initial readiness/activation receipt in its bootstrap evidence
+  without duplicating Praxis's execution ledger.
+- **CON-244** A Conditor resume operation that resumes installation/bootstrap
+  state MUST remain distinguishable from a Praxis resume operation that
+  resumes governed project work.
+- **CON-245** Installing or starting the Praxis local control plane SHALL be an
+  explicit workstation/profile step with its own receipt and ownership state;
+  the control plane's runtime data remains Praxis-owned.
