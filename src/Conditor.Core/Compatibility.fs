@@ -23,7 +23,8 @@ module Compatibility =
               "forma", "Qualified application binding."
               "folio", "Qualified application binding."
               "aegis", "Qualified NuGet application binding."
-              "tutela", "Qualified pinned immutable-source lifecycle release." ]
+              "tutela", "Qualified pinned immutable-source lifecycle release."
+              "percepta", "Qualified pinned Percepta repository lifecycle release; semantic screen contracts remain separate governing inputs." ]
 
     let supported =
         Registry.descriptors
