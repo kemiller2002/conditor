@@ -327,6 +327,23 @@ withManifest
                         Some "github:kemiller2002/tutela#1acf421e7d940665c134012f11b082a502e17537|node:bin/tutela.mjs"))
 
 withManifest
+    """{"schemaVersion":1,"name":"percepta-lifecycle-demo","components":[{"id":"percepta"}]}"""
+    (fun path ->
+        match Manifest.load path with
+        | Error _ -> check "percepta lifecycle manifest parses" false
+        | Ok manifest ->
+            match Planner.create "/tmp/percepta-lifecycle-demo" Init manifest with
+            | Error _ -> check "percepta lifecycle plan succeeds" false
+            | Ok plan ->
+                check "percepta default version resolves" (plan.Components[0].Version = "0.1.0")
+                check "percepta init plus verify planned" (plan.Actions.Length = 2)
+                check
+                    "percepta lifecycle source is immutable"
+                    (plan.Components[0].SourceReference =
+                        Some "github:kemiller2002/percepta#3027983f20b91d6856a27c1cf8ee2582108ef6be|node:distribution/percepta-repository-lifecycle/bin/percepta-repo.mjs"))
+
+
+withManifest
     """{"schemaVersion":1,"name":"requirements-demo","components":[],"requirements":[{"id":"spec","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/SPEC.md"}]}"""
     (fun path ->
         match Manifest.load path with
@@ -1040,9 +1057,10 @@ match ComponentDescriptors.loadAll () with
               "forma"
               "folio"
               "aegis"
-              "tutela" ]
+              "tutela"
+              "percepta" ]
 
-    check "embedded component descriptor count" (descriptors.Length = 9)
+    check "embedded component descriptor count" (descriptors.Length = 10)
     check "embedded component descriptor ids" (ids = expected)
     check "registry is projected from component descriptors" (Registry.all.Length = descriptors.Length)
 
@@ -1084,6 +1102,21 @@ match ComponentDescriptors.loadAll () with
                  source.Repository = "kemiller2002/tutela"
                  && source.Commit = "1acf421e7d940665c134012f11b082a502e17537"
                  && source.Entrypoint = NodeScript "bin/tutela.mjs"
+             | _ -> false))
+
+    let percepta =
+        descriptors
+        |> List.tryFind (fun descriptor -> descriptor.Definition.Id = "percepta")
+
+    check
+        "Percepta descriptor preserves immutable lifecycle source identity"
+        (percepta
+         |> Option.exists (fun descriptor ->
+             match descriptor.Definition.LifecycleSource with
+             | Some(GitHubSource source) ->
+                 source.Repository = "kemiller2002/percepta"
+                 && source.Commit = "3027983f20b91d6856a27c1cf8ee2582108ef6be"
+                 && source.Entrypoint = NodeScript "distribution/percepta-repository-lifecycle/bin/percepta-repo.mjs"
              | _ -> false))
 
 
