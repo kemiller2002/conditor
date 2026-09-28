@@ -346,3 +346,23 @@ Tracked by GitHub issue #5.
 - **CON-245** Installing or starting the Praxis local control plane SHALL be an
   explicit workstation/profile step with its own receipt and ownership state;
   the control plane's runtime data remains Praxis-owned.
+
+
+## Standard Echelon workstation composition
+
+- **CON-250** The standard Echelon engineering workstation profile MUST be able
+  to include the Praxis local control plane, Forma, Limen, and declared
+  security/containment support when the selected profile requires those
+  capabilities.
+- **CON-251** Forma and Limen SHALL be installed only as required dependencies
+  of declared interactive/browser capabilities; their presence SHALL NOT be
+  assumed for CLI-only profiles.
+- **CON-252** A security/containment profile SHALL describe the host-enforcement
+  capabilities requested for agent execution separately from Ordo/Praxis
+  semantic capabilities.
+- **CON-253** Conditor SHALL verify that requested control-plane, Forma, Limen,
+  and containment components are compatible with the selected Praxis/Ordo
+  versions before host mutation begins.
+- **CON-254** Workstation setup SHALL keep each installed Echelon component
+  independently identifiable and lifecycle-managed so removal or upgrade of one
+  component does not require deleting the entire Echelon environment.
