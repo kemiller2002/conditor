@@ -34,6 +34,10 @@
     {
       "id": "aegis",
       "version": "1.0.0"
+    },
+    {
+      "id": "percepta",
+      "version": "0.1.0"
     }
   ],
   "execution": {
