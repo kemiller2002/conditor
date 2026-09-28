@@ -91,3 +91,53 @@ Conditor must transform an uninitialized Git repository into a reproducible, gov
 - **CON-125** If Conditor produces printable/PDF/paginated installation plans, audit reports, bootstrap evidence packets, or similar documents, those surfaces MUST consume a pinned Folio release and use existing Folio primitives.
 - **CON-126** Forma and Folio are conditional until their corresponding UI/document surfaces exist; Aegis is applicable now because Conditor already owns operational boundaries.
 - **CON-127** Shared dependencies MUST be pinned to released versions or immutable artifacts. Missing shared behavior MUST be raised as a gap in the owning shared repository rather than silently reimplemented.
+
+## Workstation bootstrap and machine boundaries
+
+Tracked by GitHub issue #3.
+
+- **CON-130** Conditor SHALL support a governed bootstrap path from a supported workstation plus an empty or uninitialized Git repository to an execution-ready project.
+- **CON-131** Before host mutation begins, the plan SHALL declare every user-level or machine-level path, persistent startup mechanism, shell/profile entry, tool installation, and other durable host resource that the selected bootstrap profile may create or modify.
+- **CON-132** Host prerequisites and provider launchers SHALL be installed only when explicitly declared by the selected bootstrap profile or requested operation.
+- **CON-133** Reproducible host bootstrap SHALL use pinned or release-bound artifacts and SHALL verify downloaded artifact integrity where the distribution ecosystem provides a stable verification mechanism.
+- **CON-134** Provider/runtime installation SHALL be represented as a distinct trust boundary from repository initialization, including the identity and source of externally executed installers or binaries.
+- **CON-135** Repeated workstation bootstrap SHALL be idempotent with respect to Conditor-owned host state and SHALL NOT accumulate duplicate shell/profile configuration or duplicate startup registrations.
+
+## Step receipts
+
+- **CON-140** Every executable Conditor plan step SHALL declare an expected receipt or postcondition before execution.
+- **CON-141** Conditor SHALL capture the observed receipt after each executed step independently from the expected receipt.
+- **CON-142** Receipt comparison SHALL be explicit and machine-readable.
+- **CON-143** A required receipt mismatch SHALL stop subsequent dependent steps and SHALL preserve the observed result and diagnostic context.
+- **CON-144** Successful receipts SHALL be retained with sufficient operation, component, version/source, platform, and target identity to reconstruct what Conditor established and why.
+- **CON-145** Receipt records SHALL distinguish verified postconditions from agent or child-process narrative claims.
+- **CON-146** Readiness SHALL depend on required receipt satisfaction in addition to existing component verification and compatibility gates.
+
+## Deterministic uninstall and rollback
+
+- **CON-150** Conditor lock/install state SHALL retain enough ownership and provenance information to calculate a deterministic uninstall plan for Conditor-managed state.
+- **CON-151** Uninstall planning SHALL be read-only and SHALL identify the exact resources Conditor proposes to remove, restore, detach, or leave unchanged.
+- **CON-152** Uninstall SHALL respect tool-owned, shared, and user-owned boundaries and SHALL never delete user-owned work merely because it lies beneath a Conditor-managed repository or host path.
+- **CON-153** Conditor SHALL distinguish resources it created from compatible resources that existed before bootstrap and were adopted or reused.
+- **CON-154** Conditor SHALL NOT remove an adopted pre-existing tool or host resource unless explicit ownership evidence says Conditor created it or the user separately authorizes removal.
+- **CON-155** Workstation bootstrap SHALL provide an explicit uninstall or undo path for Conditor-owned durable host state, including startup registrations and shell/profile edits that Conditor created.
+- **CON-156** Uninstall SHALL preserve receipts or a final removal receipt sufficient to explain what was removed and what intentionally remained.
+- **CON-157** Rollback after a partially failed bootstrap SHALL use recorded effects and receipts rather than assuming an attempted action completed.
+
+
+## Bootstrap authorization and external execution
+
+- **CON-136** Before executing an external installer, downloaded script,
+  provider bootstrap, or persistent host-registration command, Conditor SHALL
+  expose the exact planned command or artifact identity together with the
+  expected durable host effects that operation is allowed to create.
+- **CON-137** A host-bootstrap profile SHALL distinguish preauthorized
+  operations from operations that require explicit user authorization and
+  SHALL NOT turn repeated approval prompts into implicit blanket permission.
+- **CON-138** When an external installer cannot be cryptographically pinned or
+  independently integrity-verified, Conditor SHALL report that limitation as
+  an unresolved trust property rather than representing the bootstrap as fully
+  reproducible.
+- **CON-139** Host bootstrap SHALL record whether each prerequisite was created
+  by Conditor, already present and reused, or externally installed outside
+  Conditor so later repair and uninstall do not infer ownership.
