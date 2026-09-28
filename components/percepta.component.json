@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "percepta",
+  "displayName": "Percepta Repository Lifecycle",
+  "distribution": "lifecycle-npm",
+  "package": "@echelon-foundry/percepta-repository-lifecycle",
+  "defaultVersion": "0.1.0",
+  "qualifiedVersions": [
+    "0.1.0"
+  ],
+  "lifecycleSource": {
+    "kind": "github",
+    "repository": "kemiller2002/percepta",
+    "commit": "3027983f20b91d6856a27c1cf8ee2582108ef6be",
+    "entrypoint": {
+      "kind": "node-script",
+      "path": "distribution/percepta-repository-lifecycle/bin/percepta-repo.mjs"
+    }
+  },
+  "command": "percepta-repo",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
