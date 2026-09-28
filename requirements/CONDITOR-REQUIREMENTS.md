@@ -123,3 +123,21 @@ Tracked by GitHub issue #3.
 - **CON-155** Workstation bootstrap SHALL provide an explicit uninstall or undo path for Conditor-owned durable host state, including startup registrations and shell/profile edits that Conditor created.
 - **CON-156** Uninstall SHALL preserve receipts or a final removal receipt sufficient to explain what was removed and what intentionally remained.
 - **CON-157** Rollback after a partially failed bootstrap SHALL use recorded effects and receipts rather than assuming an attempted action completed.
+
+
+## Bootstrap authorization and external execution
+
+- **CON-136** Before executing an external installer, downloaded script,
+  provider bootstrap, or persistent host-registration command, Conditor SHALL
+  expose the exact planned command or artifact identity together with the
+  expected durable host effects that operation is allowed to create.
+- **CON-137** A host-bootstrap profile SHALL distinguish preauthorized
+  operations from operations that require explicit user authorization and
+  SHALL NOT turn repeated approval prompts into implicit blanket permission.
+- **CON-138** When an external installer cannot be cryptographically pinned or
+  independently integrity-verified, Conditor SHALL report that limitation as
+  an unresolved trust property rather than representing the bootstrap as fully
+  reproducible.
+- **CON-139** Host bootstrap SHALL record whether each prerequisite was created
+  by Conditor, already present and reused, or externally installed outside
+  Conditor so later repair and uninstall do not infer ownership.
