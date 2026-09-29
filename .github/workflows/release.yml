@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - "v*"
+  # The operator orchestrator (release-orchestrator.yml) dispatches this
+  # workflow on the new tag: a tag pushed with GITHUB_TOKEN does not trigger
+  # the push event.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -96,14 +100,56 @@ jobs:
         run: |
           (cd assets && sha256sum *) > checksums.txt
           cat checksums.txt
-      - name: Create GitHub release
+      - name: Generate release manifest (echelon.release/v1)
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            printf '{\n  "schema": "echelon.release/v1",\n  "systemId": "conditor",\n  "version": "%s",\n' "$VERSION"
+            printf '  "repository": "%s",\n  "tag": "%s",\n  "commit": "%s",\n' "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$GITHUB_SHA"
+            printf '  "executable": "conditor",\n  "compatibilityAliases": [],\n  "provides": [],\n'
+            printf '  "distributions": [ { "channel": "github-release", "package": null, "url": "https://github.com/%s/releases/tag/%s" } ],\n' "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+            printf '  "artifacts": [\n'
+            first=1
+            while read -r sha name; do
+              rid="${name#conditor-}"; rid="${rid%.exe}"
+              [[ $first -eq 1 ]] || printf ',\n'
+              first=0
+              printf '    { "name": "%s", "platform": "%s", "sha256": "%s" }' "$name" "$rid" "$sha"
+            done < checksums.txt
+            printf '\n  ]\n}\n'
+          } > echelon-release.json
+          python3 -m json.tool echelon-release.json
+      - name: Create GitHub release (immutable per version)
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Idempotent rerun: accept only byte-identical artifacts.
+            gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern checksums.txt --dir published
+            if cmp -s published/checksums.txt checksums.txt; then
+              echo "Release $GITHUB_REF_NAME already published with identical artifacts."
+              exit 0
+            fi
+            echo "::error::Release $GITHUB_REF_NAME exists with different artifacts; refusing to overwrite an immutable version."
+            exit 1
+          fi
           gh release create "$GITHUB_REF_NAME" \
             assets/* \
             checksums.txt \
+            echelon-release.json \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "Conditor $GITHUB_REF_NAME" \
             --generate-notes
+      - name: Smoke-test the released artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern conditor-linux-x64 --dir smoke
+          chmod +x smoke/conditor-linux-x64
+          (cd smoke && sha256sum -c <(grep ' conditor-linux-x64$' ../checksums.txt))
+          smoke/conditor-linux-x64 presets
+          smoke/conditor-linux-x64 workstation plan --profile minimal --home "$RUNNER_TEMP/smoke-home"

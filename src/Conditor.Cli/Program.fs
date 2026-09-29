@@ -23,6 +23,12 @@ let private usage () =
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
+    Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
+    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--praxis PATH] [--target-id ID] [--no-rollback]"
+    Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
+    Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
+    Console.WriteLine "  conditor uninstall --plan [--home DIR] [--json]"
+    Console.WriteLine "  conditor uninstall --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--praxis PATH] [--target-id ID]"
 
 let private optionValue name (args: string array) =
     args
@@ -67,6 +73,34 @@ let private createPlan operation target selection manifest =
         | Init, Some preset -> Presets.bindToTarget preset plan
         | _ -> plan)
 
+/// After a successful repository install (every action succeeded and the
+/// lock was written), register each installed component with Project
+/// Administration through `praxis installation register`, when a Praxis with
+/// that capability is configured (`CONDITOR_PRAXIS`). The Conditor lock stays
+/// local installation evidence; it is not the central inventory. Optional:
+/// an unavailable integration never fails the install.
+let private registerRepositoryComponents (target: string) (plan: InstallationPlan) =
+    match Environment.GetEnvironmentVariable "CONDITOR_PRAXIS" |> Option.ofObj with
+    | None -> ()
+    | Some praxis ->
+        for comp in plan.Components do
+            let distribution =
+                match comp.Distribution with
+                | LifecycleNpm
+                | NpmPackage -> "npm"
+                | NugetPackage -> "nuget"
+
+            let result =
+                ProcessRunner.runProcess
+                    target
+                    praxis
+                    [ "installation"; "register"; "--system"; comp.Id; "--version"; comp.Version
+                      "--target-kind"; "repository"; "--distribution"; distribution; "--artifact"; $"{comp.Package}@{comp.Version}"
+                      "--evidence"; "lock=.conditor/lock.json" ]
+
+            let summary = result.StandardOutput.Trim().Split('\n') |> Array.tryLast |> Option.defaultValue ""
+            Console.WriteLine $"  registration {comp.Id} {comp.Version}: {summary}"
+
 let private run operation shouldExecute target selection =
     match Manifest.load selection.ManifestPath with
     | Error errors ->
@@ -87,6 +121,7 @@ let private run operation shouldExecute target selection =
                 match Installer.execute target selection.ManifestPath plan with
                 | Ok(Some lockPath) ->
                     Console.WriteLine $"Conditor completed successfully. Lock file: {lockPath}"
+                    registerRepositoryComponents target plan
                     0
                 | Ok None ->
                     Console.WriteLine "Conditor completed successfully."
@@ -559,6 +594,174 @@ let private printPresets () =
 
     0
 
+// ------------------------------------------------------------ workstation
+
+open Conditor.Core.Workstation
+
+let private workstationContext (args: string array) : WorkstationContext =
+    let home =
+        optionValue "--home" args
+        |> Option.orElse (Environment.GetEnvironmentVariable "HOME" |> Option.ofObj)
+        |> Option.defaultValue (Environment.GetFolderPath Environment.SpecialFolder.UserProfile)
+        |> Path.GetFullPath
+
+    { Home = home
+      ArtifactMirror = optionValue "--artifact-mirror" args |> Option.map Path.GetFullPath
+      Praxis = optionValue "--praxis" args |> Option.orElse (Environment.GetEnvironmentVariable "CONDITOR_PRAXIS" |> Option.ofObj)
+      TargetId = optionValue "--target-id" args }
+
+let private probe (executable: string) (arguments: string list) =
+    ProcessRunner.runProcess (Directory.GetCurrentDirectory()) executable arguments
+
+let private optionValues name (args: string array) =
+    args |> Array.toList |> List.pairwise |> List.choose (fun (flag, value) -> if flag = name then Some value else None)
+
+let private workstationPlan (args: string array) =
+    let ctx = workstationContext args
+
+    Profiles.resolve (optionValue "--profile" args |> Option.defaultValue "echelon-engineering")
+    |> Result.map (fun profile ->
+        let prerequisites = Engine.discover probe profile.Prerequisites
+        ctx, Engine.plan ctx profile (Platform.runtimeIdentifier ()) prerequisites (optionValues "--with" args))
+
+let private printPlan (json: bool) (ctx: WorkstationContext) (plan: WorkstationPlan) =
+    if json then
+        let o = System.Text.Json.Nodes.JsonObject()
+        o["schema"] <- System.Text.Json.Nodes.JsonValue.Create "conditor.workstation-plan/v1"
+        o["profile"] <- System.Text.Json.Nodes.JsonValue.Create $"{plan.Profile.Id}@{plan.Profile.Version}"
+        o["runtimeIdentifier"] <- System.Text.Json.Nodes.JsonValue.Create plan.RuntimeIdentifier
+        o["digest"] <- System.Text.Json.Nodes.JsonValue.Create plan.Digest
+        let steps = System.Text.Json.Nodes.JsonArray()
+
+        for s in plan.Steps do
+            let n = System.Text.Json.Nodes.JsonObject()
+            n["sequence"] <- System.Text.Json.Nodes.JsonValue.Create s.Sequence
+            n["id"] <- System.Text.Json.Nodes.JsonValue.Create s.Id
+            n["operation"] <- System.Text.Json.Nodes.JsonValue.Create(StepOperation.toWire s.Operation)
+            n["resource"] <- System.Text.Json.Nodes.JsonValue.Create s.Resource
+            s.Artifact |> Option.iter (fun (u, d) -> n["artifact"] <- System.Text.Json.Nodes.JsonValue.Create u; n["digest"] <- System.Text.Json.Nodes.JsonValue.Create d)
+            s.Command |> Option.iter (fun c -> n["command"] <- System.Text.Json.Nodes.JsonValue.Create c)
+            n["expectedReceipt"] <- System.Text.Json.Nodes.JsonValue.Create(Expected.describe s.Expected)
+            n["ownership"] <- System.Text.Json.Nodes.JsonValue.Create(Ownership.toWire s.Ownership)
+            n["requiresAuthorization"] <- System.Text.Json.Nodes.JsonValue.Create s.RequiresAuthorization
+            steps.Add n
+
+        o["steps"] <- steps
+        let refusals = System.Text.Json.Nodes.JsonArray()
+        plan.Refusals |> List.iter (fun r -> refusals.Add(System.Text.Json.Nodes.JsonValue.Create r))
+        o["refusals"] <- refusals
+        Console.WriteLine(o.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
+    else
+        Console.WriteLine $"Workstation plan: profile {plan.Profile.Id}@{plan.Profile.Version} for {plan.RuntimeIdentifier} (home {ctx.Home})"
+
+        for (p, state) in plan.Prerequisites do
+            Console.WriteLine $"  prerequisite {p.Id}: %A{state}"
+
+        for s in plan.Steps do
+            let artifact = s.Artifact |> Option.map (fun (u, d) -> $"\n        artifact: {u}\n        digest:   {d} (trust: %A{s.Trust})") |> Option.defaultValue ""
+            let command = s.Command |> Option.map (fun c -> $"\n        command:  {c}") |> Option.defaultValue ""
+            Console.WriteLine $"  {s.Sequence,2}. {StepOperation.toWire s.Operation,-15} {s.Resource}  [{Ownership.toWire s.Ownership}]{artifact}{command}\n        expect:   {Expected.describe s.Expected}"
+
+        for r in plan.Refusals do
+            Console.WriteLine $"  REFUSED {r}"
+
+        Console.WriteLine $"Authorize exactly these effects with: conditor workstation apply --authorize {plan.Digest}"
+
+let private runWorkstation (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "plan" ->
+        match workstationPlan args with
+        | Error e ->
+            Console.Error.WriteLine e
+            1
+        | Ok(ctx, plan) ->
+            printPlan (hasFlag "--json" args) ctx plan
+            if plan.Refusals.IsEmpty then 0 else 3
+    | Some "apply" ->
+        match workstationPlan args, optionValue "--authorize" args with
+        | Error e, _ ->
+            Console.Error.WriteLine e
+            1
+        | _, None ->
+            Console.Error.WriteLine "apply requires --authorize PLAN-DIGEST; run `conditor workstation plan` and review it first"
+            2
+        | Ok(ctx, plan), Some digest ->
+            match Engine.apply ctx probe plan digest (not (hasFlag "--no-rollback" args)) with
+            | Error e ->
+                Console.Error.WriteLine $"REFUSED {e}"
+                3
+            | Ok result ->
+                result.Reused |> List.iter (fun s -> Console.WriteLine $"  reused    {s} (receipt already matched)")
+                result.Completed |> List.iter (fun s -> Console.WriteLine $"  completed {s} (receipt matched)")
+                result.Registrations |> List.iter (fun (c, o) -> Console.WriteLine $"  registration {c}: {o}")
+
+                match result.Failed with
+                | Some(step, why) ->
+                    Console.Error.WriteLine $"  FAILED {step}: {why}"
+                    result.RolledBack |> List.iter (fun (s, o) -> Console.Error.WriteLine $"  rolled back {s}: {o}")
+                    4
+                | None ->
+                    Console.WriteLine "Workstation ready."
+                    0
+    | Some "status" ->
+        let ctx = workstationContext args
+        let entries = Ledger.read ctx
+
+        for (resource, record) in Ledger.ownership entries do
+            let klass = record |> Map.tryFind "class" |> Option.defaultValue "?"
+            let comp = record |> Map.tryFind "component" |> Option.defaultValue ""
+            Console.WriteLine $"  {klass,-17} {resource} {comp}"
+
+        0
+    | Some "reconcile" ->
+        match workstationPlan args, optionValue "--step" args with
+        | Error e, _ ->
+            Console.Error.WriteLine e
+            1
+        | _, None ->
+            Console.Error.WriteLine "reconcile requires --step ID"
+            2
+        | Ok(ctx, plan), Some step ->
+            match Engine.reconcile ctx probe plan step with
+            | Ok finding ->
+                Console.WriteLine $"{step}: effect {finding}"
+                0
+            | Error e ->
+                Console.Error.WriteLine $"REFUSED {e}"
+                3
+    | _ ->
+        usage ()
+        2
+
+let private runUninstall (args: string array) =
+    let ctx = workstationContext args
+    let plan = Engine.uninstallPlan ctx
+
+    if hasFlag "--plan" args then
+        for (resource, comp, action) in plan.Actions do
+            let reason = match action with Engine.UninstallAction.Unresolved why -> $" ({why})" | _ -> ""
+            Console.WriteLine $"  {Engine.uninstallActionToWire action,-15} {resource} {comp}{reason}"
+
+        Console.WriteLine "  (source repositories and user work are never in scope)"
+        Console.WriteLine $"Authorize exactly these actions with: conditor uninstall --authorize {plan.Digest}"
+        0
+    else
+        match optionValue "--authorize" args with
+        | None ->
+            Console.Error.WriteLine "uninstall requires --plan, or --authorize PLAN-DIGEST after reviewing the plan"
+            2
+        | Some digest ->
+            let profile = Profiles.resolve (optionValue "--profile" args |> Option.defaultValue "echelon-engineering") |> Result.toOption
+
+            match Engine.uninstall ctx probe profile plan digest with
+            | Error e ->
+                Console.Error.WriteLine $"REFUSED {e}"
+                3
+            | Ok(results, registrations) ->
+                results |> List.iter (fun (r, _, o) -> Console.WriteLine $"  removed {r}: {o}")
+                registrations |> List.iter (fun (c, o) -> Console.WriteLine $"  removal registration {c}: {o}")
+                if results |> List.forall (fun (_, _, o) -> o = "match") then 0 else 4
+
 let private execute (args: string array) =
     if args.Length = 0 then
         usage ()
@@ -566,7 +769,11 @@ let private execute (args: string array) =
     else
         let command = args[0].Trim().ToLowerInvariant()
 
-        if command = "presets" then
+        if command = "workstation" then
+            runWorkstation args
+        elif command = "uninstall" then
+            runUninstall args
+        elif command = "presets" then
             printPresets ()
         elif command = "components" then
             printComponents (hasFlag "--json" args)

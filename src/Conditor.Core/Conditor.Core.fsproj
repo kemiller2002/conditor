@@ -24,11 +24,16 @@
     <Compile Include="Upgrade.fs" />
     <Compile Include="Launcher.fs" />
     <Compile Include="Execution.fs" />
+    <Compile Include="Workstation/Model.fs" />
+    <Compile Include="Workstation/Engine.fs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />
     <EmbeddedResource Include="../../examples/clean-room.conditor.json" LogicalName="Conditor.Presets.clean-room.json" />
     <EmbeddedResource Include="../../examples/rehearsal-evidence-triage.conditor.json" LogicalName="Conditor.Presets.evidence-triage-rehearsal.json" />
+    <EmbeddedResource Include="../../profiles/*.profile.json">
+      <LogicalName>Conditor.Profiles.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="../../components/*.component.json">
       <LogicalName>Conditor.Components.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>

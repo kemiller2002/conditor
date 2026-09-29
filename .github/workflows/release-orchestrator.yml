@@ -1,0 +1,94 @@
+# Operator release entry point:
+#
+#   gh workflow run release-orchestrator.yml -f bump=patch     (or minor|major|X.Y.Z)
+#
+# Updates the single authoritative version (Directory.Build.props) exactly
+# once, validates, commits and tags, then dispatches the existing native
+# release workflow (release.yml) on the new tag. Refuses to reuse a version
+# whose tag already points elsewhere.
+name: Release (operator)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "patch | minor | major | X.Y.Z"
+        required: true
+        default: patch
+      dry_run:
+        description: "Validate and show the version without committing, tagging or releasing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: conditor-release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Resolve version
+        id: version
+        shell: bash
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          current="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)"
+          IFS=. read -r major minor patch <<<"$current"
+          case "$BUMP" in
+            patch) next="$major.$minor.$((patch + 1))" ;;
+            minor) next="$major.$((minor + 1)).0" ;;
+            major) next="$((major + 1)).0.0" ;;
+            *)
+              [[ "$BUMP" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "::error::bump must be patch, minor, major or X.Y.Z"; exit 2; }
+              next="$BUMP" ;;
+          esac
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$next" >/dev/null; then
+            tagged="$(git rev-parse "v$next^{commit}")"
+            if [[ "$current" == "$next" && "$tagged" == "$(git rev-parse HEAD)" ]]; then
+              echo "rerun=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::v$next already exists at $tagged; released versions are immutable"
+              exit 1
+            fi
+          else
+            echo "rerun=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Conditor $current -> $next"
+      - name: Update the authoritative version
+        if: steps.version.outputs.rerun == 'false'
+        run: sed -i "s:<Version>${{ steps.version.outputs.current }}</Version>:<Version>${{ steps.version.outputs.next }}</Version>:" Directory.Build.props
+      - name: Validate
+        run: |
+          dotnet restore Conditor.slnx
+          dotnet build Conditor.slnx --configuration Release --no-restore
+          dotnet run --project tests/Conditor.Tests --configuration Release --no-build
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/plan-home"
+      - name: Commit and tag
+        if: steps.version.outputs.rerun == 'false' && !inputs.dry_run
+        run: |
+          git config user.name "Conditor Release"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -am "Release v${{ steps.version.outputs.next }}"
+          git tag "v${{ steps.version.outputs.next }}"
+          git push origin HEAD:main "v${{ steps.version.outputs.next }}"
+      - name: Dispatch native release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v${{ steps.version.outputs.next }}"
