@@ -1,0 +1,142 @@
+
+==> Project Administration inventory store (temporary clone of /home/user/project-administration)
+projection is current (0 events)
+
+==> Blank target repository
+
+==> Conditor workstation plan (project profile pinning Praxis 3.5.0 for the later upgrade)
+Workstation plan: profile example-project@1 for linux-x64 (home /tmp/tmp.kKXwbFlv03/home)
+  prerequisite git: Satisfied "2.43.0"
+  prerequisite gh: ExternalOnly "GitHub CLI is not installed"
+   1. ADOPT/REUSE     git  [adopted]
+        expect:   git is present and adopted, never modified
+   2. MODIFY          ~/.profile  [shared]
+        expect:   ~/.profile holds exactly one current conditor:workstation-path block
+   3. DOWNLOAD        ~/.conditor/cache/ordo/1.4.0/ordo-linux-x64.tar.gz  [conditor-created]
+        artifact: https://github.com/kemiller2002/ordo/releases/download/v1.4.0/ordo-linux-x64.tar.gz
+        digest:   sha256:26389b98c713d4107dbf344bb8a229a97e72658e286863a5d55ebab81d6330ba (trust: IntegrityVerified)
+        expect:   file ~/.conditor/cache/ordo/1.4.0/ordo-linux-x64.tar.gz has sha256:26389b98c713d4107dbf344bb8a229a97e72658e286863a5d55ebab81d6330ba
+   4. CREATE          ~/.local/share/echelon/ordo/1.4.0  [conditor-created]
+        expect:   directory ~/.local/share/echelon/ordo/1.4.0 contains ordo
+   5. CREATE          ~/.local/bin/ordo  [conditor-created]
+        command:  ordo --version
+        expect:   `~/.local/bin/ordo --version` exits 0 and reports 1.4.0
+   6. DOWNLOAD        ~/.conditor/cache/praxis/3.5.0/praxis-linux-x64.tar.gz  [conditor-created]
+        artifact: https://github.com/kemiller2002/praxis/releases/download/v3.5.0/praxis-linux-x64.tar.gz
+        digest:   sha256:6d74f5c49a5e81709c3f681be7824ba4681a9041e25fb62bdd983c6bfee4c2bb (trust: IntegrityVerified)
+        expect:   file ~/.conditor/cache/praxis/3.5.0/praxis-linux-x64.tar.gz has sha256:6d74f5c49a5e81709c3f681be7824ba4681a9041e25fb62bdd983c6bfee4c2bb
+   7. CREATE          ~/.local/share/echelon/praxis/3.5.0  [conditor-created]
+        expect:   directory ~/.local/share/echelon/praxis/3.5.0 contains praxis
+   8. CREATE          ~/.local/bin/praxis  [conditor-created]
+        command:  praxis --version
+        expect:   `~/.local/bin/praxis --version` exits 0 and reports 3.5.0
+Authorize exactly these effects with: conditor workstation apply --authorize sha256:fbafd3e5ec97af3592a85a7355044f132d978d01c2bee1369a5ca7ff2185e792
+
+==> Install Praxis 3.5.0 and Ordo 1.4.0 (authorized plan sha256:fbafd3e5ec97af3592a85a7355044f132d978d01c2bee1369a5ca7ff2185e792); registration follows matching receipts
+  reused    prerequisite-git (receipt already matched)
+  completed shell-path (receipt matched)
+  completed ordo-download (receipt matched)
+  completed ordo-extract (receipt matched)
+  completed ordo-shim (receipt matched)
+  completed praxis-download (receipt matched)
+  completed praxis-extract (receipt matched)
+  completed praxis-shim (receipt matched)
+  registration ordo: recorded
+  registration praxis: recorded
+Workstation ready.
+ros-fs 3.5.0
+1.4.0
+
+==> Register Conditor itself on the workstation
+
+==> Initialize the target repository with the installed Praxis and Ordo; register repository installations
+installation recorded installed (IE-20260929T124234040Z-f6c2bde07f271426)
+installation recorded installed (IE-20260929T124234526Z-78c8f1b57f0f85e6)
+
+==> Governed work, execution envelope, bounded step, receipt, verification
+step write-hello: match
+evaluation: passed
+EXE-20260929T124235273Z-7d6ca2c1 -> completed
+workspace removed; execution EXE-20260929T124235273Z-7d6ca2c1 and its branch are preserved
+EXE-20260929T124235273Z-7d6ca2c1  implementation  completed  echelon-foundry/example:WI-1
+  step write-hello          Satisfied (attempts 1)
+
+==> Project Administration: what is installed where
+TARGET: repository:echelon-foundry/example
+SYSTEM                  VERSION       STATE
+ordo                    1.4.0         installed
+praxis                  3.5.0         installed
+
+TARGET: environment:ws-cleanroom
+SYSTEM                  VERSION       STATE
+conditor                0.1.0         installed
+ordo                    1.4.0         installed
+praxis                  3.5.0         installed
+
+
+==> Upgrade Praxis 3.5.0 -> 3.6.0 (workstation profile echelon-engineering, and the repository)
+  reused    prerequisite-git (receipt already matched)
+  reused    shell-path (receipt already matched)
+  reused    ordo-download (receipt already matched)
+  reused    ordo-extract (receipt already matched)
+  reused    ordo-shim (receipt already matched)
+  completed praxis-download (receipt matched)
+  completed praxis-extract (receipt matched)
+  completed praxis-shim (receipt matched)
+  registration praxis: recorded
+Workstation ready.
+ros-fs 3.6.0
+installation recorded upgraded (IE-20260929T124240646Z-f195a6ae283d91be)
+HISTORY: repository:echelon-foundry/example
+2026-09-29T12:42:34.040Z  praxis    installed   3.5.0
+2026-09-29T12:42:40.646Z  praxis    upgraded    3.6.0 (from 3.5.0)
+HISTORY: environment:ws-cleanroom
+2026-09-29T12:42:32.316Z  praxis    installed   3.5.0
+2026-09-29T12:42:39.671Z  praxis    upgraded    3.6.0 (from 3.5.0)
+TARGET: repository:echelon-foundry/example
+SYSTEM                  VERSION       STATE
+ordo                    1.4.0         installed
+praxis                  3.6.0         installed
+
+
+==> Uninstall the workstation (removal registered after matching removal receipts)
+  retain-adopted  git 
+  remove          ~/.conditor/cache/ordo/1.4.0/ordo-linux-x64.tar.gz ordo
+  remove          ~/.conditor/cache/praxis/3.5.0/praxis-linux-x64.tar.gz praxis
+  remove          ~/.conditor/cache/praxis/3.6.0/praxis-linux-x64.tar.gz praxis
+  remove          ~/.local/bin/ordo ordo
+  remove          ~/.local/bin/praxis praxis
+  remove          ~/.local/share/echelon/ordo/1.4.0 ordo
+  remove          ~/.local/share/echelon/praxis/3.5.0 praxis
+  remove          ~/.local/share/echelon/praxis/3.6.0 praxis
+  restore         ~/.profile 
+  (source repositories and user work are never in scope)
+Authorize exactly these actions with: conditor uninstall --authorize sha256:c56d2d1150dedd2cd171cfb9c2749ea0bed039eb6e34d2dddc37ae3c2076839d
+  removed ~/.conditor/cache/ordo/1.4.0/ordo-linux-x64.tar.gz: match
+  removed ~/.conditor/cache/praxis/3.5.0/praxis-linux-x64.tar.gz: match
+  removed ~/.conditor/cache/praxis/3.6.0/praxis-linux-x64.tar.gz: match
+  removed ~/.local/bin/ordo: match
+  removed ~/.local/bin/praxis: match
+  removed ~/.local/share/echelon/ordo/1.4.0: match
+  removed ~/.local/share/echelon/praxis/3.5.0: match
+  removed ~/.local/share/echelon/praxis/3.6.0: match
+  removed ~/.profile: match
+  removal registration ordo: recorded
+  removal registration praxis: recorded
+TARGET: environment:ws-cleanroom
+SYSTEM                  VERSION       STATE
+conditor                0.1.0         installed
+ordo                    1.4.0         removed
+praxis                  3.6.0         removed
+
+HISTORY: environment:ws-cleanroom
+2026-09-29T12:42:31.179Z  ordo      installed   1.4.0
+2026-09-29T12:42:32.316Z  praxis    installed   3.5.0
+2026-09-29T12:42:32.978Z  conditor  installed   0.1.0
+2026-09-29T12:42:39.671Z  praxis    upgraded    3.6.0 (from 3.5.0)
+2026-09-29T12:42:42.157Z  ordo      removed     1.4.0 (from 1.4.0)
+2026-09-29T12:42:42.590Z  praxis    removed     3.6.0 (from 3.6.0)
+projection is current (9 events)
+
+installation events recorded: 9
+Clean-room rehearsal complete.

@@ -294,7 +294,7 @@ module Engine =
                 match c.Assets |> Map.tryFind rid with
                 | None -> []
                 | Some asset ->
-                    let cached = Path.Combine(WorkstationPaths.cache ctx, asset.Name)
+                    let cached = Path.Combine(WorkstationPaths.cache ctx, c.Id, c.Version, asset.Name)
                     let installDir = Path.Combine(WorkstationPaths.installRoot ctx, c.Id, c.Version)
                     let shim = Path.Combine(WorkstationPaths.binDir ctx, c.Executable)
                     let display = WorkstationPaths.display ctx
@@ -442,11 +442,16 @@ module Engine =
 
     // ------------------------------------------------------------- effects
 
-    let private fetch (ctx: WorkstationContext) (url: string) (assetName: string) (destination: string) =
+    let private fetch (ctx: WorkstationContext) (url: string) (tag: string) (assetName: string) (destination: string) =
         Directory.CreateDirectory(Path.GetDirectoryName destination |> Option.ofObj |> Option.defaultValue ".") |> ignore
         let temp = destination + ".partial"
 
-        match ctx.ArtifactMirror |> Option.map (fun m -> Path.Combine(m, assetName)) |> Option.filter File.Exists with
+        // A mirror may be laid out by tag (`<mirror>/<tag>/<asset>`) or flat.
+        let mirrored =
+            ctx.ArtifactMirror
+            |> Option.bind (fun m -> [ Path.Combine(m, tag, assetName); Path.Combine(m, assetName) ] |> List.tryFind File.Exists)
+
+        match mirrored with
         | Some local -> File.Copy(local, temp, true)
         | None ->
             use client = new HttpClient()
@@ -518,9 +523,9 @@ module Engine =
         match step.Id, comp with
         | id, Some c when id = $"{c.Id}-download" ->
             let asset = c.Assets[rid]
-            fetch ctx (releaseUrl c asset) asset.Name (WorkstationPaths.resolve ctx step.Resource)
+            fetch ctx (releaseUrl c asset) c.Tag asset.Name (WorkstationPaths.resolve ctx step.Resource)
         | id, Some c when id = $"{c.Id}-extract" ->
-            let archive = Path.Combine(WorkstationPaths.cache ctx, c.Assets[rid].Name)
+            let archive = Path.Combine(WorkstationPaths.cache ctx, c.Id, c.Version, c.Assets[rid].Name)
             extract archive (WorkstationPaths.resolve ctx step.Resource)
         | id, Some c when id = $"{c.Id}-shim" ->
             writeShim (WorkstationPaths.resolve ctx step.Resource) (Path.Combine(WorkstationPaths.installRoot ctx, c.Id, c.Version, c.Executable))
