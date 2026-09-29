@@ -1,0 +1,119 @@
+{
+  "schema": "conditor.workstation-profile/v1",
+  "id": "echelon-engineering",
+  "version": 1,
+  "extends": "minimal",
+  "description": "Standard Echelon engineering workstation: Praxis and Ordo native releases on a Git/GitHub-ready host. Optional capabilities are installed only when selected.",
+  "prerequisites": [
+    {
+      "id": "gh",
+      "required": false
+    }
+  ],
+  "components": [
+    {
+      "id": "praxis",
+      "version": "3.6.0",
+      "executable": "praxis",
+      "versionProbe": [
+        "--version"
+      ],
+      "source": {
+        "kind": "github-release",
+        "repository": "kemiller2002/praxis",
+        "tag": "v3.6.0"
+      },
+      "assets": {
+        "linux-arm64": {
+          "name": "praxis-linux-arm64.tar.gz",
+          "sha256": "70a692fbeea75b2db67c6a8ec5d3721b84bda8d7aa031be0fd1786c5978d1b03"
+        },
+        "linux-musl-x64": {
+          "name": "praxis-linux-musl-x64.tar.gz",
+          "sha256": "e08c2bb26983352c5a46b26260945851c77cd58a1284ff57b6d9da3b67bd919c"
+        },
+        "linux-x64": {
+          "name": "praxis-linux-x64.tar.gz",
+          "sha256": "c4a5b1f3a64aa32474aba6464f9978886dbf6f3cf78fc421ce50cda1074dee71"
+        },
+        "osx-arm64": {
+          "name": "praxis-osx-arm64.tar.gz",
+          "sha256": "1c3f56cabbc17d56675e21775c71f5fe31c17d7d8797a1f3bf62fef63845b5d5"
+        },
+        "osx-x64": {
+          "name": "praxis-osx-x64.tar.gz",
+          "sha256": "423641b5d733c1f679d628d2fc13143ba3744eaef2ba286c0867a28bcd1dade0"
+        },
+        "win-x64": {
+          "name": "praxis-win-x64.zip",
+          "sha256": "f378395c83311f531deb98644eaf8cbe79dcfc792ed1c3c12030ba434a33426f"
+        }
+      }
+    },
+    {
+      "id": "ordo",
+      "version": "1.4.0",
+      "executable": "ordo",
+      "versionProbe": [
+        "--version"
+      ],
+      "source": {
+        "kind": "github-release",
+        "repository": "kemiller2002/ordo",
+        "tag": "v1.4.0"
+      },
+      "assets": {
+        "linux-arm64": {
+          "name": "ordo-linux-arm64.tar.gz",
+          "sha256": "6198ec70f8882851bbbf2e5b13fd4328822b0d828d183ca76addfa115936e197"
+        },
+        "linux-musl-x64": {
+          "name": "ordo-linux-musl-x64.tar.gz",
+          "sha256": "1130a6783325d86ef884b392354133adcbc40a2c4b163d7b84ebb71b8a7f691a"
+        },
+        "linux-x64": {
+          "name": "ordo-linux-x64.tar.gz",
+          "sha256": "26389b98c713d4107dbf344bb8a229a97e72658e286863a5d55ebab81d6330ba"
+        },
+        "osx-arm64": {
+          "name": "ordo-osx-arm64.tar.gz",
+          "sha256": "8c4407e419682c838cda013292f5dc2dddec95eb151cbf75e95f21f579ac5e87"
+        },
+        "osx-x64": {
+          "name": "ordo-osx-x64.tar.gz",
+          "sha256": "659507e89e4019339a01fcbb786601190b6e5e051d1e0406c5b6e554b4649676"
+        },
+        "win-x64": {
+          "name": "ordo-win-x64.zip",
+          "sha256": "a306b850635fb2d1333b7dadfcf6156031b0dbcdedfc0500154b07c695541e4c"
+        }
+      }
+    }
+  ],
+  "optional": [
+    {
+      "id": "praxis-control-plane",
+      "reason": "Praxis local control plane (not yet released as a separate component)"
+    },
+    {
+      "id": "forma",
+      "reason": "Forma design system; required only by projects with a UI tier"
+    },
+    {
+      "id": "limen",
+      "reason": "Limen TypeScript/WASM boundary; required only by projects with a browser tier"
+    },
+    {
+      "id": "tutela",
+      "reason": "Host containment/security capabilities where configured"
+    }
+  ],
+  "providers": {
+    "selectable": [
+      "claude",
+      "codex",
+      "gemini"
+    ],
+    "installedByConditor": false
+  }
+}

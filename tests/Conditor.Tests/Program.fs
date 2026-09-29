@@ -1133,6 +1133,8 @@ withTarget
             "Praxis active execution context overrides ready backlog projection"
             (Mission.launchState target mission = Ok "active"))
 
+WorkstationTests.run check
+
 let exitCode =
     if failures = 0 then
         Console.WriteLine "All Conditor tests passed."

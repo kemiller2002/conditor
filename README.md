@@ -182,3 +182,12 @@ bash scripts/rehearse-clean-room.sh
 The rehearsal begins from an empty temporary Git repository, plans and initializes the governed scaffold, materializes the canonical rehearsal contract, verifies the agent handoff and application bindings, and fails if bootstrap output contains competition-style application implementation. CI runs the same rehearsal after the core build/tests pass.
 
 The clean-room CI path now proves initialization, a second zero-drift initialization, Ordo baseline routing, Praxis mission creation, `start --check`, guarded provider handoff through a fake Codex adapter, and Praxis-owned active execution state. The next validation layer is an authenticated fresh-agent rehearsal in a sacrificial repository, kept separate from public CI so model credentials are never required by ordinary builds.
+
+## Workstation bootstrap
+
+`conditor workstation plan|apply|status|reconcile` and `conditor uninstall`
+bootstrap an Echelon engineering host from versioned profiles, with
+plan-before-authorization, per-step receipts, an ownership ledger,
+partial-failure rollback and installation registration through Praxis. See
+[`docs/workstation.md`](docs/workstation.md). Release an operator build with
+`gh workflow run release-orchestrator.yml -f bump=patch`.

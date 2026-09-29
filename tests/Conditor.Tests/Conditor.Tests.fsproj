@@ -6,6 +6,7 @@
     <ProjectReference Include="../../src/Conditor.Core/Conditor.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="WorkstationTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>

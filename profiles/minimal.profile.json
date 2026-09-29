@@ -1,0 +1,19 @@
+{
+  "schema": "conditor.workstation-profile/v1",
+  "id": "minimal",
+  "version": 1,
+  "description": "Host readiness only: Git available and usable. Installs nothing.",
+  "prerequisites": [
+    {
+      "id": "git",
+      "minimumVersion": "2.30.0",
+      "required": true
+    },
+    {
+      "id": "gh",
+      "required": false
+    }
+  ],
+  "components": [],
+  "optional": []
+}
