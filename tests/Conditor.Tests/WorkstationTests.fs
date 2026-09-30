@@ -64,56 +64,67 @@ let private resolvedSetFile (dir: string) (id: string) (version: string) (assetN
     let catalogSha = String.replicate 64 "b"
     let releaseSha = String.replicate 64 "c"
 
-    File.WriteAllText(
-        path,
-        $"""{
+    let template =
+        """{
           "schema": "echelon.resolved-release-set/v1",
           "profile": {
             "id": "registry-test",
             "version": "0.1.0",
-            "sha256": "{{profileSha}}"
+            "sha256": "__PROFILE_SHA__"
           },
-          "platform": "{{rid}}",
+          "platform": "__RID__",
           "resolver": {
             "name": "test",
             "version": "1.0.0"
           },
           "catalogSnapshot": {
-            "sha256": "{{catalogSha}}"
+            "sha256": "__CATALOG_SHA__"
           },
           "components": [
             {
-              "systemId": "{{id}}",
+              "systemId": "__ID__",
               "role": "host-tool",
               "required": true,
-              "version": "{{version}}",
-              "repository": "example/{{id}}",
-              "tag": "v{{version}}",
+              "version": "__VERSION__",
+              "repository": "example/__ID__",
+              "tag": "v__VERSION__",
               "commit": "1111111111111111111111111111111111111111",
               "releaseStage": "stable",
               "lifecycleState": "active",
               "distributionClass": "self-contained-native-cli",
-              "executable": "{{id}}",
+              "executable": "__ID__",
               "releaseManifest": {
                 "schema": "echelon.release/v2",
-                "sha256": "{{releaseSha}}"
+                "sha256": "__RELEASE_SHA__"
               },
               "distribution": {
                 "mechanism": "github-release",
-                "url": "https://github.com/example/{{id}}/releases/tag/v{{version}}"
+                "url": "https://github.com/example/__ID__/releases/tag/v__VERSION__"
               },
               "artifacts": [
                 {
-                  "name": "{{assetName}}",
+                  "name": "__ASSET_NAME__",
                   "purpose": "executable",
-                  "platform": "{{rid}}",
-                  "sha256": "{{assetSha}}"
+                  "platform": "__RID__",
+                  "sha256": "__ASSET_SHA__"
                 }
               ]
             }
           ]
-        }""")
+        }"""
 
+    let json =
+        template
+            .Replace("__PROFILE_SHA__", profileSha)
+            .Replace("__CATALOG_SHA__", catalogSha)
+            .Replace("__RELEASE_SHA__", releaseSha)
+            .Replace("__RID__", rid)
+            .Replace("__ID__", id)
+            .Replace("__VERSION__", version)
+            .Replace("__ASSET_NAME__", assetName)
+            .Replace("__ASSET_SHA__", assetSha)
+
+    File.WriteAllText(path, json)
     path, fileSha256 path
 
 let private setup () =
