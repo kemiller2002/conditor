@@ -393,7 +393,9 @@ module Engine =
           Prerequisites = prerequisites
           Steps = steps
           Refusals = refusals
-          Digest = "sha256:" + sha256Text ($"{profile.Id}@{profile.Version}\n{canonical}") }
+          Digest =
+            let sourceIdentity = profile.SourceIdentity |> Option.defaultValue "-"
+            "sha256:" + sha256Text ($"{profile.Id}@{profile.Version}\n{sourceIdentity}\n{canonical}") }
 
     // -------------------------------------------------------------- receipts
 
@@ -615,7 +617,12 @@ module Engine =
                 let names = unknown |> List.map (fun s -> s.Id) |> String.concat ", "
                 Error $"steps with unknown effects must be reconciled before retry: {names} (conditor workstation reconcile)"
             else
-                Ledger.append ctx [ "entry", "plan"; "digest", plan.Digest; "profile", $"{plan.Profile.Id}@{plan.Profile.Version}"; "rid", plan.RuntimeIdentifier ]
+                Ledger.append ctx (
+                    [ "entry", "plan"
+                      "digest", plan.Digest
+                      "profile", $"{plan.Profile.Id}@{plan.Profile.Version}"
+                      "rid", plan.RuntimeIdentifier ]
+                    @ (plan.Profile.SourceIdentity |> Option.map (fun source -> [ "sourceIdentity", source ]) |> Option.defaultValue []))
 
                 let stop (acc: ApplyResult) (step: PlanStep) (outcome: Outcome) (observed: string) =
                     let failed = { acc with Failed = Some(step.Id, observed) }
