@@ -175,3 +175,26 @@ when the operator follows the canonical Conditor path, then Conditor SHALL:
 without manual dependency installation, source cloning, file copying, or hand editing.
 
 The same release-set identity SHALL be reproducible later and SHALL produce an equivalent verified environment on the same supported platform class.
+
+
+## Competition profile ownership and clean-host baseline
+
+**CON-INDY-094** The Indy Init planning repository SHALL publish a machine-readable competition profile manifest that is distinct from Conditor's implementation and distinct from the application source generated at kickoff.
+
+**CON-INDY-095** The competition profile manifest SHALL name the exact required Echelon capabilities by canonical Registry id, required distribution role, profile/release-set identity, governing contract-bundle identity, and any explicitly permitted optional capabilities.
+
+**CON-INDY-096** The competition profile SHALL declare the exact clean-host baseline, including permitted preinstalled operating-system facilities, Git availability/version, shell/PowerShell assumptions, provider CLI/runtime assumptions, authentication boundaries, browser requirements, and whether each prerequisite is Conditor-managed or external.
+
+**CON-INDY-097** A requirement described as "agent-ready" SHALL identify which provider execution boundary is being proven. An absent provider executable or missing provider authentication SHALL be reported as an external readiness block, not as successful agent readiness.
+
+**CON-INDY-098** The competition profile SHALL declare the primary event platform and every additional supported platform. A successful rehearsal on one platform SHALL NOT imply another platform is supported.
+
+**CON-INDY-099** The frozen event release set SHALL include the Conditor version/bootstrap identity used to establish the environment, not only downstream component versions.
+
+**CON-INDY-100** The competition profile and contract bundle SHALL be content-addressed independently so a change to environment/tooling can be distinguished from a change to product requirements/contracts.
+
+**CON-INDY-101** The event-day canonical bootstrap SHALL be executable from the declared clean-host baseline without a manual PATH edit or shell restart between Conditor bootstrap and profile execution.
+
+**CON-INDY-102** The offline competition rehearsal SHALL begin from the same declared clean-host baseline as the online rehearsal, except for network availability. It SHALL NOT rely on warm caches, pre-existing Echelon binaries, or unpublished local packages.
+
+**CON-INDY-103** The final pre-event acceptance record SHALL identify every external prerequisite that Conditor intentionally does not install. The demonstration SHALL NOT describe those prerequisites as part of Conditor's installed result.
