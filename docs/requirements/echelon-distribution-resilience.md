@@ -121,3 +121,38 @@ This pass stress-tests the installation design against partial failure, stale st
 ## Pass 2 acceptance criteria
 
 A deliberately interrupted, corrupted, stale, or partially upgraded Echelon environment can be diagnosed without guessing, reconciled to a known state, repaired or rolled back within declared policy, and verified offline. No unverified artifact becomes active and no user-owned/adopted resource is removed as collateral damage.
+
+
+## Bootstrap and mutation hardening discovered by ecosystem audit
+
+**CON-DIST-180** A successful first-time bootstrap SHALL leave the installed Conditor executable directly usable by the documented next step in the same user session. The canonical flow SHALL NOT require a logout, shell restart, or manual PATH edit.
+
+**CON-DIST-181** Conditor SHALL define an explicit version lifecycle for Conditor itself, including exact-version install, current-version inspection, approved upgrade, and recovery/rollback semantics where platform replacement rules permit. Re-running an unpinned `latest` bootstrap script SHALL NOT be the only supported upgrade contract.
+
+**CON-DIST-182** Bootstrap/platform resolution SHALL distinguish materially incompatible runtime variants, including Linux libc/runtime differences where they affect artifact compatibility. OS name plus CPU architecture alone SHALL NOT be considered sufficient when the produced artifact has additional runtime constraints.
+
+**CON-DIST-183** Conditor SHALL prevent concurrent mutating operations against the same workstation state or target repository through a deterministic lock/lease protocol.
+
+**CON-DIST-184** A stale or interrupted Conditor mutation lock SHALL NOT be silently discarded. Recovery SHALL establish whether an operation remains active, completed, failed, or indeterminate before allowing a conflicting mutation.
+
+**CON-DIST-185** Before the first irreversible mutation, Conditor SHALL preflight, to the extent deterministically knowable, destination write access, required free space, platform compatibility, required authentication boundaries, and availability of all mandatory online sources.
+
+**CON-DIST-186** When practical, all immutable artifacts needed for an installation transaction SHALL be downloaded, integrity-verified, and staged before activation/mutation of existing active versions.
+
+**CON-DIST-187** Conditor self-replacement SHALL be atomic or restart-safe. Platforms that cannot replace the running executable directly SHALL use a staged replacement mechanism with an observable postcondition.
+
+**CON-DIST-188** Bootstrap scripts SHALL have a version/source identity that can be reported in diagnostics and competition evidence. The bootstrap script is part of the supply-chain boundary and SHALL NOT be treated as unversioned glue.
+
+**CON-DIST-189** Public native distributions SHOULD use platform-appropriate code signing/notarization where practical. Conditor SHALL distinguish operating-system publisher trust from cryptographic digest integrity and CI provenance; one SHALL NOT be reported as proof of another.
+
+## Supply-chain evidence
+
+**CON-DIST-190** For stable Echelon releases, Conditor SHALL be able to surface Registry-declared SBOM/dependency-inventory references and third-party-license evidence where those artifacts exist.
+
+**CON-DIST-191** Conditor SHALL refuse automatic selection of a Registry release marked security-revoked or withdrawn.
+
+**CON-DIST-192** Explicit historical reproduction of a withdrawn release, if supported at all, SHALL require a distinct unsafe/historical-reproduction policy boundary and SHALL NOT occur through normal stable profile resolution.
+
+**CON-DIST-193** A release being deprecated SHALL be distinguishable from a release being security-revoked. Deprecation MAY remain installable under policy; revocation SHALL fail closed for normal resolution.
+
+**CON-DIST-194** Conditor diagnostics SHALL state when required provenance, SBOM, signing, or license evidence is unavailable rather than implying that digest verification establishes those properties.
