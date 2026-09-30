@@ -296,7 +296,7 @@ module ResolvedReleaseSets =
             | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
         | Some other, _, _, _, _, _, _, _ when other <> "host-tool" ->
             Error $"resolved component '{id}' has role '{other}'; workstation native installation currently accepts only host-tool"
-        | _, Some other, _, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
+        | _, Some other, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
             Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation currently accepts only self-contained-native-cli"
         | _, _, Some state, _, _, _, _, _ when state <> "active" ->
             Error $"resolved component '{id}' is {state}; normal installation accepts only active releases"
