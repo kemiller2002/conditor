@@ -9,6 +9,7 @@
     <Compile Include="ComponentDescriptors.fs" />
     <Compile Include="Registry.fs" />
     <Compile Include="Compatibility.fs" />
+    <Compile Include="ResolvedReleaseSet.fs" />
     <Compile Include="SourceCache.fs" />
     <Compile Include="Requirements.fs" />
     <Compile Include="Scaffolding.fs" />
