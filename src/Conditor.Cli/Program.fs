@@ -13,9 +13,9 @@ let private usage () =
     Console.WriteLine "  conditor presets"
     Console.WriteLine "  conditor components [--json]"
     Console.WriteLine "  conditor compatibility [--json]"
-    Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
+    Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
+    Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
     Console.WriteLine "  conditor doctor [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
@@ -24,9 +24,11 @@ let private usage () =
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
-    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--praxis PATH] [--target-id ID] [--no-rollback]"
+    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
+    Console.WriteLine "  conditor bundle create --resolved-set PATH --resolved-set-sha256 SHA256 --output DIR [--manifest PATH]"
+    Console.WriteLine "  conditor bundle verify --path DIR"
     Console.WriteLine "  conditor uninstall --plan [--home DIR] [--json]"
     Console.WriteLine "  conditor uninstall --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--praxis PATH] [--target-id ID]"
 
@@ -600,6 +602,52 @@ let private printPresets () =
 
 open Conditor.Core.Workstation
 
+let private printBundleSummary (verb: string) (summary: OfflineBundleSummary) =
+    Console.WriteLine $"Offline bundle {verb}: {summary.Root}"
+    Console.WriteLine $"  profile:      {summary.ProfileId}@{summary.ProfileVersion}"
+    Console.WriteLine $"  platform:     {summary.Platform}"
+    Console.WriteLine $"  resolved set: sha256:{summary.ResolvedSetSha256}"
+    Console.WriteLine $"  artifacts:    {summary.ArtifactCount}"
+    Console.WriteLine $"  native mirror:{summary.NativeMirror}"
+    Console.WriteLine $"  packages:     {summary.PackageMirror}"
+    Console.WriteLine $"  sources:      {summary.SourceMirror}"
+    Console.WriteLine $"  source files: {summary.SourceFileCount}"
+    summary.ProjectManifestPath |> Option.iter (fun path -> Console.WriteLine $"  project:      {path}")
+
+let private runBundle (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "create" ->
+        match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args, optionValue "--output" args with
+        | Some resolvedSet, Some digest, Some output ->
+            let projectManifest = optionValue "--manifest" args |> Option.map Path.GetFullPath
+
+            match OfflineBundle.create (Path.GetFullPath resolvedSet) digest (Path.GetFullPath output) projectManifest with
+            | Ok summary ->
+                printBundleSummary "created" summary
+                0
+            | Error error ->
+                Console.Error.WriteLine error
+                3
+        | _ ->
+            Console.Error.WriteLine "bundle create requires --resolved-set PATH --resolved-set-sha256 SHA256 --output DIR"
+            2
+    | Some "verify" ->
+        match optionValue "--path" args with
+        | Some path ->
+            match OfflineBundle.verify (Path.GetFullPath path) with
+            | Ok summary ->
+                printBundleSummary "verified" summary
+                0
+            | Error error ->
+                Console.Error.WriteLine error
+                3
+        | None ->
+            Console.Error.WriteLine "bundle verify requires --path DIR"
+            2
+    | _ ->
+        usage ()
+        2
+
 let private workstationContext (args: string array) : WorkstationContext =
     let home =
         optionValue "--home" args
@@ -609,6 +657,7 @@ let private workstationContext (args: string array) : WorkstationContext =
 
     { Home = home
       ArtifactMirror = optionValue "--artifact-mirror" args |> Option.map Path.GetFullPath
+      Offline = hasFlag "--offline" args
       Praxis = optionValue "--praxis" args |> Option.orElse (Environment.GetEnvironmentVariable "CONDITOR_PRAXIS" |> Option.ofObj)
       TargetId = optionValue "--target-id" args }
 
@@ -777,7 +826,17 @@ let private runUninstall (args: string array) =
                 registrations |> List.iter (fun (c, o) -> Console.WriteLine $"  removal registration {c}: {o}")
                 if results |> List.forall (fun (_, _, o) -> o = "match") then 0 else 4
 
+let private configureSourcePolicy (args: string array) =
+    optionValue "--source-mirror" args
+    |> Option.iter (fun path ->
+        Environment.SetEnvironmentVariable("CONDITOR_SOURCE_MIRROR", Path.GetFullPath path))
+
+    if hasFlag "--offline" args then
+        Environment.SetEnvironmentVariable("CONDITOR_OFFLINE", "1")
+
 let private execute (args: string array) =
+    configureSourcePolicy args
+
     if args.Length = 0 then
         usage ()
         1
@@ -786,6 +845,8 @@ let private execute (args: string array) =
 
         if command = "workstation" then
             runWorkstation args
+        elif command = "bundle" then
+            runBundle args
         elif command = "uninstall" then
             runUninstall args
         elif command = "presets" then

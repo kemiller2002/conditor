@@ -136,7 +136,7 @@ let private setup () =
     home, mirror, profile
 
 let private context home mirror praxis : WorkstationContext =
-    { Home = home; ArtifactMirror = Some mirror; Praxis = praxis; TargetId = Some "ws-test" }
+    { Home = home; ArtifactMirror = Some mirror; Offline = false; Praxis = praxis; TargetId = Some "ws-test" }
 
 let private planFor ctx profilePath =
     match Profiles.resolve profilePath with
@@ -193,6 +193,39 @@ let run (check: string -> bool -> unit) =
     let registryApplied = applyOk registryCtx registryPlan
     check "Registry-resolved native release installs through the normal workstation engine" registryApplied.Failed.IsNone
     check "Registry-resolved shim reports its selected version" ((probe (Path.Combine(registryHome, ".local", "bin", "gamma")) [ "--version" ]).StandardOutput.Contains "3.0.0")
+
+    let rawHome = temp "registry-raw-home"
+    let rawName = $"rawtool-{Platform.runtimeIdentifier ()}"
+    let rawPath = Path.Combine(registryMirror, rawName)
+    File.WriteAllText(rawPath, "#!/bin/sh\necho \"rawtool 4.0.0\"\n")
+    File.SetUnixFileMode(rawPath, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+    let rawSet, rawSetSha = resolvedSetFile registryMirror "rawtool" "4.0.0" rawName (fileSha256 rawPath)
+    let rawProfile =
+        match ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) rawSet rawSetSha with
+        | Error e -> failwith e
+        | Ok profile -> profile
+    let rawCtx = context rawHome registryMirror None
+    let rawPlan = Engine.plan rawCtx rawProfile (Platform.runtimeIdentifier ()) [] []
+    let rawApplied = applyOk rawCtx rawPlan
+    check "raw self-contained native artifact installs through workstation engine" rawApplied.Failed.IsNone
+    check
+        "raw native artifact shim reports its selected version"
+        ((probe (Path.Combine(rawHome, ".local", "bin", "rawtool")) [ "--version" ]).StandardOutput.Contains "4.0.0")
+
+    let offlineMissingHome = temp "registry-offline-missing-home"
+    let offlineEmptyMirror = temp "registry-offline-empty-mirror"
+    let offlineMissingCtx =
+        { context offlineMissingHome offlineEmptyMirror None with Offline = true }
+    let offlineMissingPlan =
+        Engine.plan offlineMissingCtx registryProfile (Platform.runtimeIdentifier ()) [] []
+
+    match Engine.apply offlineMissingCtx probe offlineMissingPlan offlineMissingPlan.Digest true with
+    | Error error ->
+        check "offline workstation refuses network fallback when mirror artifact is absent" (error.Contains "Offline workstation mode")
+    | Ok result ->
+        check
+            "offline workstation refuses network fallback when mirror artifact is absent"
+            (result.Failed |> Option.exists (fun (_, detail) -> detail.Contains "Offline workstation mode"))
 
     let wrongPlatformText =
         File.ReadAllText(registrySet)
@@ -292,6 +325,109 @@ let run (check: string -> bool -> unit) =
     check
         "Registry workstation adapter refuses a security-revoked release"
         (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) revokedPath (fileSha256 revokedPath) |> Result.isError)
+
+    // Offline source mirror ------------------------------------------------
+    let sourceMirrorRoot = temp "source-mirror"
+    let sourceCacheRoot = temp "source-cache"
+    let source =
+        { Repository = "example/contracts"
+          Commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          Entrypoint = FileArtifact "docs/contract.md" }
+
+    let sourceCheckout = SourceCache.mirrorCheckoutPath sourceMirrorRoot source
+    let sourceDocs = Path.Combine(sourceCheckout, "docs")
+    Directory.CreateDirectory sourceDocs |> ignore
+    let sourcePath = Path.Combine(sourceDocs, "contract.md")
+    File.WriteAllText(sourcePath, "frozen contract\n")
+    let sourceSha = fileSha256 sourcePath
+
+    File.WriteAllText(
+        Path.Combine(sourceCheckout, ".conditor-source.json"),
+        $"""{{ 
+          "schema": "conditor.source-mirror/v1",
+          "repository": "example/contracts",
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "files": {{
+            "docs/contract.md": "{sourceSha}"
+          }}
+        }}"""
+    )
+
+    let priorMirror = Environment.GetEnvironmentVariable "CONDITOR_SOURCE_MIRROR"
+    let priorOffline = Environment.GetEnvironmentVariable "CONDITOR_OFFLINE"
+    let priorCache = Environment.GetEnvironmentVariable "CONDITOR_CACHE_DIR"
+
+    try
+        Environment.SetEnvironmentVariable("CONDITOR_SOURCE_MIRROR", sourceMirrorRoot)
+        Environment.SetEnvironmentVariable("CONDITOR_OFFLINE", "1")
+        Environment.SetEnvironmentVariable("CONDITOR_CACHE_DIR", sourceCacheRoot)
+
+        let mirroredSource =
+            SourceCache.ensure "requirements:test" source
+            |> Result.bind (fun checkout -> SourceCache.resolveEntrypoint checkout source)
+            |> Result.map File.ReadAllText
+
+        check
+            "offline source mirror resolves exact pinned file without GitHub"
+            (mirroredSource = Ok "frozen contract\n")
+
+        File.AppendAllText(sourcePath, "tamper")
+
+        check
+            "offline source mirror refuses tampered governing input"
+            (SourceCache.ensure "requirements:test" source |> Result.isError)
+    finally
+        Environment.SetEnvironmentVariable("CONDITOR_SOURCE_MIRROR", priorMirror)
+        Environment.SetEnvironmentVariable("CONDITOR_OFFLINE", priorOffline)
+        Environment.SetEnvironmentVariable("CONDITOR_CACHE_DIR", priorCache)
+
+    // Offline bundle verification ------------------------------------------
+    let bundleRoot = temp "offline-bundle"
+    let bundleResolved = Path.Combine(bundleRoot, "resolved-set.json")
+    let bundleArtifactDirectory = Path.Combine(bundleRoot, "artifacts", "gamma")
+    Directory.CreateDirectory bundleArtifactDirectory |> ignore
+    let bundleArtifact = Path.Combine(bundleArtifactDirectory, "gamma.bin")
+    File.WriteAllText(bundleResolved, "{\"schema\":\"fixture\"}\n")
+    File.WriteAllText(bundleArtifact, "gamma-offline-artifact\n")
+    let bundleResolvedSha = fileSha256 bundleResolved
+    let bundleArtifactSha = fileSha256 bundleArtifact
+    File.WriteAllText(
+        Path.Combine(bundleRoot, "bundle.json"),
+        $"""{{ 
+          "schema": "conditor.offline-bundle/v1",
+          "profileId": "registry-test",
+          "profileVersion": "0.1.0",
+          "platform": "{Platform.runtimeIdentifier ()}",
+          "resolvedSetSha256": "{bundleResolvedSha}",
+          "resolvedSetPath": "resolved-set.json",
+          "artifacts": [
+            {{
+              "systemId": "gamma",
+              "version": "3.0.0",
+              "role": "host-tool",
+              "mechanism": "github-release",
+              "purpose": "executable",
+              "name": "gamma.bin",
+              "sourceUrl": "https://example.invalid/gamma.bin",
+              "sha256": "{bundleArtifactSha}",
+              "path": "artifacts/gamma/gamma.bin"
+            }}
+          ]
+        }}"""
+    )
+
+    let verifiedBundle =
+        OfflineBundle.verify bundleRoot
+        |> Result.map (fun summary -> summary.ArtifactCount = 1 && summary.ResolvedSetSha256 = bundleResolvedSha)
+
+    check
+        "offline bundle verifier accepts exact resolved set and artifact bytes"
+        (verifiedBundle = Ok true)
+
+    File.AppendAllText(bundleArtifact, "tamper")
+    check
+        "offline bundle verifier refuses tampered artifact bytes"
+        (OfflineBundle.verify bundleRoot |> Result.isError)
 
     // Dry run ---------------------------------------------------------------
     let home, mirror, profile = setup ()

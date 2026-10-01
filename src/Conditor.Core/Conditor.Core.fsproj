@@ -25,6 +25,7 @@
     <Compile Include="Launcher.fs" />
     <Compile Include="Execution.fs" />
     <Compile Include="Workstation/Model.fs" />
+    <Compile Include="Workstation/OfflineBundle.fs" />
     <Compile Include="Workstation/Engine.fs" />
   </ItemGroup>
   <ItemGroup>

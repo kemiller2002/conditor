@@ -112,6 +112,9 @@ type WorkstationContext =
       /// A local mirror of release assets (`<dir>/<asset-name>`), used
       /// instead of downloading when present (offline rehearsals, tests).
       ArtifactMirror: string option
+      /// Refuse all network artifact fallback. Every required release asset
+      /// must be present in ArtifactMirror when true.
+      Offline: bool
       /// A Praxis executable that supports `installation register`, used to
       /// register installations when Project Administration is configured.
       Praxis: string option
@@ -455,6 +458,8 @@ module Engine =
 
         match mirrored with
         | Some local -> File.Copy(local, temp, true)
+        | None when ctx.Offline ->
+            invalidOp $"Offline workstation mode refused network fallback for {assetName}. Expected the artifact in --artifact-mirror."
         | None ->
             use client = new HttpClient()
             use response = client.GetAsync(url).GetAwaiter().GetResult()
@@ -486,6 +491,33 @@ module Engine =
         Directory.CreateDirectory(Path.GetDirectoryName destination |> Option.ofObj |> Option.defaultValue ".") |> ignore
         Directory.Move(content, destination)
         if Directory.Exists staging then Directory.Delete(staging, true)
+
+    let private installNativeAsset (artifact: string) (destination: string) (executable: string) =
+        if artifact.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+           || artifact.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) then
+            extract artifact destination
+        else
+            let staging = destination + ".staging"
+            if Directory.Exists staging then Directory.Delete(staging, true)
+            Directory.CreateDirectory staging |> ignore
+            let target = Path.Combine(staging, executable)
+            File.Copy(artifact, target, true)
+
+            if not (OperatingSystem.IsWindows()) then
+                File.SetUnixFileMode(
+                    target,
+                    UnixFileMode.UserRead
+                    ||| UnixFileMode.UserWrite
+                    ||| UnixFileMode.UserExecute
+                    ||| UnixFileMode.GroupRead
+                    ||| UnixFileMode.GroupExecute
+                    ||| UnixFileMode.OtherRead
+                    ||| UnixFileMode.OtherExecute
+                )
+
+            if Directory.Exists destination then Directory.Delete(destination, true)
+            Directory.CreateDirectory(Path.GetDirectoryName destination |> Option.ofObj |> Option.defaultValue ".") |> ignore
+            Directory.Move(staging, destination)
 
     let private writeShim (shim: string) (target: string) =
         Directory.CreateDirectory(Path.GetDirectoryName shim |> Option.ofObj |> Option.defaultValue ".") |> ignore
@@ -527,8 +559,8 @@ module Engine =
             let asset = c.Assets[rid]
             fetch ctx (releaseUrl c asset) c.Tag asset.Name (WorkstationPaths.resolve ctx step.Resource)
         | id, Some c when id = $"{c.Id}-extract" ->
-            let archive = Path.Combine(WorkstationPaths.cache ctx, c.Id, c.Version, c.Assets[rid].Name)
-            extract archive (WorkstationPaths.resolve ctx step.Resource)
+            let artifact = Path.Combine(WorkstationPaths.cache ctx, c.Id, c.Version, c.Assets[rid].Name)
+            installNativeAsset artifact (WorkstationPaths.resolve ctx step.Resource) c.Executable
         | id, Some c when id = $"{c.Id}-shim" ->
             writeShim (WorkstationPaths.resolve ctx step.Resource) (Path.Combine(WorkstationPaths.installRoot ctx, c.Id, c.Version, c.Executable))
         | "shell-path", _ -> ensureBlock ctx (WorkstationPaths.resolve ctx step.Resource)

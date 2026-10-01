@@ -115,23 +115,19 @@ withManifest
 
 
 withManifest
-    """{"schemaVersion":1,"name":"limen-bootstrap","components":[{"id":"limen","version":"0.6.1"}]}"""
+    """{"schemaVersion":1,"name":"limen-binding","components":[{"id":"limen","version":"0.6.1"}]}"""
     (fun path ->
         match Manifest.load path with
         | Error _ ->
-            check "limen bootstrap manifest parses" false
+            check "limen project binding manifest parses" false
         | Ok manifest ->
-            match Planner.create "/tmp/limen-bootstrap" Init manifest with
-            | Error _ ->
-                check "limen bootstrap plan succeeds" false
-            | Ok plan ->
-                check "limen init plus verify planned" (plan.Actions.Length = 2)
-
-                match plan.Actions[1].Execution with
-                | ExternalProcess(_, arguments) ->
-                    check "limen bootstrap verification is non-strict" (arguments |> List.contains "--strict" |> not)
-                | _ ->
-                    check "limen bootstrap verification is non-strict" false)
+            match Planner.create "/tmp/limen-binding" Init manifest with
+            | Error errors ->
+                check
+                    "limen project binding requires an explicit scaffold target"
+                    (errors |> List.exists (fun error -> error.Contains("A scaffold is required")))
+            | Ok _ ->
+                check "limen project binding requires an explicit scaffold target" false)
 
 let withTarget test =
     let path = Path.Combine(Path.GetTempPath(), $"conditor-target-{Guid.NewGuid():N}")
@@ -159,7 +155,7 @@ withTarget
                     | Ok plan ->
                         check "scaffold application bindings resolve" (plan.Components.Length = 4)
                         check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 12)
-                        check "scaffold ends in strict Limen readiness" (plan.Actions |> List.exists (fun action -> action.Kind = ReadinessVerify))
+                        check "scaffold does not execute a package-manager Limen lifecycle" (plan.Actions |> List.exists (fun action -> action.ComponentId = "limen" && action.Kind = VerifyLifecycle) |> not)
 
                         let packageJson =
                             plan.Actions
@@ -268,18 +264,13 @@ withTarget
                                  text.Contains("@echelon-foundry/print-components")
                                  && text.Contains("<ef-print-document>")))
 
-                        let readiness =
-                            plan.Actions
-                            |> List.tryFind (fun action -> action.Kind = ReadinessVerify)
-
                         check
-                            "readiness uses strict Limen verification"
-                            (readiness
-                             |> Option.exists (fun action ->
-                                 match action.Execution with
-                                 | ExternalProcess(_, arguments) ->
-                                     arguments |> List.contains "--strict"
-                                 | _ -> false))))
+                            "Limen remains a project-bound package in scaffold output"
+                            (plan.Actions
+                             |> List.exists (fun action ->
+                                 action.ComponentId = "limen"
+                                 && (action.Kind = InstallLifecycle || action.Kind = VerifyLifecycle))
+                             |> not)))
 
 withTarget
     (fun target ->

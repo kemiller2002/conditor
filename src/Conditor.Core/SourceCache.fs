@@ -3,7 +3,9 @@ namespace Conditor.Core
 open System
 open System.Diagnostics
 open System.IO
+open System.Security.Cryptography
 open System.Text
+open System.Text.Json
 open System.Text.RegularExpressions
 
 module SourceCache =
@@ -15,6 +17,100 @@ module SourceCache =
         | null -> None
         | value when String.IsNullOrWhiteSpace value -> None
         | value -> Some value
+
+
+    let private offlineRequired () =
+        match environmentValue "CONDITOR_OFFLINE" with
+        | Some value ->
+            value = "1"
+            || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("yes", StringComparison.OrdinalIgnoreCase)
+        | None -> false
+
+    let private sourceMirrorRoot () =
+        environmentValue "CONDITOR_SOURCE_MIRROR"
+        |> Option.map Path.GetFullPath
+
+    let private sourceEntrypoint source =
+        match source.Entrypoint with
+        | NodeScript path -> path
+        | FileArtifact path -> path
+
+    let private sha256File path =
+        use stream = File.OpenRead path
+        SHA256.HashData stream
+        |> Convert.ToHexString
+        |> fun value -> value.ToLowerInvariant()
+
+    let mirrorCheckoutPath (root: string) (source: GitHubSource) =
+        Path.Combine(
+            Path.GetFullPath root,
+            Regex.Replace(source.Repository, "[^A-Za-z0-9_.-]", "_"),
+            source.Commit.ToLowerInvariant()
+        )
+
+    let private verifyMirrorCheckout checkout source =
+        let metadataPath = Path.Combine(checkout, ".conditor-source.json")
+
+        if not (File.Exists metadataPath) then
+            Error [ $"Offline source mirror metadata is missing: {metadataPath}" ]
+        else
+            try
+                use document = JsonDocument.Parse(File.ReadAllBytes metadataPath)
+                let root = document.RootElement
+                let mutable value = Unchecked.defaultof<JsonElement>
+
+                let stringProperty (name: string) =
+                    if root.TryGetProperty(name, &value) && value.ValueKind = JsonValueKind.String then
+                        value.GetString() |> Option.ofObj
+                    else
+                        None
+
+                let schema = stringProperty "schema"
+                let repository = stringProperty "repository"
+                let commit = stringProperty "commit"
+                let entrypoint = sourceEntrypoint source
+
+                if schema <> Some "conditor.source-mirror/v1" then
+                    Error [ $"Unsupported offline source mirror schema in {metadataPath}." ]
+                elif repository <> Some source.Repository || commit <> Some(source.Commit.ToLowerInvariant()) then
+                    Error
+                        [ $"Offline source mirror identity mismatch for {source.Repository}@{source.Commit}." ]
+                elif not (root.TryGetProperty("files", &value)) || value.ValueKind <> JsonValueKind.Object then
+                    Error [ $"Offline source mirror files map is missing: {metadataPath}" ]
+                else
+                    let mutable digestElement = Unchecked.defaultof<JsonElement>
+
+                    if not (value.TryGetProperty(entrypoint, &digestElement))
+                       || digestElement.ValueKind <> JsonValueKind.String then
+                        Error
+                            [ $"Offline source mirror does not contain declared entrypoint '{entrypoint}' for {source.Repository}@{source.Commit}." ]
+                    else
+                        let expected = digestElement.GetString()
+                        let candidate = Path.GetFullPath(Path.Combine(checkout, entrypoint))
+                        let rootPath = Path.GetFullPath checkout
+                        let rootPrefix =
+                            rootPath.TrimEnd(Path.DirectorySeparatorChar)
+                            + string Path.DirectorySeparatorChar
+
+                        let comparison =
+                            if OperatingSystem.IsWindows() then
+                                StringComparison.OrdinalIgnoreCase
+                            else
+                                StringComparison.Ordinal
+
+                        if not (candidate.StartsWith(rootPrefix, comparison)) || not (File.Exists candidate) then
+                            Error [ $"Offline source mirror entrypoint is missing or escapes its checkout: {entrypoint}" ]
+                        else
+                            let observed = sha256File candidate
+
+                            if not (String.Equals(expected, observed, StringComparison.Ordinal)) then
+                                Error
+                                    [ $"Offline source mirror digest mismatch for {source.Repository}@{source.Commit}:{entrypoint}. Expected sha256:{expected}, observed sha256:{observed}." ]
+                            else
+                                Ok checkout
+            with :? JsonException as ex ->
+                Error [ $"Offline source mirror metadata is invalid JSON: {ex.Message}" ]
 
     let private cacheRoot () =
         match environmentValue "CONDITOR_CACHE_DIR" with
@@ -222,22 +318,49 @@ module SourceCache =
         if not validationErrors.IsEmpty then
             Error validationErrors
         else
-            let checkout =
-                Path.Combine(
-                    cacheRoot (),
-                    "sources",
-                    safeSegment componentId,
-                    source.Commit.ToLowerInvariant()
-                )
+            let mirrored =
+                sourceMirrorRoot ()
+                |> Option.map (fun root ->
+                    let checkout = mirrorCheckoutPath root source
 
-            if Directory.Exists checkout then
-                match verifyCheckout checkout source with
-                | Ok path -> Ok path
-                | Error _ ->
-                    Directory.Delete(checkout, true)
+                    if Directory.Exists checkout then
+                        verifyMirrorCheckout checkout source
+                    else
+                        Error
+                            [ $"Offline source mirror checkout is missing for {source.Repository}@{source.Commit}: {checkout}" ])
+
+            match mirrored with
+            | Some(Ok checkout) ->
+                Ok checkout
+            | mirroredResult ->
+                let checkout =
+                    Path.Combine(
+                        cacheRoot (),
+                        "sources",
+                        safeSegment componentId,
+                        source.Commit.ToLowerInvariant()
+                    )
+
+                if Directory.Exists checkout then
+                    match verifyCheckout checkout source with
+                    | Ok path -> Ok path
+                    | Error _ when offlineRequired () ->
+                        match mirroredResult with
+                        | Some(Error errors) -> Error errors
+                        | _ ->
+                            Error
+                                [ $"Offline mode requires an exact cached or mirrored source for {source.Repository}@{source.Commit}." ]
+                    | Error _ ->
+                        Directory.Delete(checkout, true)
+                        populate checkout source
+                elif offlineRequired () then
+                    match mirroredResult with
+                    | Some(Error errors) -> Error errors
+                    | _ ->
+                        Error
+                            [ $"Offline mode requires CONDITOR_SOURCE_MIRROR or an exact cached source for {source.Repository}@{source.Commit}." ]
+                else
                     populate checkout source
-            else
-                populate checkout source
 
     let resolveEntrypoint checkout source =
         entrypointPath checkout source
