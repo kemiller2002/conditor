@@ -243,7 +243,7 @@ module OfflineBundle =
         node["path"] <- JsonValue.Create(relativePath.Replace('\\', '/'))
         node
 
-    let create resolvedSetPath expectedResolvedSetSha256 outputRoot =
+    let rec create resolvedSetPath expectedResolvedSetSha256 outputRoot =
         parseResolvedSet resolvedSetPath expectedResolvedSetSha256
         |> Result.bind (fun resolved ->
             try
