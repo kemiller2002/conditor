@@ -281,7 +281,7 @@ module ResolvedReleaseSets =
                 | _ -> None)
 
         match role, distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
-        | Some "host-tool", Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
+        | (Some "host-tool" | Some "repository-lifecycle"), Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
             match executableArtifacts with
             | [ asset ] ->
                 Ok
@@ -294,8 +294,8 @@ module ResolvedReleaseSets =
                       Assets = Map.ofList [ platform, asset ] }
             | [] -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
             | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
-        | Some other, _, _, _, _, _, _, _ when other <> "host-tool" ->
-            Error $"resolved component '{id}' has role '{other}'; workstation native installation currently accepts only host-tool"
+        | Some other, _, _, _, _, _, _, _ when other <> "host-tool" && other <> "repository-lifecycle" ->
+            Error $"resolved component '{id}' has role '{other}'; workstation native installation accepts only host-tool or repository-lifecycle"
         | _, Some other, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
             Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation currently accepts only self-contained-native-cli"
         | _, _, Some state, _, _, _, _, _ when state <> "active" ->
