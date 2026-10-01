@@ -45,7 +45,7 @@ module SourceCache =
     let mirrorCheckoutPath (root: string) (source: GitHubSource) =
         Path.Combine(
             Path.GetFullPath root,
-            safeSegment source.Repository,
+            Regex.Replace(source.Repository, "[^A-Za-z0-9_.-]", "_"),
             source.Commit.ToLowerInvariant()
         )
 
