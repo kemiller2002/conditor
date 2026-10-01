@@ -326,6 +326,58 @@ let run (check: string -> bool -> unit) =
         "Registry workstation adapter refuses a security-revoked release"
         (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) revokedPath (fileSha256 revokedPath) |> Result.isError)
 
+    // Offline source mirror ------------------------------------------------
+    let sourceMirrorRoot = temp "source-mirror"
+    let sourceCacheRoot = temp "source-cache"
+    let source =
+        { Repository = "example/contracts"
+          Commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          Entrypoint = FileArtifact "docs/contract.md" }
+
+    let sourceCheckout = SourceCache.mirrorCheckoutPath sourceMirrorRoot source
+    let sourcePath = Path.Combine(sourceCheckout, "docs", "contract.md")
+    Directory.CreateDirectory(Path.GetDirectoryName sourcePath) |> ignore
+    File.WriteAllText(sourcePath, "frozen contract\n")
+    let sourceSha = fileSha256 sourcePath
+
+    File.WriteAllText(
+        Path.Combine(sourceCheckout, ".conditor-source.json"),
+        $"""{{ 
+          "schema": "conditor.source-mirror/v1",
+          "repository": "example/contracts",
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "files": {{
+            "docs/contract.md": "{sourceSha}"
+          }}
+        }}"""
+    )
+
+    let priorMirror = Environment.GetEnvironmentVariable "CONDITOR_SOURCE_MIRROR"
+    let priorOffline = Environment.GetEnvironmentVariable "CONDITOR_OFFLINE"
+    let priorCache = Environment.GetEnvironmentVariable "CONDITOR_CACHE_DIR"
+
+    try
+        Environment.SetEnvironmentVariable("CONDITOR_SOURCE_MIRROR", sourceMirrorRoot)
+        Environment.SetEnvironmentVariable("CONDITOR_OFFLINE", "1")
+        Environment.SetEnvironmentVariable("CONDITOR_CACHE_DIR", sourceCacheRoot)
+
+        check
+            "offline source mirror resolves exact pinned file without GitHub"
+            (SourceCache.ensure "requirements:test" source
+             |> Result.bind (fun checkout -> SourceCache.resolveEntrypoint checkout source)
+             |> Result.map File.ReadAllText
+             = Ok "frozen contract\n")
+
+        File.AppendAllText(sourcePath, "tamper")
+
+        check
+            "offline source mirror refuses tampered governing input"
+            (SourceCache.ensure "requirements:test" source |> Result.isError)
+    finally
+        Environment.SetEnvironmentVariable("CONDITOR_SOURCE_MIRROR", priorMirror)
+        Environment.SetEnvironmentVariable("CONDITOR_OFFLINE", priorOffline)
+        Environment.SetEnvironmentVariable("CONDITOR_CACHE_DIR", priorCache)
+
     // Offline bundle verification ------------------------------------------
     let bundleRoot = temp "offline-bundle"
     let bundleResolved = Path.Combine(bundleRoot, "resolved-set.json")
