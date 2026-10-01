@@ -5,6 +5,8 @@ open System.IO
 open System.Reflection
 open System.Runtime.InteropServices
 open System.Text.Json
+open System.Text.Json.Nodes
+open Conditor.Core
 
 // Workstation bootstrap (CON-130..254): versioned profiles, host prerequisite
 // discovery, plan-before-authorization, per-step expected/observed receipts
@@ -281,7 +283,7 @@ module ResolvedReleaseSets =
                 | _ -> None)
 
         match role, distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
-        | Some "host-tool", Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
+        | (Some "host-tool" | Some "repository-lifecycle"), Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
             match executableArtifacts with
             | [ asset ] ->
                 Ok
@@ -294,8 +296,8 @@ module ResolvedReleaseSets =
                       Assets = Map.ofList [ platform, asset ] }
             | [] -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
             | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
-        | Some other, _, _, _, _, _, _, _ when other <> "host-tool" ->
-            Error $"resolved component '{id}' has role '{other}'; workstation native installation currently accepts only host-tool"
+        | Some other, _, _, _, _, _, _, _ when other <> "host-tool" && other <> "repository-lifecycle" ->
+            Error $"resolved component '{id}' has role '{other}'; workstation native installation accepts only host-tool or repository-lifecycle"
         | _, Some other, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
             Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation currently accepts only self-contained-native-cli"
         | _, _, Some state, _, _, _, _, _ when state <> "active" ->
@@ -368,6 +370,222 @@ module ResolvedReleaseSets =
                         | _ -> Error "resolved release set needs profile, catalogSnapshot and platform"
                 with :? JsonException as ex ->
                     Error $"resolved release set is not valid JSON: {ex.Message}"
+
+    type ProjectBinding =
+        { Id: string
+          Version: string
+          Package: string
+          Mechanism: string
+          ArtifactName: string
+          ArtifactSha256: string
+          Required: bool }
+
+    let private parseProjectBinding (element: JsonElement) : Result<ProjectBinding option, string> =
+        let role = str "role" element
+
+        if role <> Some "project-binding" then
+            Ok None
+        else
+            let id = str "systemId" element |> Option.defaultValue "<unknown>"
+            let version = str "version" element
+            let lifecycleState = str "lifecycleState" element
+            let distributionClass = str "distributionClass" element
+            let required = boolValue "required" element |> Option.defaultValue true
+            let distribution = tryProperty "distribution" element
+            let mechanism = distribution |> Option.bind (str "mechanism")
+            let package = distribution |> Option.bind (str "package")
+
+            let packageArtifacts =
+                objects "artifacts" element
+                |> List.choose (fun artifact ->
+                    match str "purpose" artifact, str "platform" artifact, str "name" artifact, str "sha256" artifact with
+                    | Some "package", None, Some name, Some digest when isSha256 digest ->
+                        Some(name, digest)
+                    | _ -> None)
+
+            match version, lifecycleState, distributionClass, mechanism, package with
+            | Some resolvedVersion, Some "active", Some resolvedClass, Some resolvedMechanism, Some resolvedPackage ->
+                match Registry.tryFind id, Registry.qualifiedVersions id with
+                | None, _ ->
+                    Error $"resolved project binding '{id}' has no Conditor component descriptor"
+                | _, None ->
+                    Error $"resolved project binding '{id}' has no Conditor qualification policy"
+                | Some definition, Some qualified when not (qualified.Contains resolvedVersion) ->
+                    let known = qualified |> Seq.sort |> String.concat ", "
+                    Error $"resolved project binding '{id}' version '{resolvedVersion}' is not qualified by Conditor (qualified: {known})"
+                | Some definition, Some _ when definition.Package <> resolvedPackage ->
+                    Error $"resolved project binding '{id}' package '{resolvedPackage}' does not match Conditor package '{definition.Package}'"
+                | Some definition, Some _ ->
+                    let bindingMatches =
+                        match resolvedClass, definition.ApplicationBinding, resolvedMechanism with
+                        | "web-package", Some NpmDependency, ("npm" | "github-release" | "static-bundle") -> true
+                        | "nuget-library", Some NugetReference, ("nuget" | "github-release") -> true
+                        | _ -> false
+
+                    if not bindingMatches then
+                        Error $"resolved project binding '{id}' class/mechanism is incompatible with Conditor's application binding"
+                    else
+                        match packageArtifacts with
+                        | [ artifactName, artifactSha ] ->
+                            Ok(
+                                Some
+                                    { Id = id
+                                      Version = resolvedVersion
+                                      Package = resolvedPackage
+                                      Mechanism = resolvedMechanism
+                                      ArtifactName = artifactName
+                                      ArtifactSha256 = artifactSha
+                                      Required = required }
+                            )
+                        | [] ->
+                            Error $"resolved project binding '{id}' has no digest-verified package artifact"
+                        | _ ->
+                            Error $"resolved project binding '{id}' has more than one package artifact; binding is ambiguous"
+            | _, Some state, _, _, _ when state <> "active" ->
+                Error $"resolved project binding '{id}' is {state}; normal project binding accepts only active releases"
+            | _ ->
+                Error $"resolved project binding '{id}' is missing required release/package facts"
+
+    let private verifiedRoot
+        (expectedRuntimeIdentifier: string)
+        (expectedSha256: string)
+        (bytes: byte array)
+        : Result<JsonDocument * string, string> =
+        let expected = normalizeSha256 expectedSha256
+
+        if not (isSha256 expected) then
+            Error "resolved release set requires an expected 64-character lowercase SHA-256"
+        else
+            let actual = sha256Bytes bytes
+
+            if actual <> expected then
+                Error $"resolved release set digest mismatch: expected sha256:{expected}, observed sha256:{actual}"
+            else
+                try
+                    let document = JsonDocument.Parse bytes
+                    let root = document.RootElement
+
+                    if str "schema" root <> Some "echelon.resolved-release-set/v1" then
+                        document.Dispose()
+                        Error "resolved release set must declare schema echelon.resolved-release-set/v1"
+                    elif str "platform" root <> Some expectedRuntimeIdentifier then
+                        let observed = str "platform" root |> Option.defaultValue "<missing>"
+                        document.Dispose()
+                        Error $"resolved release set targets {observed}, but this host is {expectedRuntimeIdentifier}"
+                    else
+                        Ok(document, actual)
+                with :? JsonException as ex ->
+                    Error $"resolved release set is not valid JSON: {ex.Message}"
+
+    let overlayProjectBindings
+        (expectedRuntimeIdentifier: string)
+        (path: string)
+        (expectedSha256: string)
+        (manifestJson: string)
+        : Result<string, string> =
+        if not (File.Exists path) then
+            Error $"resolved release set not found: {path}"
+        else
+            verifiedRoot expectedRuntimeIdentifier expectedSha256 (File.ReadAllBytes path)
+            |> Result.bind (fun (document, actualSha) ->
+                use resolvedDocument = document
+                let root = resolvedDocument.RootElement
+
+                let profileRef = tryProperty "profile" root
+                let catalogRef = tryProperty "catalogSnapshot" root
+
+                match profileRef, catalogRef with
+                | Some profile, Some catalog ->
+                    match str "id" profile, str "version" profile, str "sha256" profile, str "sha256" catalog with
+                    | Some profileId, Some profileVersion, Some profileSha, Some catalogSha
+                        when isSha256 profileSha && isSha256 catalogSha ->
+
+                        let bindingResult =
+                            objects "components" root
+                            |> List.map parseProjectBinding
+                            |> List.fold
+                                (fun state item ->
+                                    state
+                                    |> Result.bind (fun values ->
+                                        item
+                                        |> Result.map (function
+                                            | Some value -> value :: values
+                                            | None -> values)))
+                                (Ok [])
+                            |> Result.map List.rev
+
+                        bindingResult
+                        |> Result.bind (fun bindings ->
+                            try
+                                let node =
+                                    JsonNode.Parse(manifestJson)
+                                    |> Option.ofObj
+                                    |> Option.defaultWith (fun () -> invalidOp "manifest JSON parsed to null")
+                                let manifestRoot = node.AsObject()
+
+                                let components =
+                                    match manifestRoot["components"] with
+                                    | :? JsonArray as values -> values
+                                    | _ -> invalidOp "manifest components must be an array"
+
+                                let componentObjects =
+                                    components
+                                    |> Seq.choose (fun item ->
+                                        match item with
+                                        | :? JsonObject as value -> Some value
+                                        | _ -> None)
+                                    |> Seq.toList
+
+                                let errors = ResizeArray<string>()
+
+                                for binding in bindings do
+                                    let matching =
+                                        componentObjects
+                                        |> List.filter (fun componentNode ->
+                                            match componentNode["id"] with
+                                            | null -> false
+                                            | value -> value.GetValue<string>().Equals(binding.Id, StringComparison.OrdinalIgnoreCase))
+
+                                    match matching with
+                                    | [] when binding.Required ->
+                                        errors.Add $"Registry profile requires project binding '{binding.Id}', but the selected Conditor preset does not declare it."
+                                    | [] -> ()
+                                    | [ componentNode ] ->
+                                        componentNode["version"] <- JsonValue.Create binding.Version
+
+                                        let artifact = JsonObject()
+                                        artifact["package"] <- JsonValue.Create binding.Package
+                                        artifact["mechanism"] <- JsonValue.Create binding.Mechanism
+                                        artifact["name"] <- JsonValue.Create binding.ArtifactName
+                                        artifact["sha256"] <- JsonValue.Create binding.ArtifactSha256
+                                        componentNode["resolvedArtifact"] <- artifact
+                                    | _ ->
+                                        errors.Add $"Conditor manifest declares project binding '{binding.Id}' more than once."
+
+                                if errors.Count > 0 then
+                                    Error(String.Join(Environment.NewLine, errors))
+                                else
+                                    let resolution = JsonObject()
+                                    resolution["schema"] <- JsonValue.Create "echelon.resolved-release-set/v1"
+                                    resolution["sha256"] <- JsonValue.Create actualSha
+                                    resolution["profileId"] <- JsonValue.Create profileId
+                                    resolution["profileVersion"] <- JsonValue.Create profileVersion
+                                    resolution["profileSha256"] <- JsonValue.Create profileSha
+                                    resolution["catalogSha256"] <- JsonValue.Create catalogSha
+                                    resolution["platform"] <- JsonValue.Create expectedRuntimeIdentifier
+                                    manifestRoot["registryResolution"] <- resolution
+
+                                    let options = JsonSerializerOptions(WriteIndented = true, IndentSize = 2)
+                                    Ok(manifestRoot.ToJsonString(options) + Environment.NewLine)
+                            with
+                            | :? JsonException as ex ->
+                                Error $"Conditor manifest is not valid JSON: {ex.Message}"
+                            | ex ->
+                                Error $"Unable to apply Registry project bindings: {ex.Message}")
+                    | _ ->
+                        Error "resolved release set profile/catalog identity is incomplete or has an invalid SHA-256"
+                | _ ->
+                    Error "resolved release set needs profile and catalogSnapshot")
 
     let loadFile (expectedRuntimeIdentifier: string) (path: string) (expectedSha256: string) =
         if not (File.Exists path) then
