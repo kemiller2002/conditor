@@ -51,11 +51,12 @@ module Scaffolding =
                     binding, definition.Package, version)))
 
     [<Literal>]
-    let private Folio030Commit = "273b18f5b23db15cddd173c05af5d1a8484fc4cf"
+    let private Folio030Release =
+        "https://github.com/kemiller2002/folio/releases/download/v0.3.0/echelon-foundry-print-components-0.3.0.tgz"
 
     let private dependencySpecifier package version =
         if package = "@echelon-foundry/print-components" && version = "0.3.0" then
-            $"github:kemiller2002/folio#{Folio030Commit}"
+            Folio030Release
         else
             version
 
