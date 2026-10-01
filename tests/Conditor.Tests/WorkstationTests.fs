@@ -214,8 +214,8 @@ let run (check: string -> bool -> unit) =
 
     check
         "Registry workstation adapter accepts native repository-lifecycle tools"
-        (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) lifecyclePath (fileSha256 lifecyclePath)
-         |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id))
+        ((ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) lifecyclePath (fileSha256 lifecyclePath)
+          |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id)))
          = Ok [ "gamma" ])
 
     let projectBindingText =
