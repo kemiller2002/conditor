@@ -6,6 +6,7 @@ open System.Net.Http
 open System.Security.Cryptography
 open System.Text.Json
 open System.Text.Json.Nodes
+open Conditor.Core
 
 type OfflineBundleSummary =
     { Root: string
@@ -16,8 +17,11 @@ type OfflineBundleSummary =
       ProfileId: string
       ProfileVersion: string
       ArtifactCount: int
+      SourceFileCount: int
+      ProjectManifestPath: string option
       NativeMirror: string
-      PackageMirror: string }
+      PackageMirror: string
+      SourceMirror: string }
 
 module OfflineBundle =
     let private tryProperty (name: string) (element: JsonElement) =
@@ -130,6 +134,19 @@ module OfflineBundle =
           Sha256: string
           Bytes: byte array
           Artifacts: ParsedArtifact list }
+
+
+    type private BundledSourceFile =
+        { Repository: string
+          Commit: string
+          Entrypoint: string
+          Sha256: string
+          RelativePath: string }
+
+    type private BundledProject =
+        { ManifestRelativePath: string
+          ManifestSha256: string
+          SourceFiles: BundledSourceFile list }
 
     let private parseResolvedSet (path: string) (expectedSha256: string) =
         if not (File.Exists path) then
