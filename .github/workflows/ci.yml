@@ -43,7 +43,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/conditor-indy-plan"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --preset indy-init --target "$RUNNER_TEMP/conditor-indy-plan"
 
-  upgrade-rehearsal-smoke:
+  host-tool-upgrade-boundary:
     if: github.event_name == 'push'
     needs: build-test
     runs-on: ubuntu-latest
@@ -54,25 +54,30 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
-      - name: Establish older Praxis lifecycle version
+      - name: Install exact native Echelon host tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/praxis/main/scripts/install-native.sh | sh -s -- --version 3.6.0
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version 1.4.0
+          echo "$HOME/.echelon/bin" >> "$GITHUB_PATH"
+          "$HOME/.echelon/bin/praxis" --version
+          "$HOME/.echelon/bin/ordo" --version
+      - name: Establish current native lifecycle declaration
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-upgrade"
-          cp examples/upgrade-rehearsal.conditor.json "$RUNNER_TEMP/conditor-upgrade/conditor.json"
+          cp examples/current-lifecycle-upgrade-rehearsal.conditor.json "$RUNNER_TEMP/conditor-upgrade/conditor.json"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-upgrade"
-          grep -F '"installedVersion": "3.1.3"' "$RUNNER_TEMP/conditor-upgrade/.echelon/ros.json"
-      - name: Declare Praxis lifecycle upgrade
+      - name: Refuse repository-only host-tool version change
+        shell: bash
         run: |
-          sed -i 's/"version": "3.1.3"/"version": "3.1.4"/' "$RUNNER_TEMP/conditor-upgrade/conditor.json"
-      - name: Preview declared lifecycle upgrade without mutation
-        run: |
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- upgrade --check --target "$RUNNER_TEMP/conditor-upgrade"
-          grep -F '"installedVersion": "3.1.3"' "$RUNNER_TEMP/conditor-upgrade/.echelon/ros.json"
-      - name: Upgrade declared lifecycle version
-        run: |
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- upgrade --target "$RUNNER_TEMP/conditor-upgrade"
-          grep -F '"installedVersion": "3.1.4"' "$RUNNER_TEMP/conditor-upgrade/.echelon/ros.json"
-          grep -F '"version": "3.1.4"' "$RUNNER_TEMP/conditor-upgrade/.conditor/lock.json"
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-upgrade"
+          set -euo pipefail
+          sed -i 's/"version": "3.6.0"/"version": "3.1.4"/' "$RUNNER_TEMP/conditor-upgrade/conditor.json"
+          if dotnet run --project src/Conditor.Cli --configuration Release --no-build -- upgrade --check --target "$RUNNER_TEMP/conditor-upgrade" >"$RUNNER_TEMP/host-upgrade.txt" 2>&1; then
+            echo "repository-only Praxis host-tool downgrade unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -F "native host tool" "$RUNNER_TEMP/host-upgrade.txt"
 
   current-lifecycle-qualification:
     if: github.event_name == 'push'
@@ -85,13 +90,22 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
-      - name: Qualify current installable lifecycle releases
+      - name: Install exact native Echelon host tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/praxis/main/scripts/install-native.sh | sh -s -- --version 3.6.0
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version 1.4.0
+          echo "$HOME/.echelon/bin" >> "$GITHUB_PATH"
+          "$HOME/.echelon/bin/praxis" --version
+          "$HOME/.echelon/bin/ordo" --version
+      - name: Qualify current native lifecycle releases
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-current"
           cp examples/current-lifecycle-upgrade-rehearsal.conditor.json "$RUNNER_TEMP/conditor-current/conditor.json"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- init --target "$RUNNER_TEMP/conditor-current"
-          grep -F '"installedVersion": "3.1.4"' "$RUNNER_TEMP/conditor-current/.echelon/ros.json"
-          grep -F '"installedVersion": "1.3.0"' "$RUNNER_TEMP/conditor-current/.echelon/sde.json"
+          "$HOME/.echelon/bin/praxis" --version | grep -F "3.6.0"
+          "$HOME/.echelon/bin/ordo" --version | grep -F "1.4.0"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- status --target "$RUNNER_TEMP/conditor-current"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- doctor --json --target "$RUNNER_TEMP/conditor-current" > "$RUNNER_TEMP/current-lifecycle-doctor.json"
           grep -F '"healthy": true' "$RUNNER_TEMP/current-lifecycle-doctor.json"
@@ -107,6 +121,15 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install exact native Echelon host tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/praxis/main/scripts/install-native.sh | sh -s -- --version 3.6.0
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version 1.4.0
+          echo "$HOME/.echelon/bin" >> "$GITHUB_PATH"
+          "$HOME/.echelon/bin/praxis" --version
+          "$HOME/.echelon/bin/ordo" --version
       - name: Create empty target
         run: mkdir -p "$RUNNER_TEMP/conditor-empty"
       - name: Initialize empty target from embedded preset
@@ -453,6 +476,15 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install exact native Echelon host tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/praxis/main/scripts/install-native.sh | sh -s -- --version 3.6.0
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version 1.4.0
+          echo "$HOME/.echelon/bin" >> "$GITHUB_PATH"
+          "$HOME/.echelon/bin/praxis" --version
+          "$HOME/.echelon/bin/ordo" --version
       - name: Run sacrificial factory rehearsal
         run: bash scripts/rehearse-clean-room.sh "$RUNNER_TEMP/evidence-triage-rehearsal"
       - name: Inspect rehearsal output
