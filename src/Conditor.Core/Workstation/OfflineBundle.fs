@@ -381,7 +381,8 @@ module OfflineBundle =
                                   PackageMirror = Path.Combine(root, "packages") }
                     | _ ->
                         Error "Offline bundle manifest is missing profile/platform/resolved-set identity."
-        with :? JsonException as ex ->
+        with
+        | :? JsonException as ex ->
             Error $"Offline bundle manifest is not valid JSON: {ex.Message}"
-        with ex ->
+        | ex ->
             Error $"Unable to verify offline bundle: {ex.Message}"
