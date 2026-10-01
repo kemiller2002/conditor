@@ -212,11 +212,13 @@ let run (check: string -> bool -> unit) =
     let lifecyclePath = Path.Combine(registryMirror, "repository-lifecycle.resolved.json")
     File.WriteAllText(lifecyclePath, lifecycleText)
 
+    let lifecycleResult =
+        ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) lifecyclePath (fileSha256 lifecyclePath)
+        |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id))
+
     check
         "Registry workstation adapter accepts native repository-lifecycle tools"
-        ((ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) lifecyclePath (fileSha256 lifecyclePath)
-          |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id)))
-         = Ok [ "gamma" ])
+        (lifecycleResult = Ok [ "gamma" ])
 
     let projectBindingText =
         File.ReadAllText(registrySet)
