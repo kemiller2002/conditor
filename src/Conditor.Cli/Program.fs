@@ -13,8 +13,8 @@ let private usage () =
     Console.WriteLine "  conditor presets"
     Console.WriteLine "  conditor components [--json]"
     Console.WriteLine "  conditor compatibility [--json]"
-    Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor plan   [--preset NAME [--resolved-set PATH --resolved-set-sha256 SHA256] | --manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor init   [--preset NAME [--resolved-set PATH --resolved-set-sha256 SHA256] | --manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor doctor [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
@@ -22,7 +22,7 @@ let private usage () =
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
+    Console.WriteLine "  conditor start  [--preset NAME [--resolved-set PATH --resolved-set-sha256 SHA256] | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
@@ -45,6 +45,25 @@ let private writeErrors (errors: string list) =
 let private resolveManifestSelection command target (args: string array) =
     let presetName = optionValue "--preset" args
     let manifestPath = optionValue "--manifest" args
+    let resolvedSetPath = optionValue "--resolved-set" args
+    let resolvedSetSha = optionValue "--resolved-set-sha256" args
+
+    let bindResolvedPreset preset =
+        match resolvedSetPath, resolvedSetSha with
+        | None, None -> Ok preset
+        | Some _, None
+        | None, Some _ ->
+            Error [ "--resolved-set and --resolved-set-sha256 must be supplied together." ]
+        | Some path, Some digest ->
+            ResolvedReleaseSet.loadFile (Platform.runtimeIdentifier ()) (Path.GetFullPath path) digest
+            |> Result.bind (fun resolved ->
+                if not (String.Equals(resolved.ProfileId, preset.Id, StringComparison.Ordinal)) then
+                    Error
+                        [ $"resolved profile '{resolved.ProfileId}' does not match preset '{preset.Id}'"
+                          "Conditor will not apply one profile's release set to another preset." ]
+                else
+                    ResolvedReleaseSet.bindPresetJson resolved preset.Content)
+            |> Result.bind (Presets.materialize preset.Id)
 
     match presetName, manifestPath with
     | Some _, Some _ ->
@@ -54,13 +73,18 @@ let private resolveManifestSelection command target (args: string array) =
             Error [ $"--preset is supported by plan, init, and start; '{command}' uses the repository's conditor.json." ]
         else
             Presets.resolve presetName
+            |> Result.bind bindResolvedPreset
             |> Result.map (fun preset ->
                 { ManifestPath = preset.ManifestPath
                   Preset = Some preset })
+    | None, Some manifestPath when resolvedSetPath.IsSome || resolvedSetSha.IsSome ->
+        Error [ "--resolved-set currently requires --preset so Conditor can persist the exact Registry selection into the governed project manifest." ]
     | None, Some manifestPath ->
         Ok
             { ManifestPath = Path.GetFullPath manifestPath
               Preset = None }
+    | None, None when resolvedSetPath.IsSome || resolvedSetSha.IsSome ->
+        Error [ "--resolved-set requires --preset for initial project establishment." ]
     | None, None ->
         Ok
             { ManifestPath = Path.Combine(target, "conditor.json") |> Path.GetFullPath
