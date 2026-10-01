@@ -212,6 +212,21 @@ let run (check: string -> bool -> unit) =
         "raw native artifact shim reports its selected version"
         ((probe (Path.Combine(rawHome, ".local", "bin", "rawtool")) [ "--version" ]).StandardOutput.Contains "4.0.0")
 
+    let offlineMissingHome = temp "registry-offline-missing-home"
+    let offlineEmptyMirror = temp "registry-offline-empty-mirror"
+    let offlineMissingCtx =
+        { context offlineMissingHome offlineEmptyMirror None with Offline = true }
+    let offlineMissingPlan =
+        Engine.plan offlineMissingCtx registryProfile (Platform.runtimeIdentifier ()) [] []
+
+    match Engine.apply offlineMissingCtx probe offlineMissingPlan offlineMissingPlan.Digest true with
+    | Error error ->
+        check "offline workstation refuses network fallback when mirror artifact is absent" (error.Contains "Offline workstation mode")
+    | Ok result ->
+        check
+            "offline workstation refuses network fallback when mirror artifact is absent"
+            (result.Failed |> Option.exists (fun (_, detail) -> detail.Contains "Offline workstation mode"))
+
     let wrongPlatformText =
         File.ReadAllText(registrySet)
             .Replace($"\"platform\": \"{Platform.runtimeIdentifier ()}\"", "\"platform\": \"unsupported-x64\"")
