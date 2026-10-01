@@ -127,6 +127,94 @@ let private resolvedSetFile (dir: string) (id: string) (version: string) (assetN
     File.WriteAllText(path, json)
     path, fileSha256 path
 
+let private mixedResolvedSetFile (dir: string) =
+    let rid = Platform.runtimeIdentifier ()
+    let path = Path.Combine(dir, "mixed.resolved.json")
+    let sha ch = String.replicate 64 ch
+
+    let json =
+        $"""{
+          "schema": "echelon.resolved-release-set/v1",
+          "profile": {
+            "id": "indy-init",
+            "version": "0.1.0",
+            "sha256": "{{sha "a"}}"
+          },
+          "platform": "{{rid}}",
+          "resolver": {
+            "name": "test",
+            "version": "1.0.0"
+          },
+          "catalogSnapshot": {
+            "sha256": "{{sha "b"}}"
+          },
+          "components": [
+            {
+              "systemId": "praxis",
+              "role": "host-tool",
+              "required": true,
+              "version": "3.6.0",
+              "repository": "kemiller2002/praxis",
+              "tag": "v3.6.0",
+              "commit": "1111111111111111111111111111111111111111",
+              "releaseStage": "stable",
+              "lifecycleState": "active",
+              "distributionClass": "self-contained-native-cli",
+              "executable": "praxis",
+              "releaseManifest": {
+                "schema": "echelon.release/v2",
+                "sha256": "{{sha "c"}}"
+              },
+              "distribution": {
+                "mechanism": "github-release",
+                "package": null,
+                "url": "https://github.com/kemiller2002/praxis/releases/tag/v3.6.0"
+              },
+              "artifacts": [
+                {
+                  "name": "praxis-{{rid}}.tar.gz",
+                  "purpose": "executable",
+                  "platform": "{{rid}}",
+                  "sha256": "{{sha "d"}}"
+                }
+              ]
+            },
+            {
+              "systemId": "aegis",
+              "role": "project-binding",
+              "required": true,
+              "version": "1.0.0",
+              "repository": "kemiller2002/aegis",
+              "tag": "nuget:EchelonFoundry.Aegis.Core@1.0.0",
+              "commit": "2222222222222222222222222222222222222222",
+              "releaseStage": "stable",
+              "lifecycleState": "active",
+              "distributionClass": "nuget-library",
+              "executable": null,
+              "releaseManifest": {
+                "schema": "echelon.release/v2",
+                "sha256": "{{sha "e"}}"
+              },
+              "distribution": {
+                "mechanism": "nuget",
+                "package": "EchelonFoundry.Aegis.Core",
+                "url": "https://api.nuget.org/v3-flatcontainer/echelonfoundry.aegis.core/1.0.0/echelonfoundry.aegis.core.1.0.0.nupkg"
+              },
+              "artifacts": [
+                {
+                  "name": "EchelonFoundry.Aegis.Core.1.0.0.nupkg",
+                  "purpose": "package",
+                  "platform": null,
+                  "sha256": "{{sha "f"}}"
+                }
+              ]
+            }
+          ]
+        }"""
+
+    File.WriteAllText(path, json)
+    path, fileSha256 path
+
 let private setup () =
     let home = temp "home"
     let mirror = temp "mirror"
@@ -220,17 +308,35 @@ let run (check: string -> bool -> unit) =
         "Registry workstation adapter accepts native repository-lifecycle tools"
         (lifecycleResult = Ok [ "gamma" ])
 
-    let projectBindingText =
-        File.ReadAllText(registrySet)
-            .Replace("\"role\": \"host-tool\"", "\"role\": \"project-binding\"")
-            .Replace("\"distributionClass\": \"self-contained-native-cli\"", "\"distributionClass\": \"nuget-library\"")
+    let mixedSet, mixedSetSha = mixedResolvedSetFile registryMirror
 
-    let projectBindingPath = Path.Combine(registryMirror, "project-binding.resolved.json")
-    File.WriteAllText(projectBindingPath, projectBindingText)
+    let mixedWorkstation =
+        ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) mixedSet mixedSetSha
 
     check
-        "Registry workstation adapter refuses project-bound libraries instead of guessing an install target"
-        (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) projectBindingPath (fileSha256 projectBindingPath) |> Result.isError)
+        "mixed Registry set installs only native workstation/lifecycle components"
+        (mixedWorkstation
+         |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id, item.Version))
+         = Ok [ "praxis", "3.6.0" ])
+
+    let mixedResolved =
+        match ResolvedReleaseSet.loadFile (Platform.runtimeIdentifier ()) mixedSet mixedSetSha with
+        | Ok value -> value
+        | Error errors -> failwith (String.concat "; " errors)
+
+    let boundPreset =
+        ResolvedReleaseSet.bindPresetJson
+            mixedResolved
+            """{"schemaVersion":1,"name":"mixed","components":[{"id":"praxis"},{"id":"aegis"}]}"""
+
+    check
+        "mixed Registry set injects exact project versions and resolution identity"
+        (boundPreset
+         |> Result.exists (fun json ->
+             json.Contains("\"version\": \"3.6.0\"")
+             && json.Contains("\"version\": \"1.0.0\"")
+             && json.Contains("\"schema\": \"echelon.resolution/v1\"")
+             && json.Contains(mixedSetSha)))
 
     let revokedText =
         File.ReadAllText(registrySet)
