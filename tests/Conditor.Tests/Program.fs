@@ -39,10 +39,16 @@ withManifest
             | Ok plan ->
                 check "init emits install and verify per lifecycle component" (plan.Actions.Length = 4)
                 check "explicit version is preserved" (plan.Components[0].Version = "3.1.4")
-                check "default version resolves" (plan.Components[1].Version = "1.3.0")
+                check "default version resolves" (plan.Components[1].Version = "1.4.0")
                 check
-                    "registry package source is immutable"
-                    (plan.Components[0].SourceReference = Some "@echelon-foundry/repository-operating-system@3.1.4"))
+                    "native host source identity is explicit"
+                    (plan.Components[0].SourceReference = Some "host:praxis@3.1.4")
+
+                match plan.Actions[0].Execution with
+                | ExternalProcess(executable, arguments) ->
+                    check "native Praxis lifecycle executes directly" (executable = "praxis" && arguments = [ "init" ])
+                | _ ->
+                    check "native Praxis lifecycle executes directly" false)
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"communication-engineering","version":"1.0.0"}]}"""
@@ -223,7 +229,7 @@ withTarget
                             "Folio dependency is immutable"
                             (packageJson
                              |> Option.exists (fun text ->
-                                 text.Contains("github:kemiller2002/folio#273b18f5b23db15cddd173c05af5d1a8484fc4cf")))
+                                 text.Contains("https://github.com/kemiller2002/folio/releases/download/v0.3.0/echelon-foundry-print-components-0.3.0.tgz")))
 
                         check
                             "scaffold declares application foundations"
@@ -232,7 +238,7 @@ withTarget
                                  text.Contains("\"aegis\"")
                                  && text.Contains("\"forma\"")
                                  && text.Contains("\"folio\"")
-                                 && text.Contains("273b18f5b23db15cddd173c05af5d1a8484fc4cf")))
+                                 && text.Contains("echelon-foundry-print-components-0.3.0.tgz")))
 
                         check
                             "scaffold configures Aegis"
@@ -1036,13 +1042,14 @@ match ComponentDescriptors.loadAll () with
               "ordo"
               "visual-engineering"
               "communication-engineering"
+              "percepta"
               "limen"
               "forma"
               "folio"
               "aegis"
               "tutela" ]
 
-    check "embedded component descriptor count" (descriptors.Length = 9)
+    check "embedded component descriptor count" (descriptors.Length = 10)
     check "embedded component descriptor ids" (ids = expected)
     check "registry is projected from component descriptors" (Registry.all.Length = descriptors.Length)
 
