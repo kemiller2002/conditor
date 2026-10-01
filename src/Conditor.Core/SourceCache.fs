@@ -66,11 +66,14 @@ module SourceCache =
                     else
                         None
 
+                let schema = stringProperty "schema"
                 let repository = stringProperty "repository"
                 let commit = stringProperty "commit"
                 let entrypoint = sourceEntrypoint source
 
-                if repository <> Some source.Repository || commit <> Some(source.Commit.ToLowerInvariant()) then
+                if schema <> Some "conditor.source-mirror/v1" then
+                    Error [ $"Unsupported offline source mirror schema in {metadataPath}." ]
+                elif repository <> Some source.Repository || commit <> Some(source.Commit.ToLowerInvariant()) then
                     Error
                         [ $"Offline source mirror identity mismatch for {source.Repository}@{source.Commit}." ]
                 elif not (root.TryGetProperty("files", &value)) || value.ValueKind <> JsonValueKind.Object then
