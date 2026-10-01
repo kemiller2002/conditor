@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "percepta",
+  "displayName": "Percepta Repository Lifecycle",
+  "distribution": "host-tool",
+  "package": "percepta-repo",
+  "defaultVersion": "0.1.0",
+  "qualifiedVersions": [
+    "0.1.0"
+  ],
+  "command": "percepta-repo",
+  "initArguments": [
+    "init"
+  ],
+  "verifyArguments": [
+    "verify",
+    "--strict"
+  ],
+  "doctorArguments": [
+    "doctor"
+  ],
+  "upgradeArguments": [
+    "upgrade"
+  ]
+}
