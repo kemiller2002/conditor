@@ -408,6 +408,7 @@ jobs:
             bundle create \
             --resolved-set "$RUNNER_TEMP/indy-init-linux-x64.json" \
             --resolved-set-sha256 3ac237804c546244499619aa88803fd280de6bb3a5daec205ccf730f61be5b40 \
+            --manifest examples/indy-init.conditor.json \
             --output "$RUNNER_TEMP/indy-init-bundle"
 
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
@@ -417,6 +418,9 @@ jobs:
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/limen/echelon-foundry-typescript-wasm-kernel-0.6.2.tgz"
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/forma/echelon-foundry-design-system-0.3.0.tgz"
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/folio/echelon-foundry-print-components-0.3.0.tgz"
+          test -f "$RUNNER_TEMP/indy-init-bundle/project/conditor.json"
+          test -f "$RUNNER_TEMP/indy-init-bundle/sources/kemiller2002_Indy-init/b2c67e5e3bf410a6acf0065f897588aa949a0663/kickoff/indy-init.kickoff.json"
+          test -f "$RUNNER_TEMP/indy-init-bundle/sources/kemiller2002_percepta/9e6307734f5ae03f98155bdd0588fee13d701b50/examples/indy-init/application.json"
 
       - name: Plan frozen workstation from bundled resolved set
         shell: bash
@@ -464,6 +468,37 @@ jobs:
           test ! -e "$home/.local/bin/limen"
           test ! -e "$home/.local/bin/forma"
           test ! -e "$home/.local/bin/folio"
+
+      - name: Initialize frozen Indy Init project from bundle sources only
+        shell: bash
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/indy-init-home"
+          target="$RUNNER_TEMP/indy-init-project"
+          cache="$RUNNER_TEMP/indy-init-empty-source-cache"
+          mkdir -p "$target" "$cache"
+          export PATH="$home/.local/bin:$PATH"
+          export CONDITOR_CACHE_DIR="$cache"
+
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            init \
+            --manifest "$RUNNER_TEMP/indy-init-bundle/project/conditor.json" \
+            --target "$target" \
+            --source-mirror "$RUNNER_TEMP/indy-init-bundle/sources" \
+            --offline
+
+          test -f "$target/docs/PRODUCT-REQUIREMENTS.md"
+          test -f "$target/.percepta/application.json"
+          test -f "$target/.percepta/contracts/s25-demo-health.json"
+          test -f "$target/package.json"
+          test -f "$target/.conditor/lock.json"
+
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            verify \
+            --manifest "$RUNNER_TEMP/indy-init-bundle/project/conditor.json" \
+            --target "$target" \
+            --source-mirror "$RUNNER_TEMP/indy-init-bundle/sources" \
+            --offline
 
   factory-rehearsal-smoke:
     if: github.event_name == 'push'
