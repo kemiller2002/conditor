@@ -20,7 +20,7 @@ module Compatibility =
               "percepta", "Native Percepta repository lifecycle 0.1.0 is the frozen Indy Init repository-lifecycle baseline."
               "visual-engineering", "Qualified lifecycle release."
               "communication-engineering", "Pinned immutable-source lifecycle release."
-              "limen", "Qualified lifecycle and application binding used by the current web scaffold."
+              "limen", "Qualified project-bound WASM/browser package used by the current web scaffold; Conditor does not run a package-manager lifecycle for it."
               "forma", "Qualified application binding."
               "folio", "Qualified application binding."
               "aegis", "Qualified NuGet application binding."
