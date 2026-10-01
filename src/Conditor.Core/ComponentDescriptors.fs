@@ -61,6 +61,7 @@ module ComponentDescriptors =
     let private parseDistribution value =
         match value with
         | "lifecycle-npm" -> Ok LifecycleNpm
+        | "native-lifecycle" -> Ok NativeLifecycle
         | "npm" -> Ok NpmPackage
         | "nuget" -> Ok NugetPackage
         | other -> Error $"Unknown component distribution '{other}'."
@@ -192,6 +193,12 @@ module ComponentDescriptors =
 
                 if command.IsNone then
                     errors.Add $"Lifecycle component '{id}' must declare command."
+            | NativeLifecycle ->
+                if lifecycleSource.IsSome then
+                    errors.Add $"Native lifecycle component '{id}' must not declare lifecycleSource."
+
+                if command.IsNone then
+                    errors.Add $"Native lifecycle component '{id}' must declare command."
             | NpmPackage ->
                 if binding <> Some NpmDependency then
                     errors.Add $"Npm component '{id}' must declare applicationBinding 'npm'."
