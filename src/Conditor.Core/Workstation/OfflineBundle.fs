@@ -377,7 +377,7 @@ module OfflineBundle =
         node["path"] <- JsonValue.Create(relativePath.Replace('\\', '/'))
         node
 
-    let rec create (resolvedSetPath: string) (expectedResolvedSetSha256: string) (outputRoot: string) =
+    let rec create (resolvedSetPath: string) (expectedResolvedSetSha256: string) (outputRoot: string) (projectManifestPath: string option) =
         parseResolvedSet resolvedSetPath expectedResolvedSetSha256
         |> Result.bind (fun resolved ->
             try
@@ -419,6 +419,11 @@ module OfflineBundle =
                         let packagePath = Path.Combine(staging, "packages", artifact.SystemId, artifact.Name)
                         copyAtomic artifactPath packagePath
 
+                let bundledProject =
+                    match materializeProjectSources staging projectManifestPath with
+                    | Ok value -> value
+                    | Error error -> raise (InvalidDataException error)
+
                 let manifest = JsonObject()
                 manifest["schema"] <- JsonValue.Create "conditor.offline-bundle/v1"
                 manifest["profileId"] <- JsonValue.Create resolved.ProfileId
@@ -427,6 +432,21 @@ module OfflineBundle =
                 manifest["resolvedSetSha256"] <- JsonValue.Create resolved.Sha256
                 manifest["resolvedSetPath"] <- JsonValue.Create "resolved-set.json"
                 manifest["artifacts"] <- manifestArtifacts
+
+                match bundledProject with
+                | None ->
+                    manifest["projectManifest"] <- null
+                    manifest["sources"] <- JsonArray()
+                | Some project ->
+                    let projectNode = JsonObject()
+                    projectNode["path"] <- JsonValue.Create(project.ManifestRelativePath.Replace('\\', '/'))
+                    projectNode["sha256"] <- JsonValue.Create project.ManifestSha256
+                    manifest["projectManifest"] <- projectNode
+
+                    let sourceNodes = JsonArray()
+                    project.SourceFiles
+                    |> List.iter (fun sourceFile -> sourceNodes.Add(sourceManifestEntry sourceFile))
+                    manifest["sources"] <- sourceNodes
 
                 let manifestPath = Path.Combine(staging, "bundle.json")
                 File.WriteAllText(
@@ -447,7 +467,11 @@ module OfflineBundle =
                             ManifestPath = Path.Combine(root, "bundle.json")
                             ResolvedSetPath = Path.Combine(root, "resolved-set.json")
                             NativeMirror = Path.Combine(root, "mirror")
-                            PackageMirror = Path.Combine(root, "packages") }
+                            PackageMirror = Path.Combine(root, "packages")
+                            SourceMirror = Path.Combine(root, "sources")
+                            ProjectManifestPath =
+                                bundledProject
+                                |> Option.map (fun _ -> Path.Combine(root, "project", "conditor.json")) }
             with ex ->
                 Error $"Unable to create offline bundle: {ex.Message}")
 
