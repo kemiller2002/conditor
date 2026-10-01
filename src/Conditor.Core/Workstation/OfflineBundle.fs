@@ -526,7 +526,7 @@ module OfflineBundle =
                         let mutable projectManifestPath: string option = None
 
                         match tryProperty "projectManifest" manifest with
-                        | None
+                        | None -> ()
                         | Some project when project.ValueKind = JsonValueKind.Null -> ()
                         | Some project when project.ValueKind = JsonValueKind.Object ->
                             match str "path" project, str "sha256" project with
