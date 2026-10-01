@@ -8,14 +8,17 @@ module Planner =
         if OperatingSystem.IsWindows() then "npx.cmd" else "npx"
 
     let private sourceReference version (definition: ComponentDefinition) =
-        match definition.LifecycleSource with
-        | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
-        | Some(GitHubSource source) when version = definition.DefaultVersion ->
-            Ok(SourceCache.sourceReference source)
-        | Some(GitHubSource _) ->
-            Error
-                $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
-        | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
+        match definition.Distribution with
+        | HostTool -> Ok $"host:{definition.Id}@{version}"
+        | _ ->
+            match definition.LifecycleSource with
+            | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
+            | Some(GitHubSource source) when version = definition.DefaultVersion ->
+                Ok(SourceCache.sourceReference source)
+            | Some(GitHubSource _) ->
+                Error
+                    $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
+            | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
 
     let private bindingReference version (definition: ComponentDefinition) =
         match definition.ApplicationBinding with
@@ -34,19 +37,23 @@ module Planner =
 
         let resolvedArguments = replaceTarget target arguments
 
-        match definition.LifecycleSource with
-        | Some RegistryPackage ->
-            ExternalProcess(
-                npxExecutable (),
-                [ "--yes"
-                  $"--package={definition.Package}@{version}"
-                  command ]
-                @ resolvedArguments
-            )
-        | Some(GitHubSource source) ->
-            GitHubSourceProcess(source, resolvedArguments)
-        | None ->
-            invalidOp $"Lifecycle component '{definition.Id}' has no distribution source."
+        match definition.Distribution with
+        | HostTool ->
+            ExternalProcess(command, resolvedArguments)
+        | _ ->
+            match definition.LifecycleSource with
+            | Some RegistryPackage ->
+                ExternalProcess(
+                    npxExecutable (),
+                    [ "--yes"
+                      $"--package={definition.Package}@{version}"
+                      command ]
+                    @ resolvedArguments
+                )
+            | Some(GitHubSource source) ->
+                GitHubSourceProcess(source, resolvedArguments)
+            | None ->
+                invalidOp $"Lifecycle component '{definition.Id}' has no distribution source."
 
     let private actionKind operation phase =
         match operation, phase with
@@ -169,6 +176,33 @@ module Planner =
                 let version = request.Version |> Option.defaultValue definition.DefaultVersion
 
                 match definition.Distribution with
+                | HostTool ->
+                    match sourceReference version definition with
+                    | Error error ->
+                        if request.Required then
+                            errors.Add error
+                    | Ok resolvedSource ->
+                        resolved.Add
+                            { Id = definition.Id
+                              Version = version
+                              Distribution = definition.Distribution
+                              Package = definition.Package
+                              SourceReference = Some resolvedSource }
+
+                        match operation with
+                        | Init ->
+                            addLifecycleAction request version definition "install" definition.InitArguments
+                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                        | Verify ->
+                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                        | Doctor ->
+                            addLifecycleAction request version definition "doctor" definition.DoctorArguments
+                        | Upgrade ->
+                            addLifecycleAction request version definition "upgrade" definition.UpgradeArguments
+                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+
+                        if definition.Id = "praxis" && manifest.Scaffold.IsSome then
+                            praxisReconciliation <- Some(request, version, definition)
                 | LifecycleNpm ->
                     match sourceReference version definition with
                     | Error error ->

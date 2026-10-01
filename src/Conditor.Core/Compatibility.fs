@@ -15,8 +15,9 @@ module Compatibility =
 
     let private notes =
         Map.ofList
-            [ "praxis", "3.1.4 is the current Conditor default; 3.1.3 is retained as the proven lifecycle-upgrade source fixture."
-              "ordo", "Qualified with the current Conditor greenfield Ordo baseline."
+            [ "praxis", "Native Praxis 3.6.0 is the frozen Indy Init host-tool baseline; 3.1.x remains qualified only for existing compatibility fixtures."
+              "ordo", "Native Ordo 1.4.0 is the frozen Indy Init host-tool baseline."
+              "percepta", "Native Percepta repository lifecycle 0.1.0 is the frozen Indy Init repository-lifecycle baseline."
               "visual-engineering", "Qualified lifecycle release."
               "communication-engineering", "Pinned immutable-source lifecycle release."
               "limen", "Qualified lifecycle and application binding used by the current web scaffold."

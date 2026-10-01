@@ -4,9 +4,10 @@
   "displayName": "Limen",
   "distribution": "lifecycle-npm",
   "package": "@echelon-foundry/typescript-wasm-kernel",
-  "defaultVersion": "0.6.1",
+  "defaultVersion": "0.6.2",
   "qualifiedVersions": [
-    "0.6.1"
+    "0.6.1",
+    "0.6.2"
   ],
   "lifecycleSource": {
     "kind": "registry"

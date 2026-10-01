@@ -37,6 +37,7 @@
           },
           "distribution": {
             "enum": [
+              "host-tool",
               "lifecycle-npm",
               "npm",
               "nuget"

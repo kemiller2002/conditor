@@ -1,15 +1,14 @@
 {
   "schemaVersion": 1,
-  "id": "ordo",
-  "displayName": "Ordo / State-Directed Engineering",
+  "id": "percepta",
+  "displayName": "Percepta Repository Lifecycle",
   "distribution": "host-tool",
-  "package": "ordo",
-  "defaultVersion": "1.4.0",
+  "package": "percepta-repo",
+  "defaultVersion": "0.1.0",
   "qualifiedVersions": [
-    "1.3.0",
-    "1.4.0"
+    "0.1.0"
   ],
-  "command": "ordo",
+  "command": "percepta-repo",
   "initArguments": [
     "init"
   ],

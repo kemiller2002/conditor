@@ -79,6 +79,7 @@ module LockFile =
 
     let private distributionText =
         function
+        | HostTool -> "host-tool"
         | LifecycleNpm -> "lifecycle-npm"
         | NpmPackage -> "npm"
         | NugetPackage -> "nuget"

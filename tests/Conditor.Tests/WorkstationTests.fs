@@ -229,8 +229,58 @@ let run (check: string -> bool -> unit) =
     File.WriteAllText(projectBindingPath, projectBindingText)
 
     check
-        "Registry workstation adapter refuses project-bound libraries instead of guessing an install target"
+        "Registry workstation adapter refuses project-bound-only sets instead of guessing an install target"
         (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) projectBindingPath (fileSha256 projectBindingPath) |> Result.isError)
+
+    let mixedText =
+        File.ReadAllText(registrySet)
+            .Replace(
+                "          ]\n        }",
+                """          ,
+            {
+              "systemId": "delta",
+              "role": "project-binding",
+              "required": true,
+              "version": "1.0.0",
+              "repository": "example/delta",
+              "tag": "nuget:Delta@1.0.0",
+              "commit": "2222222222222222222222222222222222222222",
+              "releaseStage": "stable",
+              "lifecycleState": "active",
+              "distributionClass": "nuget-library",
+              "executable": null,
+              "releaseManifest": {
+                "schema": "echelon.release/v2",
+                "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              },
+              "distribution": {
+                "mechanism": "nuget",
+                "package": "Delta",
+                "url": "https://example.invalid/delta.1.0.0.nupkg"
+              },
+              "artifacts": [
+                {
+                  "name": "Delta.1.0.0.nupkg",
+                  "purpose": "package",
+                  "platform": null,
+                  "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+                }
+              ]
+            }
+          ]
+        }"""
+            )
+
+    let mixedPath = Path.Combine(registryMirror, "mixed-environment.resolved.json")
+    File.WriteAllText(mixedPath, mixedText)
+
+    let mixedResult =
+        ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) mixedPath (fileSha256 mixedPath)
+        |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id))
+
+    check
+        "Registry workstation adapter consumes native subset from full environment set"
+        (mixedResult = Ok [ "gamma" ])
 
     let revokedText =
         File.ReadAllText(registrySet)
