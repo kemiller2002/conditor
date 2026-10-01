@@ -541,8 +541,8 @@ module ResolvedReleaseSets =
                                 for binding in bindings do
                                     let matching =
                                         componentObjects
-                                        |> List.filter (fun component ->
-                                            match component["id"] with
+                                        |> List.filter (fun componentNode ->
+                                            match componentNode["id"] with
                                             | null -> false
                                             | value -> value.GetValue<string>().Equals(binding.Id, StringComparison.OrdinalIgnoreCase))
 
@@ -550,15 +550,15 @@ module ResolvedReleaseSets =
                                     | [] when binding.Required ->
                                         errors.Add $"Registry profile requires project binding '{binding.Id}', but the selected Conditor preset does not declare it."
                                     | [] -> ()
-                                    | [ component ] ->
-                                        component["version"] <- JsonValue.Create binding.Version
+                                    | [ componentNode ] ->
+                                        componentNode["version"] <- JsonValue.Create binding.Version
 
                                         let artifact = JsonObject()
                                         artifact["package"] <- JsonValue.Create binding.Package
                                         artifact["mechanism"] <- JsonValue.Create binding.Mechanism
                                         artifact["name"] <- JsonValue.Create binding.ArtifactName
                                         artifact["sha256"] <- JsonValue.Create binding.ArtifactSha256
-                                        component["resolvedArtifact"] <- artifact
+                                        componentNode["resolvedArtifact"] <- artifact
                                     | _ ->
                                         errors.Add $"Conditor manifest declares project binding '{binding.Id}' more than once."
 
