@@ -22,7 +22,7 @@ let withManifest (json: string) (test: string -> unit) =
             File.Delete path
 
 withManifest
-    """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis","version":"3.1.4"},{"id":"ordo"}]}"""
+    """{"schemaVersion":1,"name":"demo","components":[{"id":"praxis","version":"3.6.0"},{"id":"ordo"}]}"""
     (fun path ->
         match Manifest.load path with
         | Error errors ->
@@ -38,11 +38,19 @@ withManifest
                 check $"plan succeeds: {details}" false
             | Ok plan ->
                 check "init emits install and verify per lifecycle component" (plan.Actions.Length = 4)
-                check "explicit version is preserved" (plan.Components[0].Version = "3.1.4")
-                check "default version resolves" (plan.Components[1].Version = "1.3.0")
+                check "explicit version is preserved" (plan.Components[0].Version = "3.6.0")
+                check "default version resolves" (plan.Components[1].Version = "1.4.0")
                 check
-                    "registry package source is immutable"
-                    (plan.Components[0].SourceReference = Some "@echelon-foundry/repository-operating-system@3.1.4"))
+                    "native Praxis source identity is immutable"
+                    (plan.Components[0].SourceReference = Some "native:praxis@3.6.0")
+
+                check
+                    "native lifecycle uses installed commands, not npx"
+                    (plan.Actions
+                     |> List.forall (fun action ->
+                         match action.Execution with
+                         | ExternalProcess(executable, _) -> executable = "praxis" || executable = "ordo"
+                         | _ -> false)))
 
 withManifest
     """{"schemaVersion":1,"name":"demo","components":[{"id":"communication-engineering","version":"1.0.0"}]}"""
@@ -109,23 +117,19 @@ withManifest
 
 
 withManifest
-    """{"schemaVersion":1,"name":"limen-bootstrap","components":[{"id":"limen","version":"0.6.1"}]}"""
+    """{"schemaVersion":1,"name":"limen-binding","components":[{"id":"limen","version":"0.6.2"}]}"""
     (fun path ->
         match Manifest.load path with
         | Error _ ->
-            check "limen bootstrap manifest parses" false
+            check "limen binding manifest parses" false
         | Ok manifest ->
-            match Planner.create "/tmp/limen-bootstrap" Init manifest with
-            | Error _ ->
-                check "limen bootstrap plan succeeds" false
-            | Ok plan ->
-                check "limen init plus verify planned" (plan.Actions.Length = 2)
-
-                match plan.Actions[1].Execution with
-                | ExternalProcess(_, arguments) ->
-                    check "limen bootstrap verification is non-strict" (arguments |> List.contains "--strict" |> not)
-                | _ ->
-                    check "limen bootstrap verification is non-strict" false)
+            match Planner.create "/tmp/limen-binding" Init manifest with
+            | Error errors ->
+                check
+                    "Limen project binding requires an explicit scaffold target"
+                    (errors |> List.exists (fun error -> error.Contains("A scaffold is required")))
+            | Ok _ ->
+                check "Limen is not installed as a lifecycle command" false)
 
 let withTarget test =
     let path = Path.Combine(Path.GetTempPath(), $"conditor-target-{Guid.NewGuid():N}")
@@ -140,7 +144,7 @@ let withTarget test =
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"scaffold-demo","components":[{"id":"limen","version":"0.6.1"},{"id":"forma","version":"0.2.0"},{"id":"folio","version":"0.3.0"},{"id":"aegis","version":"1.0.0"}],"scaffold":{"kind":"fsharp-limen-web","name":"scaffold-demo"}}"""
+            """{"schemaVersion":1,"name":"scaffold-demo","components":[{"id":"limen","version":"0.6.2"},{"id":"forma","version":"0.3.0"},{"id":"folio","version":"0.3.0"},{"id":"aegis","version":"1.0.0"}],"scaffold":{"kind":"fsharp-limen-web","name":"scaffold-demo"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error _ ->
@@ -153,7 +157,13 @@ withTarget
                     | Ok plan ->
                         check "scaffold application bindings resolve" (plan.Components.Length = 4)
                         check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 12)
-                        check "scaffold ends in strict Limen readiness" (plan.Actions |> List.exists (fun action -> action.Kind = ReadinessVerify))
+                        check
+                            "scaffold does not execute Limen as a lifecycle command"
+                            (plan.Actions
+                             |> List.exists (fun action ->
+                                 action.ComponentId = "limen"
+                                 && (action.Kind = InstallLifecycle || action.Kind = VerifyLifecycle || action.Kind = ReadinessVerify))
+                             |> not)
 
                         let packageJson =
                             plan.Actions
@@ -220,10 +230,10 @@ withTarget
 
 
                         check
-                            "Folio dependency is immutable"
+                            "Folio dependency uses immutable release artifact"
                             (packageJson
                              |> Option.exists (fun text ->
-                                 text.Contains("github:kemiller2002/folio#273b18f5b23db15cddd173c05af5d1a8484fc4cf")))
+                                 text.Contains("https://github.com/kemiller2002/folio/releases/download/v0.3.0/echelon-foundry-print-components-0.3.0.tgz")))
 
                         check
                             "scaffold declares application foundations"
@@ -232,7 +242,8 @@ withTarget
                                  text.Contains("\"aegis\"")
                                  && text.Contains("\"forma\"")
                                  && text.Contains("\"folio\"")
-                                 && text.Contains("273b18f5b23db15cddd173c05af5d1a8484fc4cf")))
+                                 && text.Contains("github-release")
+                                 && text.Contains("echelon-foundry-print-components-0.3.0.tgz")))
 
                         check
                             "scaffold configures Aegis"
@@ -262,24 +273,15 @@ withTarget
                                  text.Contains("@echelon-foundry/print-components")
                                  && text.Contains("<ef-print-document>")))
 
-                        let readiness =
-                            plan.Actions
-                            |> List.tryFind (fun action -> action.Kind = ReadinessVerify)
-
                         check
-                            "readiness uses strict Limen verification"
-                            (readiness
-                             |> Option.exists (fun action ->
-                                 match action.Execution with
-                                 | ExternalProcess(_, arguments) ->
-                                     arguments |> List.contains "--strict"
-                                 | _ -> false))))
+                            "project-bound Limen has no readiness process action"
+                            (plan.Actions |> List.exists (fun action -> action.Kind = ReadinessVerify) |> not))
 
 withTarget
     (fun target ->
         File.WriteAllText(Path.Combine(target, "Directory.Build.props"), "user-owned")
         withManifest
-            """{"schemaVersion":1,"name":"conflict-demo","components":[{"id":"limen","version":"0.6.1"}],"scaffold":{"kind":"fsharp-limen-web"}}"""
+            """{"schemaVersion":1,"name":"conflict-demo","components":[{"id":"limen","version":"0.6.2"}],"scaffold":{"kind":"fsharp-limen-web"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error _ ->
@@ -371,7 +373,7 @@ withManifest
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"contract-demo","components":[{"id":"limen","version":"0.6.1"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"package.json"},"targetPath":".echelon/kickoff/project.json"}],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
+            """{"schemaVersion":1,"name":"contract-demo","components":[{"id":"limen","version":"0.6.2"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"package.json"},"targetPath":".echelon/kickoff/project.json"}],"execution":{"enabled":false,"mission":"Build the governed app.","contractPath":".echelon/kickoff/project.json"},"scaffold":{"kind":"fsharp-limen-web"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
@@ -420,7 +422,7 @@ withManifest
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"mission-demo","components":[{"id":"praxis","version":"3.1.4"}],"execution":{"enabled":false,"mission":"Build the governed application.","contractPath":"requirements/contract.json"},"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.json"}]}"""
+            """{"schemaVersion":1,"name":"mission-demo","components":[{"id":"praxis","version":"3.6.0"}],"execution":{"enabled":false,"mission":"Build the governed application.","contractPath":"requirements/contract.json"},"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.json"}]}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
@@ -511,7 +513,7 @@ withTarget
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"ordo-baseline-demo","components":[{"id":"ordo","version":"1.3.0"},{"id":"limen","version":"0.6.1"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.md"}],"execution":{"enabled":false,"contractPath":"requirements/contract.md"},"scaffold":{"kind":"fsharp-limen-web","name":"ordo-baseline-demo"}}"""
+            """{"schemaVersion":1,"name":"ordo-baseline-demo","components":[{"id":"ordo","version":"1.4.0"},{"id":"limen","version":"0.6.2"}],"requirements":[{"id":"contract","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/contract.md"}],"execution":{"enabled":false,"contractPath":"requirements/contract.md"},"scaffold":{"kind":"fsharp-limen-web","name":"ordo-baseline-demo"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
@@ -560,7 +562,7 @@ withTarget
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"praxis-reconcile-demo","components":[{"id":"praxis","version":"3.1.4"},{"id":"limen","version":"0.6.1"}],"scaffold":{"kind":"fsharp-limen-web","name":"praxis-reconcile-demo"}}"""
+            """{"schemaVersion":1,"name":"praxis-reconcile-demo","components":[{"id":"praxis","version":"3.6.0"},{"id":"limen","version":"0.6.2"}],"scaffold":{"kind":"fsharp-limen-web","name":"praxis-reconcile-demo"}}"""
             (fun path ->
                 match Manifest.load path with
                 | Error errors ->
@@ -794,7 +796,7 @@ withTarget
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"upgrade-app-binding","components":[{"id":"forma","version":"0.2.0"}],"requirements":[],"execution":{"enabled":false}}"""
+            """{"schemaVersion":1,"name":"upgrade-app-binding","components":[{"id":"forma","version":"0.3.0"}],"requirements":[],"execution":{"enabled":false}}"""
             (fun manifestPath ->
                 let targetManifest = Path.Combine(target, "conditor.json")
                 File.Copy(manifestPath, targetManifest)
@@ -813,7 +815,7 @@ withTarget
 
                     File.WriteAllText(
                         targetManifest,
-                        """{"schemaVersion":1,"name":"upgrade-app-binding","components":[{"id":"forma","version":"0.3.0"}],"requirements":[],"execution":{"enabled":false}}"""
+                        """{"schemaVersion":1,"name":"upgrade-app-binding","components":[{"id":"forma","version":"0.3.1"}],"requirements":[],"execution":{"enabled":false}}"""
                     )
 
                     match Manifest.load targetManifest with
@@ -829,7 +831,7 @@ withTarget
                             check "upgrade rejects application-bound version changes" false))
 
 withManifest
-    """{"schemaVersion":1,"name":"upgrade-plan","components":[{"id":"praxis","version":"3.1.4"}],"requirements":[],"execution":{"enabled":false}}"""
+    """{"schemaVersion":1,"name":"upgrade-plan","components":[{"id":"praxis","version":"3.6.0"}],"requirements":[],"execution":{"enabled":false}}"""
     (fun path ->
         match Manifest.load path with
         | Error _ ->
@@ -850,7 +852,7 @@ withManifest
 withTarget
     (fun target ->
         withManifest
-            """{"schemaVersion":1,"name":"source-lock-demo","components":[{"id":"praxis","version":"3.1.4"}],"requirements":[],"execution":{"enabled":false}}"""
+            """{"schemaVersion":1,"name":"source-lock-demo","components":[{"id":"praxis","version":"3.6.0"}],"requirements":[],"execution":{"enabled":false}}"""
             (fun manifestPath ->
                 let targetManifest = Path.Combine(target, "conditor.json")
                 File.Copy(manifestPath, targetManifest)
