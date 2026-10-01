@@ -88,6 +88,7 @@ let private registerRepositoryComponents (target: string) (plan: InstallationPla
                 match comp.Distribution with
                 | LifecycleNpm
                 | NpmPackage -> "npm"
+                | NativeLifecycle -> "native"
                 | NugetPackage -> "nuget"
 
             let result =
@@ -458,6 +459,7 @@ let private runStatus json target manifestPath =
 let private distributionText =
     function
     | LifecycleNpm -> "lifecycle-npm"
+    | NativeLifecycle -> "native-lifecycle"
     | NpmPackage -> "npm"
     | NugetPackage -> "nuget"
 
