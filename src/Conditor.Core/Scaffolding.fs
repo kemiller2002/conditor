@@ -50,12 +50,12 @@ module Scaffolding =
 
                     binding, definition.Package, version)))
 
-    [<Literal>]
-    let private Folio030Commit = "273b18f5b23db15cddd173c05af5d1a8484fc4cf"
+    let private folioReleaseUrl version =
+        $"https://github.com/kemiller2002/folio/releases/download/v{version}/echelon-foundry-print-components-{version}.tgz"
 
     let private dependencySpecifier package version =
-        if package = "@echelon-foundry/print-components" && version = "0.3.0" then
-            $"github:kemiller2002/folio#{Folio030Commit}"
+        if package = "@echelon-foundry/print-components" then
+            folioReleaseUrl version
         else
             version
 
@@ -138,12 +138,14 @@ module Scaffolding =
         addCapability "forma" ignore
 
         addCapability "folio" (fun node ->
-            match resolvedVersion "folio" manifest with
-            | Some "0.3.0" -> node["sourceCommit"] <- JsonValue.Create Folio030Commit
-            | _ -> ())
+            resolvedVersion "folio" manifest
+            |> Option.iter (fun version ->
+                node["distribution"] <- JsonValue.Create "github-release"
+                node["artifact"] <- JsonValue.Create(folioReleaseUrl version)))
 
         addCapability "limen" ignore
         addCapability "ordo" ignore
+        addCapability "percepta" ignore
         addCapability "praxis" ignore
 
         let root = JsonObject()
