@@ -194,6 +194,24 @@ let run (check: string -> bool -> unit) =
     check "Registry-resolved native release installs through the normal workstation engine" registryApplied.Failed.IsNone
     check "Registry-resolved shim reports its selected version" ((probe (Path.Combine(registryHome, ".local", "bin", "gamma")) [ "--version" ]).StandardOutput.Contains "3.0.0")
 
+    let rawHome = temp "registry-raw-home"
+    let rawName = $"rawtool-{Platform.runtimeIdentifier ()}"
+    let rawPath = Path.Combine(registryMirror, rawName)
+    File.WriteAllText(rawPath, "#!/bin/sh\necho \"rawtool 4.0.0\"\n")
+    File.SetUnixFileMode(rawPath, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+    let rawSet, rawSetSha = resolvedSetFile registryMirror "rawtool" "4.0.0" rawName (fileSha256 rawPath)
+    let rawProfile =
+        match ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) rawSet rawSetSha with
+        | Error e -> failwith e
+        | Ok profile -> profile
+    let rawCtx = context rawHome registryMirror None
+    let rawPlan = Engine.plan rawCtx rawProfile (Platform.runtimeIdentifier ()) [] []
+    let rawApplied = applyOk rawCtx rawPlan
+    check "raw self-contained native artifact installs through workstation engine" rawApplied.Failed.IsNone
+    check
+        "raw native artifact shim reports its selected version"
+        ((probe (Path.Combine(rawHome, ".local", "bin", "rawtool")) [ "--version" ]).StandardOutput.Contains "4.0.0")
+
     let wrongPlatformText =
         File.ReadAllText(registrySet)
             .Replace($"\"platform\": \"{Platform.runtimeIdentifier ()}\"", "\"platform\": \"unsupported-x64\"")
