@@ -616,10 +616,23 @@ let private probe (executable: string) (arguments: string list) =
 let private optionValues name (args: string array) =
     args |> Array.toList |> List.pairwise |> List.choose (fun (flag, value) -> if flag = name then Some value else None)
 
+let private workstationProfile (args: string array) =
+    let runtimeIdentifier = Platform.runtimeIdentifier ()
+
+    match optionValue "--resolved-set" args with
+    | Some path ->
+        match optionValue "--resolved-set-sha256" args with
+        | None ->
+            Error "--resolved-set requires --resolved-set-sha256 SHA256 so Registry selection is integrity-bound"
+        | Some digest ->
+            ResolvedReleaseSets.loadFile runtimeIdentifier (Path.GetFullPath path) digest
+    | None ->
+        Profiles.resolve (optionValue "--profile" args |> Option.defaultValue "echelon-engineering")
+
 let private workstationPlan (args: string array) =
     let ctx = workstationContext args
 
-    Profiles.resolve (optionValue "--profile" args |> Option.defaultValue "echelon-engineering")
+    workstationProfile args
     |> Result.map (fun profile ->
         let prerequisites = Engine.discover probe profile.Prerequisites
         ctx, Engine.plan ctx profile (Platform.runtimeIdentifier ()) prerequisites (optionValues "--with" args))
@@ -751,7 +764,7 @@ let private runUninstall (args: string array) =
             Console.Error.WriteLine "uninstall requires --plan, or --authorize PLAN-DIGEST after reviewing the plan"
             2
         | Some digest ->
-            let profile = Profiles.resolve (optionValue "--profile" args |> Option.defaultValue "echelon-engineering") |> Result.toOption
+            let profile = workstationProfile args |> Result.toOption
 
             match Engine.uninstall ctx probe profile plan digest with
             | Error e ->
