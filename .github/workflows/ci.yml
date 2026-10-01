@@ -402,6 +402,8 @@ jobs:
 
       - name: Create and verify exact offline bundle
         shell: bash
+        env:
+          CONDITOR_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
