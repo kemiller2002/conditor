@@ -455,6 +455,8 @@ module Engine =
 
         match mirrored with
         | Some local -> File.Copy(local, temp, true)
+        | None when ctx.Offline ->
+            invalidOp $"Offline workstation mode refused network fallback for {assetName}. Expected the artifact in --artifact-mirror."
         | None ->
             use client = new HttpClient()
             use response = client.GetAsync(url).GetAwaiter().GetResult()
