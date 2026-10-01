@@ -343,6 +343,105 @@ jobs:
           test "$before" = "$after"
 
 
+  indy-init-offline-freeze:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out frozen Registry authority
+        uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/echelon-registry
+          ref: c174b8937b9ad3f543a020f737db4eca5fad6317
+          path: registry-freeze
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+
+      - name: Regenerate frozen Linux release set
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet fsi registry-freeze/tools/resolve-profile.fsx -- \
+            --profile registry-freeze/profiles/indy-init.profile.json \
+            --snapshot registry-freeze/snapshots/indy-init-0.1.0.catalog.json \
+            --platform linux-x64 \
+            --output "$RUNNER_TEMP/indy-init-linux-x64.json"
+
+          observed="$(sha256sum "$RUNNER_TEMP/indy-init-linux-x64.json" | awk '{print $1}')"
+          expected="3ac237804c546244499619aa88803fd280de6bb3a5daec205ccf730f61be5b40"
+          test "$observed" = "$expected"
+
+      - name: Create and verify exact offline bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            bundle create \
+            --resolved-set "$RUNNER_TEMP/indy-init-linux-x64.json" \
+            --resolved-set-sha256 3ac237804c546244499619aa88803fd280de6bb3a5daec205ccf730f61be5b40 \
+            --output "$RUNNER_TEMP/indy-init-bundle"
+
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            bundle verify --path "$RUNNER_TEMP/indy-init-bundle"
+
+          test -f "$RUNNER_TEMP/indy-init-bundle/packages/aegis/EchelonFoundry.Aegis.Core.1.0.0.nupkg"
+          test -f "$RUNNER_TEMP/indy-init-bundle/packages/limen/echelon-foundry-typescript-wasm-kernel-0.6.2.tgz"
+          test -f "$RUNNER_TEMP/indy-init-bundle/packages/forma/echelon-foundry-design-system-0.3.0.tgz"
+          test -f "$RUNNER_TEMP/indy-init-bundle/packages/folio/echelon-foundry-print-components-0.3.0.tgz"
+
+      - name: Plan frozen workstation from bundled resolved set
+        shell: bash
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/indy-init-home"
+          mkdir -p "$home"
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            workstation plan \
+            --resolved-set "$RUNNER_TEMP/indy-init-bundle/resolved-set.json" \
+            --resolved-set-sha256 3ac237804c546244499619aa88803fd280de6bb3a5daec205ccf730f61be5b40 \
+            --home "$home" \
+            --json > "$RUNNER_TEMP/indy-init-plan.json"
+
+          python3 - "$RUNNER_TEMP/indy-init-plan.json" "$RUNNER_TEMP/indy-init-plan.digest" <<'PY'
+          import json, sys
+          plan = json.load(open(sys.argv[1]))
+          digest = plan.get("digest")
+          if not isinstance(digest, str) or not digest.startswith("sha256:"):
+              raise SystemExit("workstation plan did not emit a digest")
+          open(sys.argv[2], "w").write(digest)
+          PY
+
+      - name: Apply workstation with network fallback forbidden
+        shell: bash
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/indy-init-home"
+          digest="$(cat "$RUNNER_TEMP/indy-init-plan.digest")"
+
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- \
+            workstation apply \
+            --resolved-set "$RUNNER_TEMP/indy-init-bundle/resolved-set.json" \
+            --resolved-set-sha256 3ac237804c546244499619aa88803fd280de6bb3a5daec205ccf730f61be5b40 \
+            --artifact-mirror "$RUNNER_TEMP/indy-init-bundle/mirror" \
+            --offline \
+            --home "$home" \
+            --authorize "$digest"
+
+          "$home/.local/bin/praxis" --version | grep -F "3.6.0"
+          "$home/.local/bin/ordo" --version | grep -F "1.4.0"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+
+          test ! -e "$home/.local/bin/aegis"
+          test ! -e "$home/.local/bin/limen"
+          test ! -e "$home/.local/bin/forma"
+          test ! -e "$home/.local/bin/folio"
+
   factory-rehearsal-smoke:
     if: github.event_name == 'push'
     needs: build-test
