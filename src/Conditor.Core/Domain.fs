@@ -2,6 +2,7 @@ namespace Conditor.Core
 
 type Distribution =
     | LifecycleNpm
+    | NativeLifecycle
     | NpmPackage
     | NugetPackage
 
