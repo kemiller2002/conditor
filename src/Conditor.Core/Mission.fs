@@ -79,7 +79,7 @@ module Mission =
             with ex ->
                 Error [ $"Unable to inspect Praxis work queue: {ex.Message}" ]
 
-    let private commandFailure display arguments (result: ProcessResult) =
+    let private commandFailure (display: string) (arguments: string list) (result: ProcessResult) =
         let argumentText = String.Join(" ", arguments)
 
         Error
@@ -88,7 +88,7 @@ module Mission =
               result.StandardError.Trim() ]
         |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
 
-    let private runRos target arguments =
+    let private runRos (target: string) (arguments: string list) =
         // Native Praxis is the primary execution boundary. The repository-local
         // Node launcher remains only as a compatibility fallback for older repos.
         let nativeProbe = ProcessRunner.runProcess target "praxis" [ "--version" ]
