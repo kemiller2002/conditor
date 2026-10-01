@@ -261,7 +261,7 @@ module ResolvedReleaseSets =
         |> Convert.ToHexString
         |> fun value -> value.ToLowerInvariant()
 
-    let private parseComponent (platform: string) (element: JsonElement) : Result<ProfileComponent, string> =
+    let private parseComponent (platform: string) (element: JsonElement) : Result<ProfileComponent option, string> =
         let id = str "systemId" element |> Option.defaultValue "<unknown>"
         let role = str "role" element
         let distributionClass = str "distributionClass" element
@@ -280,30 +280,50 @@ module ResolvedReleaseSets =
                     Some { Name = name; Sha256 = digest }
                 | _ -> None)
 
-        match role, distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
-        | (Some "host-tool" | Some "repository-lifecycle"), Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
-            match executableArtifacts with
-            | [ asset ] ->
-                Ok
-                    { Id = id
-                      Version = version
-                      Executable = exe
-                      VersionProbe = [ "--version" ]
-                      Repository = repository
-                      Tag = tag
-                      Assets = Map.ofList [ platform, asset ] }
-            | [] -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
-            | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
-        | Some other, _, _, _, _, _, _, _ when other <> "host-tool" && other <> "repository-lifecycle" ->
-            Error $"resolved component '{id}' has role '{other}'; workstation native installation accepts only host-tool or repository-lifecycle"
-        | _, Some other, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
-            Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation currently accepts only self-contained-native-cli"
-        | _, _, Some state, _, _, _, _, _ when state <> "active" ->
-            Error $"resolved component '{id}' is {state}; normal installation accepts only active releases"
-        | _, _, _, Some mechanism, _, _, _, _ when mechanism <> "github-release" ->
-            Error $"resolved component '{id}' uses distribution mechanism '{mechanism}'; native workstation installation currently accepts only github-release"
-        | _ ->
-            Error $"resolved component '{id}' is missing required native-host release facts"
+        match role with
+        | Some "project-binding" ->
+            match distributionClass, lifecycleState, distributionMechanism with
+            | Some ("web-package" | "nuget-library"), Some "active", Some ("github-release" | "npm" | "nuget") ->
+                // The full environment set stays integrity-bound, but workstation
+                // bootstrap must not guess a project target for libraries/assets.
+                Ok None
+            | Some other, _, _ ->
+                Error $"resolved project binding '{id}' has unsupported distribution class '{other}'"
+            | _, Some state, _ when state <> "active" ->
+                Error $"resolved project binding '{id}' is {state}; normal binding accepts only active releases"
+            | _, _, Some mechanism ->
+                Error $"resolved project binding '{id}' uses unsupported distribution mechanism '{mechanism}'"
+            | _ ->
+                Error $"resolved project binding '{id}' is missing required release facts"
+        | Some ("host-tool" | "repository-lifecycle") ->
+            match distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
+            | Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
+                match executableArtifacts with
+                | [ asset ] ->
+                    Ok(
+                        Some
+                            { Id = id
+                              Version = version
+                              Executable = exe
+                              VersionProbe = [ "--version" ]
+                              Repository = repository
+                              Tag = tag
+                              Assets = Map.ofList [ platform, asset ] }
+                    )
+                | [] -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
+                | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
+            | Some other, _, _, _, _, _, _ ->
+                Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation accepts only self-contained-native-cli"
+            | _, Some state, _, _, _, _, _ when state <> "active" ->
+                Error $"resolved component '{id}' is {state}; normal installation accepts only active releases"
+            | _, _, Some mechanism, _, _, _, _ when mechanism <> "github-release" ->
+                Error $"resolved component '{id}' uses distribution mechanism '{mechanism}'; native workstation installation accepts only github-release"
+            | _ ->
+                Error $"resolved component '{id}' is missing required native-host release facts"
+        | Some other ->
+            Error $"resolved component '{id}' has unsupported environment role '{other}'"
+        | None ->
+            Error $"resolved component '{id}' is missing role"
 
     let parseVerified (expectedRuntimeIdentifier: string) (expectedSha256: string) (bytes: byte array) : Result<WorkstationProfile, string> =
         let expected = normalizeSha256 expectedSha256
@@ -340,7 +360,7 @@ module ResolvedReleaseSets =
                                         (fun state item ->
                                             state
                                             |> Result.bind (fun values ->
-                                                item |> Result.map (fun value -> value :: values)))
+                                                item |> Result.map (fun value -> value |> Option.map (fun parsed -> parsed :: values) |> Option.defaultValue values)))
                                         (Ok [])
                                     |> Result.map List.rev
 
