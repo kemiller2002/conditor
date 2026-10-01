@@ -253,6 +253,117 @@ module OfflineBundle =
                     with :? JsonException as ex ->
                         Error $"Resolved release set is not valid JSON: {ex.Message}"
 
+    let private sourceEntrypoint (source: GitHubSource) =
+        match source.Entrypoint with
+        | NodeScript path -> path
+        | FileArtifact path -> path
+
+    let private sourceManifestEntry (sourceFile: BundledSourceFile) =
+        let node = JsonObject()
+        node["repository"] <- JsonValue.Create sourceFile.Repository
+        node["commit"] <- JsonValue.Create sourceFile.Commit
+        node["entrypoint"] <- JsonValue.Create sourceFile.Entrypoint
+        node["sha256"] <- JsonValue.Create sourceFile.Sha256
+        node["path"] <- JsonValue.Create(sourceFile.RelativePath.Replace('\\', '/'))
+        node
+
+    let private materializeProjectSources staging manifestPath =
+        match manifestPath with
+        | None -> Ok None
+        | Some path ->
+            match Manifest.load path with
+            | Error errors ->
+                Error(String.Join(Environment.NewLine, errors))
+            | Ok manifest ->
+                try
+                    let projectDirectory = Path.Combine(staging, "project")
+                    Directory.CreateDirectory projectDirectory |> ignore
+                    let projectManifestPath = Path.Combine(projectDirectory, "conditor.json")
+                    copyAtomic path projectManifestPath
+                    let manifestSha = sha256File projectManifestPath
+
+                    let sourceRoot = Path.Combine(staging, "sources")
+                    Directory.CreateDirectory sourceRoot |> ignore
+                    let bundled = ResizeArray<BundledSourceFile>()
+                    let seen = System.Collections.Generic.Dictionary<string, string>(StringComparer.Ordinal)
+
+                    for requirement in manifest.Requirements do
+                        let source = requirement.Source
+                        let entrypoint = sourceEntrypoint source
+                        let identity = $"{source.Repository}|{source.Commit.ToLowerInvariant()}|{entrypoint}"
+
+                        match SourceCache.ensure $"offline-bundle:{requirement.Id}" source with
+                        | Error errors ->
+                            raise (InvalidDataException(String.Join(Environment.NewLine, errors)))
+                        | Ok checkout ->
+                            match SourceCache.resolveEntrypoint checkout source with
+                            | Error errors ->
+                                raise (InvalidDataException(String.Join(Environment.NewLine, errors)))
+                            | Ok sourcePath ->
+                                let mirrorCheckout = SourceCache.mirrorCheckoutPath sourceRoot source
+                                let destination = Path.GetFullPath(Path.Combine(mirrorCheckout, entrypoint))
+
+                                match ensureInside mirrorCheckout destination with
+                                | Error error -> raise (InvalidDataException error)
+                                | Ok safeDestination ->
+                                    let observed = sha256File sourcePath
+
+                                    match seen.TryGetValue identity with
+                                    | true, previous when previous <> observed ->
+                                        raise (
+                                            InvalidDataException(
+                                                $"Pinned source identity produced different bytes within one bundle: {identity}."
+                                            )
+                                        )
+                                    | true, _ -> ()
+                                    | false, _ ->
+                                        copyAtomic sourcePath safeDestination
+                                        seen[identity] <- observed
+                                        bundled.Add
+                                            { Repository = source.Repository
+                                              Commit = source.Commit.ToLowerInvariant()
+                                              Entrypoint = entrypoint
+                                              Sha256 = observed
+                                              RelativePath = Path.GetRelativePath(staging, safeDestination) }
+
+                    let groups =
+                        bundled
+                        |> Seq.groupBy (fun sourceFile -> sourceFile.Repository, sourceFile.Commit)
+
+                    for (repository, commit), files in groups do
+                        let example = files |> Seq.head
+                        let source =
+                            { Repository = repository
+                              Commit = commit
+                              Entrypoint = FileArtifact example.Entrypoint }
+
+                        let checkout = SourceCache.mirrorCheckoutPath sourceRoot source
+                        let metadata = JsonObject()
+                        metadata["schema"] <- JsonValue.Create "conditor.source-mirror/v1"
+                        metadata["repository"] <- JsonValue.Create repository
+                        metadata["commit"] <- JsonValue.Create commit
+                        let fileMap = JsonObject()
+
+                        files
+                        |> Seq.sortBy _.Entrypoint
+                        |> Seq.iter (fun sourceFile ->
+                            fileMap[sourceFile.Entrypoint] <- JsonValue.Create sourceFile.Sha256)
+
+                        metadata["files"] <- fileMap
+                        File.WriteAllText(
+                            Path.Combine(checkout, ".conditor-source.json"),
+                            metadata.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine
+                        )
+
+                    Ok(
+                        Some
+                            { ManifestRelativePath = Path.GetRelativePath(staging, projectManifestPath)
+                              ManifestSha256 = manifestSha
+                              SourceFiles = bundled |> Seq.sortBy (fun x -> x.Repository, x.Commit, x.Entrypoint) |> List.ofSeq }
+                    )
+                with ex ->
+                    Error $"Unable to materialize project sources for offline bundle: {ex.Message}"
+
     let private manifestArtifact (relativePath: string) (artifact: ParsedArtifact) =
         let node = JsonObject()
         node["systemId"] <- JsonValue.Create artifact.SystemId
