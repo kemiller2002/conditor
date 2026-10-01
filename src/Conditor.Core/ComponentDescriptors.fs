@@ -60,6 +60,7 @@ module ComponentDescriptors =
 
     let private parseDistribution value =
         match value with
+        | "host-tool" -> Ok HostTool
         | "lifecycle-npm" -> Ok LifecycleNpm
         | "npm" -> Ok NpmPackage
         | "nuget" -> Ok NugetPackage
@@ -186,6 +187,12 @@ module ComponentDescriptors =
                 errors.Add $"defaultVersion '{defaultVersion}' is not present in qualifiedVersions for '{id}'."
 
             match distribution with
+            | HostTool ->
+                if lifecycleSource.IsSome then
+                    errors.Add $"Host-tool component '{id}' must not declare a package lifecycleSource."
+
+                if command.IsNone then
+                    errors.Add $"Host-tool component '{id}' must declare command."
             | LifecycleNpm ->
                 if lifecycleSource.IsNone then
                     errors.Add $"Lifecycle component '{id}' must declare lifecycleSource."
