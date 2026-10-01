@@ -27,6 +27,8 @@ let private usage () =
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
+    Console.WriteLine "  conditor bundle create --resolved-set PATH --resolved-set-sha256 SHA256 --output DIR"
+    Console.WriteLine "  conditor bundle verify --path DIR"
     Console.WriteLine "  conditor uninstall --plan [--home DIR] [--json]"
     Console.WriteLine "  conditor uninstall --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--praxis PATH] [--target-id ID]"
 
@@ -600,6 +602,47 @@ let private printPresets () =
 
 open Conditor.Core.Workstation
 
+let private printBundleSummary (verb: string) (summary: OfflineBundleSummary) =
+    Console.WriteLine $"Offline bundle {verb}: {summary.Root}"
+    Console.WriteLine $"  profile:      {summary.ProfileId}@{summary.ProfileVersion}"
+    Console.WriteLine $"  platform:     {summary.Platform}"
+    Console.WriteLine $"  resolved set: sha256:{summary.ResolvedSetSha256}"
+    Console.WriteLine $"  artifacts:    {summary.ArtifactCount}"
+    Console.WriteLine $"  native mirror:{summary.NativeMirror}"
+    Console.WriteLine $"  packages:     {summary.PackageMirror}"
+
+let private runBundle (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "create" ->
+        match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args, optionValue "--output" args with
+        | Some resolvedSet, Some digest, Some output ->
+            match OfflineBundle.create (Path.GetFullPath resolvedSet) digest (Path.GetFullPath output) with
+            | Ok summary ->
+                printBundleSummary "created" summary
+                0
+            | Error error ->
+                Console.Error.WriteLine error
+                3
+        | _ ->
+            Console.Error.WriteLine "bundle create requires --resolved-set PATH --resolved-set-sha256 SHA256 --output DIR"
+            2
+    | Some "verify" ->
+        match optionValue "--path" args with
+        | Some path ->
+            match OfflineBundle.verify (Path.GetFullPath path) with
+            | Ok summary ->
+                printBundleSummary "verified" summary
+                0
+            | Error error ->
+                Console.Error.WriteLine error
+                3
+        | None ->
+            Console.Error.WriteLine "bundle verify requires --path DIR"
+            2
+    | _ ->
+        usage ()
+        2
+
 let private workstationContext (args: string array) : WorkstationContext =
     let home =
         optionValue "--home" args
@@ -786,6 +829,8 @@ let private execute (args: string array) =
 
         if command = "workstation" then
             runWorkstation args
+        elif command = "bundle" then
+            runBundle args
         elif command = "uninstall" then
             runUninstall args
         elif command = "presets" then
