@@ -127,6 +127,89 @@ let private resolvedSetFile (dir: string) (id: string) (version: string) (assetN
     File.WriteAllText(path, json)
     path, fileSha256 path
 
+let private projectBindingResolvedSetFile
+    (dir: string)
+    (id: string)
+    (version: string)
+    (distributionClass: string)
+    (mechanism: string)
+    (packageName: string)
+    (artifactName: string)
+    (artifactSha: string)
+    =
+    let rid = Platform.runtimeIdentifier ()
+    let path = Path.Combine(dir, $"{id}-binding.resolved.json")
+    let profileSha = String.replicate 64 "d"
+    let catalogSha = String.replicate 64 "e"
+    let releaseSha = String.replicate 64 "f"
+
+    let template =
+        """{
+          "schema": "echelon.resolved-release-set/v1",
+          "profile": {
+            "id": "binding-test",
+            "version": "0.1.0",
+            "sha256": "__PROFILE_SHA__"
+          },
+          "platform": "__RID__",
+          "resolver": {
+            "name": "test",
+            "version": "1.0.0"
+          },
+          "catalogSnapshot": {
+            "sha256": "__CATALOG_SHA__"
+          },
+          "components": [
+            {
+              "systemId": "__ID__",
+              "role": "project-binding",
+              "required": true,
+              "version": "__VERSION__",
+              "repository": "example/__ID__",
+              "tag": "package:__VERSION__",
+              "commit": "2222222222222222222222222222222222222222",
+              "releaseStage": "stable",
+              "lifecycleState": "active",
+              "distributionClass": "__CLASS__",
+              "executable": null,
+              "releaseManifest": {
+                "schema": "echelon.release/v2",
+                "sha256": "__RELEASE_SHA__"
+              },
+              "distribution": {
+                "mechanism": "__MECHANISM__",
+                "package": "__PACKAGE__",
+                "url": "https://example.invalid/__ARTIFACT__"
+              },
+              "artifacts": [
+                {
+                  "name": "__ARTIFACT__",
+                  "purpose": "package",
+                  "platform": null,
+                  "sha256": "__ARTIFACT_SHA__"
+                }
+              ]
+            }
+          ]
+        }"""
+
+    let json =
+        template
+            .Replace("__PROFILE_SHA__", profileSha)
+            .Replace("__CATALOG_SHA__", catalogSha)
+            .Replace("__RELEASE_SHA__", releaseSha)
+            .Replace("__RID__", rid)
+            .Replace("__ID__", id)
+            .Replace("__VERSION__", version)
+            .Replace("__CLASS__", distributionClass)
+            .Replace("__MECHANISM__", mechanism)
+            .Replace("__PACKAGE__", packageName)
+            .Replace("__ARTIFACT__", artifactName)
+            .Replace("__ARTIFACT_SHA__", artifactSha)
+
+    File.WriteAllText(path, json)
+    path, fileSha256 path
+
 let private setup () =
     let home = temp "home"
     let mirror = temp "mirror"
@@ -166,6 +249,73 @@ let run (check: string -> bool -> unit) =
         check "optional capabilities are not installed unless selected" (p.Optional |> List.exists (fun (id, _) -> id = "forma"))
 
     check "minimal profile installs nothing" (Profiles.resolve "minimal" |> Result.map (fun p -> p.Components.IsEmpty) = Ok true)
+
+    // Registry project bindings ---------------------------------------------
+    let bindingDir = temp "registry-binding"
+    let bindingSha = String.replicate 64 "1"
+    let bindingPath, bindingSetSha =
+        projectBindingResolvedSetFile
+            bindingDir
+            "limen"
+            "0.6.2"
+            "web-package"
+            "npm"
+            "@echelon-foundry/typescript-wasm-kernel"
+            "echelon-foundry-typescript-wasm-kernel-0.6.2.tgz"
+            bindingSha
+
+    let indyPreset =
+        match Presets.resolve "indy-init" with
+        | Ok value -> value
+        | Error errors -> failwith (String.Join(Environment.NewLine, errors))
+
+    let overlaid =
+        match ResolvedReleaseSets.overlayProjectBindings (Platform.runtimeIdentifier ()) bindingPath bindingSetSha indyPreset.Content with
+        | Ok value -> value
+        | Error error -> failwith error
+
+    use overlaidDoc = System.Text.Json.JsonDocument.Parse(overlaid)
+    let overlaidRoot = overlaidDoc.RootElement
+    let limenComponent =
+        overlaidRoot.GetProperty("components").EnumerateArray()
+        |> Seq.find (fun item -> item.GetProperty("id").GetString() = "limen")
+
+    check "Registry binding overlays the exact qualified Limen version" (limenComponent.GetProperty("version").GetString() = "0.6.2")
+    check "Registry binding records the package artifact SHA" (limenComponent.GetProperty("resolvedArtifact").GetProperty("sha256").GetString() = bindingSha)
+    check "Registry binding records the resolved-set SHA" (overlaidRoot.GetProperty("registryResolution").GetProperty("sha256").GetString() = bindingSetSha)
+    check "Registry-overlaid preset remains a valid Conditor manifest" (Manifest.parseText overlaid |> Result.isOk)
+
+    let unqualifiedPath, unqualifiedSha =
+        projectBindingResolvedSetFile
+            bindingDir
+            "limen"
+            "9.9.9"
+            "web-package"
+            "npm"
+            "@echelon-foundry/typescript-wasm-kernel"
+            "limen-9.9.9.tgz"
+            bindingSha
+
+    check
+        "Registry binding refuses a version not qualified by Conditor"
+        (ResolvedReleaseSets.overlayProjectBindings (Platform.runtimeIdentifier ()) unqualifiedPath unqualifiedSha indyPreset.Content
+         |> Result.isError)
+
+    let wrongPackagePath, wrongPackageSha =
+        projectBindingResolvedSetFile
+            bindingDir
+            "limen"
+            "0.6.2"
+            "web-package"
+            "npm"
+            "@example/wrong-package"
+            "limen-0.6.2.tgz"
+            bindingSha
+
+    check
+        "Registry binding refuses a package identity mismatch"
+        (ResolvedReleaseSets.overlayProjectBindings (Platform.runtimeIdentifier ()) wrongPackagePath wrongPackageSha indyPreset.Content
+         |> Result.isError)
 
     // Registry resolved release sets ----------------------------------------
     let registryHome = temp "registry-home"
