@@ -1,6 +1,7 @@
 namespace Conditor.Core
 
 type Distribution =
+    | HostTool
     | LifecycleNpm
     | NpmPackage
     | NugetPackage
