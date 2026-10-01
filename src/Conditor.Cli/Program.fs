@@ -24,7 +24,7 @@ let private usage () =
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
-    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--praxis PATH] [--target-id ID] [--no-rollback]"
+    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
     Console.WriteLine "  conditor bundle create --resolved-set PATH --resolved-set-sha256 SHA256 --output DIR"
@@ -652,6 +652,7 @@ let private workstationContext (args: string array) : WorkstationContext =
 
     { Home = home
       ArtifactMirror = optionValue "--artifact-mirror" args |> Option.map Path.GetFullPath
+      Offline = hasFlag "--offline" args
       Praxis = optionValue "--praxis" args |> Option.orElse (Environment.GetEnvironmentVariable "CONDITOR_PRAXIS" |> Option.ofObj)
       TargetId = optionValue "--target-id" args }
 
