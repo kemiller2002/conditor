@@ -335,8 +335,9 @@ let run (check: string -> bool -> unit) =
           Entrypoint = FileArtifact "docs/contract.md" }
 
     let sourceCheckout = SourceCache.mirrorCheckoutPath sourceMirrorRoot source
-    let sourcePath = Path.Combine(sourceCheckout, "docs", "contract.md")
-    Directory.CreateDirectory(Path.GetDirectoryName sourcePath) |> ignore
+    let sourceDocs = Path.Combine(sourceCheckout, "docs")
+    Directory.CreateDirectory sourceDocs |> ignore
+    let sourcePath = Path.Combine(sourceDocs, "contract.md")
     File.WriteAllText(sourcePath, "frozen contract\n")
     let sourceSha = fileSha256 sourcePath
 
@@ -383,8 +384,9 @@ let run (check: string -> bool -> unit) =
     // Offline bundle verification ------------------------------------------
     let bundleRoot = temp "offline-bundle"
     let bundleResolved = Path.Combine(bundleRoot, "resolved-set.json")
-    let bundleArtifact = Path.Combine(bundleRoot, "artifacts", "gamma", "gamma.bin")
-    Directory.CreateDirectory(Path.GetDirectoryName bundleArtifact) |> ignore
+    let bundleArtifactDirectory = Path.Combine(bundleRoot, "artifacts", "gamma")
+    Directory.CreateDirectory bundleArtifactDirectory |> ignore
+    let bundleArtifact = Path.Combine(bundleArtifactDirectory, "gamma.bin")
     File.WriteAllText(bundleResolved, "{\"schema\":\"fixture\"}\n")
     File.WriteAllText(bundleArtifact, "gamma-offline-artifact\n")
     let bundleResolvedSha = fileSha256 bundleResolved
