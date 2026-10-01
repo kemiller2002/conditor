@@ -145,6 +145,7 @@ module Scaffolding =
 
         addCapability "limen" ignore
         addCapability "ordo" ignore
+        addCapability "percepta" ignore
         addCapability "praxis" ignore
 
         let root = JsonObject()
