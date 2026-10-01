@@ -8,14 +8,18 @@ module Planner =
         if OperatingSystem.IsWindows() then "npx.cmd" else "npx"
 
     let private sourceReference version (definition: ComponentDefinition) =
-        match definition.LifecycleSource with
-        | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
-        | Some(GitHubSource source) when version = definition.DefaultVersion ->
-            Ok(SourceCache.sourceReference source)
-        | Some(GitHubSource _) ->
-            Error
-                $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
-        | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
+        match definition.Distribution, definition.Command with
+        | NativeLifecycle, Some command -> Ok $"native:{command}@{version}"
+        | NativeLifecycle, None -> Error $"Native lifecycle component '{definition.Id}' has no command."
+        | _ ->
+            match definition.LifecycleSource with
+            | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
+            | Some(GitHubSource source) when version = definition.DefaultVersion ->
+                Ok(SourceCache.sourceReference source)
+            | Some(GitHubSource _) ->
+                Error
+                    $"Component '{definition.Id}' version '{version}' has no immutable distribution mapping. Available mapped version: '{definition.DefaultVersion}'."
+            | None -> Error $"Lifecycle component '{definition.Id}' has no distribution source."
 
     let private bindingReference version (definition: ComponentDefinition) =
         match definition.ApplicationBinding with
@@ -34,8 +38,10 @@ module Planner =
 
         let resolvedArguments = replaceTarget target arguments
 
-        match definition.LifecycleSource with
-        | Some RegistryPackage ->
+        match definition.Distribution, definition.LifecycleSource with
+        | NativeLifecycle, _ ->
+            ExternalProcess(command, resolvedArguments)
+        | _, Some RegistryPackage ->
             ExternalProcess(
                 npxExecutable (),
                 [ "--yes"
@@ -43,9 +49,9 @@ module Planner =
                   command ]
                 @ resolvedArguments
             )
-        | Some(GitHubSource source) ->
+        | _, Some(GitHubSource source) ->
             GitHubSourceProcess(source, resolvedArguments)
-        | None ->
+        | _, None ->
             invalidOp $"Lifecycle component '{definition.Id}' has no distribution source."
 
     let private actionKind operation phase =
@@ -169,7 +175,8 @@ module Planner =
                 let version = request.Version |> Option.defaultValue definition.DefaultVersion
 
                 match definition.Distribution with
-                | LifecycleNpm ->
+                | LifecycleNpm
+                | NativeLifecycle ->
                     match sourceReference version definition with
                     | Error error ->
                         if request.Required then
