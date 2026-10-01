@@ -6,7 +6,8 @@
   "package": "@echelon-foundry/typescript-wasm-kernel",
   "defaultVersion": "0.6.1",
   "qualifiedVersions": [
-    "0.6.1"
+    "0.6.1",
+    "0.6.2"
   ],
   "lifecycleSource": {
     "kind": "registry"
