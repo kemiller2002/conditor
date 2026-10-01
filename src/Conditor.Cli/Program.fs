@@ -13,8 +13,8 @@ let private usage () =
     Console.WriteLine "  conditor presets"
     Console.WriteLine "  conditor components [--json]"
     Console.WriteLine "  conditor compatibility [--json]"
-    Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--resolved-set PATH --resolved-set-sha256 SHA256] [--target PATH]"
+    Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--resolved-set PATH --resolved-set-sha256 SHA256] [--target PATH]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor doctor [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
@@ -22,7 +22,7 @@ let private usage () =
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
+    Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--resolved-set PATH --resolved-set-sha256 SHA256] [--check] [--launcher codex|claude] [--target PATH]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
@@ -65,6 +65,48 @@ let private resolveManifestSelection command target (args: string array) =
         Ok
             { ManifestPath = Path.Combine(target, "conditor.json") |> Path.GetFullPath
               Preset = None }
+
+let private applyRegistryPresetResolution (args: string array) (selection: ManifestSelection) =
+    match optionValue "--resolved-set" args with
+    | None -> Ok selection
+    | Some resolvedSet ->
+        match selection.Preset, optionValue "--resolved-set-sha256" args with
+        | None, _ ->
+            Error [ "--resolved-set for repository plan/init/start currently requires --preset so Conditor never rewrites a user-owned manifest implicitly." ]
+        | Some _, None ->
+            Error [ "--resolved-set requires --resolved-set-sha256 SHA256." ]
+        | Some preset, Some digest ->
+            let resolvedPath = Path.GetFullPath resolvedSet
+
+            match
+                Conditor.Core.Workstation.ResolvedReleaseSets.overlayProjectBindings
+                    (Conditor.Core.Workstation.Platform.runtimeIdentifier ())
+                    resolvedPath
+                    digest
+                    preset.Content
+            with
+            | Error error -> Error [ error ]
+            | Ok resolvedContent ->
+                try
+                    let directory =
+                        Path.Combine(Path.GetTempPath(), "conditor", "resolved-presets")
+
+                    Directory.CreateDirectory directory |> ignore
+                    let path =
+                        Path.Combine(directory, $"{preset.Id}-{Guid.NewGuid():N}.json")
+
+                    File.WriteAllText(path, resolvedContent)
+
+                    let resolvedPreset =
+                        { preset with
+                            Content = resolvedContent
+                            ManifestPath = path }
+
+                    Ok
+                        { ManifestPath = path
+                          Preset = Some resolvedPreset }
+                with ex ->
+                    Error [ $"Unable to stage Registry-resolved preset: {ex.Message}" ]
 
 let private createPlan operation target selection manifest =
     Planner.create target operation manifest
@@ -802,32 +844,37 @@ let private execute (args: string array) =
             | Error errors ->
                 writeErrors errors
                 1
-            | Ok selection ->
-                match command with
-                | "plan" -> run Init false target selection
-                | "init" -> run Init true target selection
-                | "verify" -> run Verify true target selection
-                | "doctor" -> runDoctor (hasFlag "--json" args) target selection.ManifestPath
-                | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
-                | "repair" -> runRepair target selection.ManifestPath
-                | "upgrade" -> runUpgrade (hasFlag "--check" args) target selection.ManifestPath
-                | "resume" -> runResume (optionValue "--launcher" args) target selection.ManifestPath
-                | "handoff" ->
-                    runHandoff
-                        (hasFlag "--resume" args)
-                        (optionValue "--launcher" args)
-                        (optionValue "--prompt-file" args)
-                        target
-                        selection.ManifestPath
-                | "start" ->
-                    runStart
-                        (hasFlag "--check" args)
-                        (optionValue "--launcher" args)
-                        target
-                        selection
-                | _ ->
-                    usage ()
+            | Ok unresolvedSelection ->
+                match applyRegistryPresetResolution args unresolvedSelection with
+                | Error errors ->
+                    writeErrors errors
                     1
+                | Ok selection ->
+                    match command with
+                    | "plan" -> run Init false target selection
+                    | "init" -> run Init true target selection
+                    | "verify" -> run Verify true target selection
+                    | "doctor" -> runDoctor (hasFlag "--json" args) target selection.ManifestPath
+                    | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
+                    | "repair" -> runRepair target selection.ManifestPath
+                    | "upgrade" -> runUpgrade (hasFlag "--check" args) target selection.ManifestPath
+                    | "resume" -> runResume (optionValue "--launcher" args) target selection.ManifestPath
+                    | "handoff" ->
+                        runHandoff
+                            (hasFlag "--resume" args)
+                            (optionValue "--launcher" args)
+                            (optionValue "--prompt-file" args)
+                            target
+                            selection.ManifestPath
+                    | "start" ->
+                        runStart
+                            (hasFlag "--check" args)
+                            (optionValue "--launcher" args)
+                            target
+                            selection
+                    | _ ->
+                        usage ()
+                        1
 
 
 [<EntryPoint>]
