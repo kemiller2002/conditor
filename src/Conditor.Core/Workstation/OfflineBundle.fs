@@ -194,10 +194,9 @@ module OfflineBundle =
                                         elif not (seenSystems.Add id) then
                                             errors.Add $"Resolved set contains duplicate system id '{id}'."
 
-                                        match safeSegment "systemId" id, safeSegment "tag" tag with
-                                        | Error error, _ -> errors.Add error
-                                        | _, Error error -> errors.Add error
-                                        | _ -> ()
+                                        match safeSegment "systemId" id with
+                                        | Error error -> errors.Add error
+                                        | Ok _ -> ()
 
                                         let distribution = tryProperty "distribution" releaseComponent
                                         let mechanism = distribution |> Option.bind (str "mechanism") |> Option.defaultValue ""
@@ -205,8 +204,13 @@ module OfflineBundle =
                                         let native =
                                             role = "host-tool" || role = "repository-lifecycle"
 
-                                        if native && distributionClass <> "self-contained-native-cli" then
-                                            errors.Add $"Native component '{id}' must be self-contained-native-cli, observed '{distributionClass}'."
+                                        if native then
+                                            if distributionClass <> "self-contained-native-cli" then
+                                                errors.Add $"Native component '{id}' must be self-contained-native-cli, observed '{distributionClass}'."
+
+                                            match safeSegment "tag" tag with
+                                            | Error error -> errors.Add error
+                                            | Ok _ -> ()
 
                                         for artifact in objects "artifacts" releaseComponent do
                                             let name = str "name" artifact |> Option.defaultValue ""
