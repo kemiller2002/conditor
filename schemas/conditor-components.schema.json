@@ -38,6 +38,7 @@
           "distribution": {
             "enum": [
               "lifecycle-npm",
+              "native-lifecycle",
               "npm",
               "nuget"
             ]
