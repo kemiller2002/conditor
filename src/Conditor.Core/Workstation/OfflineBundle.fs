@@ -64,7 +64,7 @@ module OfflineBundle =
         else
             Ok value
 
-    let private ensureInside root path =
+    let private ensureInside (root: string) (path: string) =
         let root = Path.GetFullPath root
         let full = Path.GetFullPath path
         let prefix = root.TrimEnd(Path.DirectorySeparatorChar) + string Path.DirectorySeparatorChar
@@ -74,14 +74,20 @@ module OfflineBundle =
         if full = root || full.StartsWith(prefix, comparison) then Ok full
         else Error $"Offline bundle path escapes its root: {path}"
 
-    let private copyAtomic source destination =
-        Directory.CreateDirectory(Path.GetDirectoryName destination |> Option.ofObj |> Option.defaultValue ".") |> ignore
+    let private parentDirectory (path: string) =
+        match Path.GetDirectoryName(path) with
+        | null
+        | "" -> "."
+        | value -> value
+
+    let private copyAtomic (source: string) (destination: string) =
+        Directory.CreateDirectory(parentDirectory destination) |> ignore
         let partial = destination + ".partial"
         File.Copy(source, partial, true)
         File.Move(partial, destination, true)
 
-    let private downloadAtomic (client: HttpClient) url destination =
-        Directory.CreateDirectory(Path.GetDirectoryName destination |> Option.ofObj |> Option.defaultValue ".") |> ignore
+    let private downloadAtomic (client: HttpClient) (url: string) (destination: string) =
+        Directory.CreateDirectory(parentDirectory destination) |> ignore
         let partial = destination + ".partial"
 
         if File.Exists partial then File.Delete partial
@@ -92,7 +98,7 @@ module OfflineBundle =
         response.Content.CopyToAsync(output).GetAwaiter().GetResult()
         File.Move(partial, destination, true)
 
-    let private artifactUrl repository tag mechanism distributionUrl artifactName =
+    let private artifactUrl (repository: string) (tag: string) (mechanism: string) (distributionUrl: string option) (artifactName: string) =
         match mechanism with
         | "github-release" ->
             Ok $"https://github.com/{repository}/releases/download/{tag}/{artifactName}"
@@ -125,7 +131,7 @@ module OfflineBundle =
           Bytes: byte array
           Artifacts: ParsedArtifact list }
 
-    let private parseResolvedSet path expectedSha256 =
+    let private parseResolvedSet (path: string) (expectedSha256: string) =
         if not (File.Exists path) then
             Error $"Resolved release set not found: {path}"
         else
@@ -243,7 +249,7 @@ module OfflineBundle =
         node["path"] <- JsonValue.Create(relativePath.Replace('\\', '/'))
         node
 
-    let rec create resolvedSetPath expectedResolvedSetSha256 outputRoot =
+    let rec create (resolvedSetPath: string) (expectedResolvedSetSha256: string) (outputRoot: string) =
         parseResolvedSet resolvedSetPath expectedResolvedSetSha256
         |> Result.bind (fun resolved ->
             try
@@ -317,7 +323,7 @@ module OfflineBundle =
             with ex ->
                 Error $"Unable to create offline bundle: {ex.Message}")
 
-    and verify bundleRoot =
+    and verify (bundleRoot: string) =
         try
             let root = Path.GetFullPath bundleRoot
             let manifestPath = Path.Combine(root, "bundle.json")
