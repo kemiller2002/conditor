@@ -270,7 +270,7 @@ withTarget
                              |> List.exists (fun action ->
                                  action.ComponentId = "limen"
                                  && (action.Kind = InstallLifecycle || action.Kind = VerifyLifecycle))
-                             |> not))
+                             |> not)))
 
 withTarget
     (fun target ->
