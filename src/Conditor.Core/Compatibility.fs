@@ -15,15 +15,16 @@ module Compatibility =
 
     let private notes =
         Map.ofList
-            [ "praxis", "3.1.4 is the current Conditor default; 3.1.3 is retained as the proven lifecycle-upgrade source fixture."
-              "ordo", "Qualified with the current Conditor greenfield Ordo baseline."
-              "visual-engineering", "Qualified lifecycle release."
-              "communication-engineering", "Pinned immutable-source lifecycle release."
-              "limen", "Qualified lifecycle and application binding used by the current web scaffold."
-              "forma", "Qualified application binding."
-              "folio", "Qualified application binding."
-              "aegis", "Qualified NuGet application binding."
-              "tutela", "Qualified pinned immutable-source lifecycle release." ]
+            [ "praxis", "Praxis 3.6.0 is the Registry-qualified native work/runtime authority."
+              "ordo", "Ordo 1.4.0 is the Registry-qualified native methodology/lifecycle release."
+              "percepta", "Percepta repository lifecycle 0.1.0 is installed as a native lifecycle command."
+              "limen", "Limen 0.6.2 is a project-bound web package; Conditor no longer requires npx lifecycle delivery for Indy Init."
+              "forma", "Forma 0.3.0 is the qualified project-bound design-system package."
+              "folio", "Folio 0.3.0 is the qualified project-bound print package."
+              "aegis", "Aegis 1.0.0 is the qualified NuGet project binding."
+              "visual-engineering", "Optional repository capability; not required by the canonical Indy Init profile."
+              "communication-engineering", "Optional repository capability; not required by the canonical Indy Init profile."
+              "tutela", "Optional security capability; not required by the canonical Indy Init profile." ]
 
     let supported =
         Registry.descriptors
