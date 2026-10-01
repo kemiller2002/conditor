@@ -71,6 +71,16 @@ module Presets =
                 if File.Exists temporary then
                     File.Delete temporary
 
+    let materialize (id: string) (content: string) =
+        let normalized = id.Trim().ToLowerInvariant()
+        let path = cachePath normalized content
+
+        ensureCached path content
+        |> Result.map (fun () ->
+            { Id = normalized
+              Content = content
+              ManifestPath = path })
+
     let resolve (id: string) =
         let normalized = id.Trim().ToLowerInvariant()
 
