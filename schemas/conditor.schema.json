@@ -129,6 +129,43 @@
           }
         }
       }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "profile",
+        "profileSha256",
+        "catalogSha256",
+        "resolvedSetSha256",
+        "platform"
+      ],
+      "properties": {
+        "schema": {
+          "const": "echelon.resolution/v1"
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profileSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "catalogSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "resolvedSetSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   },
   "allOf": [
