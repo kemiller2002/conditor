@@ -54,6 +54,9 @@ module Upgrade =
                         match definition.Distribution, definition.ApplicationBinding, definition.LifecycleSource with
                         | LifecycleNpm, None, Some RegistryPackage ->
                             changed.Add id
+                        | HostTool, _, _ ->
+                            errors.Add
+                                $"Component '{id}' is a native host tool; change its version through the integrity-bound workstation resolved set, not a repository-only upgrade."
                         | _ ->
                             errors.Add
                                 $"Component '{id}' cannot be upgraded by the initial version-only upgrader because it has an application binding or non-registry lifecycle source."
