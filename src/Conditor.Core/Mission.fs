@@ -79,24 +79,35 @@ module Mission =
             with ex ->
                 Error [ $"Unable to inspect Praxis work queue: {ex.Message}" ]
 
+    let private commandFailure display arguments (result: ProcessResult) =
+        let argumentText = String.Join(" ", arguments)
+
+        Error
+            [ $"Praxis command failed with exit code {result.ExitCode}: {display} {argumentText}"
+              result.StandardOutput.Trim()
+              result.StandardError.Trim() ]
+        |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
+
     let private runRos target arguments =
-        let launcher = Path.Combine(target, "ros")
+        // Native Praxis is the primary execution boundary. The repository-local
+        // Node launcher remains only as a compatibility fallback for older repos.
+        let nativeProbe = ProcessRunner.runProcess target "praxis" [ "--version" ]
 
-        if not (File.Exists launcher) then
-            Error [ $"Praxis repository launcher is missing: {launcher}" ]
+        if nativeProbe.ExitCode = 0 then
+            let result = ProcessRunner.runProcess target "praxis" arguments
+            if result.ExitCode = 0 then Ok() else commandFailure "praxis" arguments result
         else
-            let result = ProcessRunner.runProcess target "node" (launcher :: arguments)
+            let launcher = Path.Combine(target, "ros")
 
-            if result.ExitCode = 0 then
-                Ok()
-            else
-                let argumentText = String.Join(" ", arguments)
-
+            if not (File.Exists launcher) then
                 Error
-                    [ $"Praxis command failed with exit code {result.ExitCode}: ros {argumentText}"
-                      result.StandardOutput.Trim()
-                      result.StandardError.Trim() ]
+                    [ "Praxis is not available on PATH and the legacy repository launcher is absent."
+                      $"Native probe: {nativeProbe.StandardError.Trim()}"
+                      $"Legacy launcher: {launcher}" ]
                 |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
+            else
+                let result = ProcessRunner.runProcess target "node" (launcher :: arguments)
+                if result.ExitCode = 0 then Ok() else commandFailure "ros" arguments result
 
     let private occurredAt () =
         DateTimeOffset.UtcNow.ToString("O")
