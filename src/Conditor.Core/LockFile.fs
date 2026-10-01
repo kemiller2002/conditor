@@ -80,6 +80,7 @@ module LockFile =
     let private distributionText =
         function
         | LifecycleNpm -> "lifecycle-npm"
+        | NativeLifecycle -> "native-lifecycle"
         | NpmPackage -> "npm"
         | NugetPackage -> "nuget"
 
