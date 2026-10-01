@@ -361,12 +361,14 @@ let run (check: string -> bool -> unit) =
         Environment.SetEnvironmentVariable("CONDITOR_OFFLINE", "1")
         Environment.SetEnvironmentVariable("CONDITOR_CACHE_DIR", sourceCacheRoot)
 
+        let mirroredSource =
+            SourceCache.ensure "requirements:test" source
+            |> Result.bind (fun checkout -> SourceCache.resolveEntrypoint checkout source)
+            |> Result.map File.ReadAllText
+
         check
             "offline source mirror resolves exact pinned file without GitHub"
-            (SourceCache.ensure "requirements:test" source
-             |> Result.bind (fun checkout -> SourceCache.resolveEntrypoint checkout source)
-             |> Result.map File.ReadAllText
-             = Ok "frozen contract\n")
+            (mirroredSource = Ok "frozen contract\n")
 
         File.AppendAllText(sourcePath, "tamper")
 
@@ -412,11 +414,13 @@ let run (check: string -> bool -> unit) =
         }}"""
     )
 
+    let verifiedBundle =
+        OfflineBundle.verify bundleRoot
+        |> Result.map (fun summary -> summary.ArtifactCount = 1 && summary.ResolvedSetSha256 = bundleResolvedSha)
+
     check
         "offline bundle verifier accepts exact resolved set and artifact bytes"
-        (OfflineBundle.verify bundleRoot
-         |> Result.map (fun summary -> summary.ArtifactCount = 1 && summary.ResolvedSetSha256 = bundleResolvedSha)
-         = Ok true)
+        (verifiedBundle = Ok true)
 
     File.AppendAllText(bundleArtifact, "tamper")
     check
