@@ -86,6 +86,7 @@ let private registerRepositoryComponents (target: string) (plan: InstallationPla
         for comp in plan.Components do
             let distribution =
                 match comp.Distribution with
+                | HostTool -> "github-release"
                 | LifecycleNpm
                 | NpmPackage -> "npm"
                 | NugetPackage -> "nuget"
@@ -457,6 +458,7 @@ let private runStatus json target manifestPath =
 
 let private distributionText =
     function
+    | HostTool -> "host-tool"
     | LifecycleNpm -> "lifecycle-npm"
     | NpmPackage -> "npm"
     | NugetPackage -> "nuget"
