@@ -293,6 +293,51 @@ let run (check: string -> bool -> unit) =
         "Registry workstation adapter refuses a security-revoked release"
         (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) revokedPath (fileSha256 revokedPath) |> Result.isError)
 
+    // Offline bundle verification ------------------------------------------
+    let bundleRoot = temp "offline-bundle"
+    let bundleResolved = Path.Combine(bundleRoot, "resolved-set.json")
+    let bundleArtifact = Path.Combine(bundleRoot, "artifacts", "gamma", "gamma.bin")
+    Directory.CreateDirectory(Path.GetDirectoryName bundleArtifact) |> ignore
+    File.WriteAllText(bundleResolved, "{\"schema\":\"fixture\"}\n")
+    File.WriteAllText(bundleArtifact, "gamma-offline-artifact\n")
+    let bundleResolvedSha = fileSha256 bundleResolved
+    let bundleArtifactSha = fileSha256 bundleArtifact
+    File.WriteAllText(
+        Path.Combine(bundleRoot, "bundle.json"),
+        $"""{{ 
+          "schema": "conditor.offline-bundle/v1",
+          "profileId": "registry-test",
+          "profileVersion": "0.1.0",
+          "platform": "{Platform.runtimeIdentifier ()}",
+          "resolvedSetSha256": "{bundleResolvedSha}",
+          "resolvedSetPath": "resolved-set.json",
+          "artifacts": [
+            {{
+              "systemId": "gamma",
+              "version": "3.0.0",
+              "role": "host-tool",
+              "mechanism": "github-release",
+              "purpose": "executable",
+              "name": "gamma.bin",
+              "sourceUrl": "https://example.invalid/gamma.bin",
+              "sha256": "{bundleArtifactSha}",
+              "path": "artifacts/gamma/gamma.bin"
+            }}
+          ]
+        }}"""
+    )
+
+    check
+        "offline bundle verifier accepts exact resolved set and artifact bytes"
+        (OfflineBundle.verify bundleRoot
+         |> Result.map (fun summary -> summary.ArtifactCount = 1 && summary.ResolvedSetSha256 = bundleResolvedSha)
+         = Ok true)
+
+    File.AppendAllText(bundleArtifact, "tamper")
+    check
+        "offline bundle verifier refuses tampered artifact bytes"
+        (OfflineBundle.verify bundleRoot |> Result.isError)
+
     // Dry run ---------------------------------------------------------------
     let home, mirror, profile = setup ()
     let ctx = context home mirror None
