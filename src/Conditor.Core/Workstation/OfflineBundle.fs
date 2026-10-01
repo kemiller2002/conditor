@@ -158,13 +158,13 @@ module OfflineBundle =
                                     let parsed = ResizeArray<ParsedArtifact>()
                                     let seenSystems = System.Collections.Generic.HashSet<string>(StringComparer.Ordinal)
 
-                                    for component in objects "components" root do
-                                        let id = str "systemId" component |> Option.defaultValue ""
-                                        let version = str "version" component |> Option.defaultValue ""
-                                        let role = str "role" component |> Option.defaultValue ""
-                                        let repository = str "repository" component |> Option.defaultValue ""
-                                        let tag = str "tag" component |> Option.defaultValue ""
-                                        let distributionClass = str "distributionClass" component |> Option.defaultValue ""
+                                    for releaseComponent in objects "components" root do
+                                        let id = str "systemId" releaseComponent |> Option.defaultValue ""
+                                        let version = str "version" releaseComponent |> Option.defaultValue ""
+                                        let role = str "role" releaseComponent |> Option.defaultValue ""
+                                        let repository = str "repository" releaseComponent |> Option.defaultValue ""
+                                        let tag = str "tag" releaseComponent |> Option.defaultValue ""
+                                        let distributionClass = str "distributionClass" releaseComponent |> Option.defaultValue ""
 
                                         if String.IsNullOrWhiteSpace id then
                                             errors.Add "Resolved component is missing systemId."
@@ -176,7 +176,7 @@ module OfflineBundle =
                                         | _, Error error -> errors.Add error
                                         | _ -> ()
 
-                                        let distribution = tryProperty "distribution" component
+                                        let distribution = tryProperty "distribution" releaseComponent
                                         let mechanism = distribution |> Option.bind (str "mechanism") |> Option.defaultValue ""
                                         let distributionUrl = distribution |> Option.bind (str "url")
                                         let native =
@@ -185,7 +185,7 @@ module OfflineBundle =
                                         if native && distributionClass <> "self-contained-native-cli" then
                                             errors.Add $"Native component '{id}' must be self-contained-native-cli, observed '{distributionClass}'."
 
-                                        for artifact in objects "artifacts" component do
+                                        for artifact in objects "artifacts" releaseComponent do
                                             let name = str "name" artifact |> Option.defaultValue ""
                                             let purpose = str "purpose" artifact |> Option.defaultValue ""
                                             let digest = str "sha256" artifact |> Option.defaultValue ""
