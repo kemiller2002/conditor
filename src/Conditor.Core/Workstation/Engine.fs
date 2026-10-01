@@ -487,6 +487,33 @@ module Engine =
         Directory.Move(content, destination)
         if Directory.Exists staging then Directory.Delete(staging, true)
 
+    let private installNativeAsset (artifact: string) (destination: string) (executable: string) =
+        if artifact.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+           || artifact.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) then
+            extract artifact destination
+        else
+            let staging = destination + ".staging"
+            if Directory.Exists staging then Directory.Delete(staging, true)
+            Directory.CreateDirectory staging |> ignore
+            let target = Path.Combine(staging, executable)
+            File.Copy(artifact, target, true)
+
+            if not (OperatingSystem.IsWindows()) then
+                File.SetUnixFileMode(
+                    target,
+                    UnixFileMode.UserRead
+                    ||| UnixFileMode.UserWrite
+                    ||| UnixFileMode.UserExecute
+                    ||| UnixFileMode.GroupRead
+                    ||| UnixFileMode.GroupExecute
+                    ||| UnixFileMode.OtherRead
+                    ||| UnixFileMode.OtherExecute
+                )
+
+            if Directory.Exists destination then Directory.Delete(destination, true)
+            Directory.CreateDirectory(Path.GetDirectoryName destination |> Option.ofObj |> Option.defaultValue ".") |> ignore
+            Directory.Move(staging, destination)
+
     let private writeShim (shim: string) (target: string) =
         Directory.CreateDirectory(Path.GetDirectoryName shim |> Option.ofObj |> Option.defaultValue ".") |> ignore
         File.WriteAllText(shim, $"#!/bin/sh\n# Managed by Conditor; see ~/.conditor/workstation/ledger.jsonl\nexec \"{target}\" \"$@\"\n")
@@ -527,8 +554,8 @@ module Engine =
             let asset = c.Assets[rid]
             fetch ctx (releaseUrl c asset) c.Tag asset.Name (WorkstationPaths.resolve ctx step.Resource)
         | id, Some c when id = $"{c.Id}-extract" ->
-            let archive = Path.Combine(WorkstationPaths.cache ctx, c.Id, c.Version, c.Assets[rid].Name)
-            extract archive (WorkstationPaths.resolve ctx step.Resource)
+            let artifact = Path.Combine(WorkstationPaths.cache ctx, c.Id, c.Version, c.Assets[rid].Name)
+            installNativeAsset artifact (WorkstationPaths.resolve ctx step.Resource) c.Executable
         | id, Some c when id = $"{c.Id}-shim" ->
             writeShim (WorkstationPaths.resolve ctx step.Resource) (Path.Combine(WorkstationPaths.installRoot ctx, c.Id, c.Version, c.Executable))
         | "shell-path", _ -> ensureBlock ctx (WorkstationPaths.resolve ctx step.Resource)
