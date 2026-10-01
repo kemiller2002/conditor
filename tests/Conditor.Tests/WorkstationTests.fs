@@ -131,6 +131,12 @@ let private mixedResolvedSetFile (dir: string) =
     let rid = Platform.runtimeIdentifier ()
     let path = Path.Combine(dir, "mixed.resolved.json")
     let sha ch = String.replicate 64 ch
+    let profileSha = sha "a"
+    let catalogSha = sha "b"
+    let praxisReleaseSha = sha "c"
+    let praxisArtifactSha = sha "d"
+    let aegisReleaseSha = sha "e"
+    let aegisArtifactSha = sha "f"
 
     let json =
         $"""{
@@ -138,7 +144,7 @@ let private mixedResolvedSetFile (dir: string) =
           "profile": {
             "id": "indy-init",
             "version": "0.1.0",
-            "sha256": "{{sha "a"}}"
+            "sha256": "{{profileSha}}"
           },
           "platform": "{{rid}}",
           "resolver": {
@@ -146,7 +152,7 @@ let private mixedResolvedSetFile (dir: string) =
             "version": "1.0.0"
           },
           "catalogSnapshot": {
-            "sha256": "{{sha "b"}}"
+            "sha256": "{{catalogSha}}"
           },
           "components": [
             {
@@ -163,7 +169,7 @@ let private mixedResolvedSetFile (dir: string) =
               "executable": "praxis",
               "releaseManifest": {
                 "schema": "echelon.release/v2",
-                "sha256": "{{sha "c"}}"
+                "sha256": "{{praxisReleaseSha}}"
               },
               "distribution": {
                 "mechanism": "github-release",
@@ -175,7 +181,7 @@ let private mixedResolvedSetFile (dir: string) =
                   "name": "praxis-{{rid}}.tar.gz",
                   "purpose": "executable",
                   "platform": "{{rid}}",
-                  "sha256": "{{sha "d"}}"
+                  "sha256": "{{praxisArtifactSha}}"
                 }
               ]
             },
@@ -193,7 +199,7 @@ let private mixedResolvedSetFile (dir: string) =
               "executable": null,
               "releaseManifest": {
                 "schema": "echelon.release/v2",
-                "sha256": "{{sha "e"}}"
+                "sha256": "{{aegisReleaseSha}}"
               },
               "distribution": {
                 "mechanism": "nuget",
@@ -205,7 +211,7 @@ let private mixedResolvedSetFile (dir: string) =
                   "name": "EchelonFoundry.Aegis.Core.1.0.0.nupkg",
                   "purpose": "package",
                   "platform": null,
-                  "sha256": "{{sha "f"}}"
+                  "sha256": "{{aegisArtifactSha}}"
                 }
               ]
             }
@@ -331,12 +337,13 @@ let run (check: string -> bool -> unit) =
 
     check
         "mixed Registry set injects exact project versions and resolution identity"
-        (boundPreset
-         |> Result.exists (fun json ->
+        (match boundPreset with
+         | Ok json ->
              json.Contains("\"version\": \"3.6.0\"")
              && json.Contains("\"version\": \"1.0.0\"")
              && json.Contains("\"schema\": \"echelon.resolution/v1\"")
-             && json.Contains(mixedSetSha)))
+             && json.Contains(mixedSetSha)
+         | Error _ -> false)
 
     let revokedText =
         File.ReadAllText(registrySet)
