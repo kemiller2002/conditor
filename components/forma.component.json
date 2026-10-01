@@ -6,7 +6,8 @@
   "package": "@echelon-foundry/design-system",
   "defaultVersion": "0.2.0",
   "qualifiedVersions": [
-    "0.2.0"
+    "0.2.0",
+    "0.3.0"
   ],
   "applicationBinding": "npm",
   "initArguments": [],
