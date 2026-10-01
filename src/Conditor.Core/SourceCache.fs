@@ -60,7 +60,7 @@ module SourceCache =
                 let root = document.RootElement
                 let mutable value = Unchecked.defaultof<JsonElement>
 
-                let stringProperty name =
+                let stringProperty (name: string) =
                     if root.TryGetProperty(name, &value) && value.ValueKind = JsonValueKind.String then
                         value.GetString() |> Option.ofObj
                     else
