@@ -287,6 +287,60 @@ jobs:
           "$RUNNER_TEMP/conditor-native/conditor" components
           "$RUNNER_TEMP/conditor-native/conditor" compatibility
           "$RUNNER_TEMP/conditor-native/conditor" plan --preset clean-room --target "$RUNNER_TEMP/conditor-native-target"
+      - name: Validate bootstrap script syntax
+        run: |
+          sh -n scripts/install.sh
+          pwsh -NoProfile -Command '$null = [scriptblock]::Create((Get-Content -Raw scripts/install.ps1))'
+      - name: Rehearse one-line Unix bootstrap from local release mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$RUNNER_TEMP/bootstrap-release"
+          home="$RUNNER_TEMP/bootstrap-home"
+          install="$home/bin"
+          mkdir -p "$release" "$home"
+
+          cp "$RUNNER_TEMP/conditor-native/conditor" "$release/conditor-linux-x64"
+          chmod +x "$release/conditor-linux-x64"
+          (cd "$release" && sha256sum conditor-linux-x64 > checksums.txt)
+
+          HOME="$home" \
+          SHELL=/bin/bash \
+          CONDITOR_RELEASE_BASE="file://$release" \
+          CONDITOR_INSTALL_DIR="$install" \
+          sh scripts/install.sh presets > "$RUNNER_TEMP/bootstrap-first.txt"
+
+          test -x "$install/conditor"
+          grep -F "Built-in Conditor presets:" "$RUNNER_TEMP/bootstrap-first.txt"
+          grep -F '# >>> conditor:path >>>' "$home/.profile"
+          test "$(grep -c '# >>> conditor:path >>>' "$home/.profile")" -eq 1
+
+          HOME="$home" \
+          SHELL=/bin/bash \
+          CONDITOR_RELEASE_BASE="file://$release" \
+          CONDITOR_INSTALL_DIR="$install" \
+          sh scripts/install.sh components > "$RUNNER_TEMP/bootstrap-second.txt"
+
+          grep -F "Conditor components:" "$RUNNER_TEMP/bootstrap-second.txt"
+          test "$(grep -c '# >>> conditor:path >>>' "$home/.profile")" -eq 1
+      - name: Refuse tampered bootstrap artifact without replacing installed Conditor
+        shell: bash
+        run: |
+          set -euo pipefail
+          release="$RUNNER_TEMP/bootstrap-release"
+          home="$RUNNER_TEMP/bootstrap-home"
+          install="$home/bin"
+          before="$("$install/conditor" presets | sha256sum | awk '{print $1}')"
+
+          printf 'tampered\n' > "$release/conditor-linux-x64"
+
+          if HOME="$home" SHELL=/bin/bash CONDITOR_RELEASE_BASE="file://$release" CONDITOR_INSTALL_DIR="$install" sh scripts/install.sh presets; then
+            echo "tampered bootstrap unexpectedly succeeded" >&2
+            exit 1
+          fi
+
+          after="$("$install/conditor" presets | sha256sum | awk '{print $1}')"
+          test "$before" = "$after"
 
 
   factory-rehearsal-smoke:

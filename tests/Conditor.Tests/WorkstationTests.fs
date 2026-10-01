@@ -53,6 +53,80 @@ let private profileFile (dir: string) (components: (string * string * string * s
     File.WriteAllText(path, $$"""{ "schema": "conditor.workstation-profile/v1", "id": "test", "version": 1, "extends": "minimal", "components": [ {{entries}} ] }""")
     path
 
+let private fileSha256 path =
+    use stream = File.OpenRead path
+    Convert.ToHexString(SHA256.HashData stream).ToLowerInvariant()
+
+let private resolvedSetFile (dir: string) (id: string) (version: string) (assetName: string) (assetSha: string) =
+    let rid = Platform.runtimeIdentifier ()
+    let path = Path.Combine(dir, $"{id}.resolved.json")
+    let profileSha = String.replicate 64 "a"
+    let catalogSha = String.replicate 64 "b"
+    let releaseSha = String.replicate 64 "c"
+
+    let template =
+        """{
+          "schema": "echelon.resolved-release-set/v1",
+          "profile": {
+            "id": "registry-test",
+            "version": "0.1.0",
+            "sha256": "__PROFILE_SHA__"
+          },
+          "platform": "__RID__",
+          "resolver": {
+            "name": "test",
+            "version": "1.0.0"
+          },
+          "catalogSnapshot": {
+            "sha256": "__CATALOG_SHA__"
+          },
+          "components": [
+            {
+              "systemId": "__ID__",
+              "role": "host-tool",
+              "required": true,
+              "version": "__VERSION__",
+              "repository": "example/__ID__",
+              "tag": "v__VERSION__",
+              "commit": "1111111111111111111111111111111111111111",
+              "releaseStage": "stable",
+              "lifecycleState": "active",
+              "distributionClass": "self-contained-native-cli",
+              "executable": "__ID__",
+              "releaseManifest": {
+                "schema": "echelon.release/v2",
+                "sha256": "__RELEASE_SHA__"
+              },
+              "distribution": {
+                "mechanism": "github-release",
+                "url": "https://github.com/example/__ID__/releases/tag/v__VERSION__"
+              },
+              "artifacts": [
+                {
+                  "name": "__ASSET_NAME__",
+                  "purpose": "executable",
+                  "platform": "__RID__",
+                  "sha256": "__ASSET_SHA__"
+                }
+              ]
+            }
+          ]
+        }"""
+
+    let json =
+        template
+            .Replace("__PROFILE_SHA__", profileSha)
+            .Replace("__CATALOG_SHA__", catalogSha)
+            .Replace("__RELEASE_SHA__", releaseSha)
+            .Replace("__RID__", rid)
+            .Replace("__ID__", id)
+            .Replace("__VERSION__", version)
+            .Replace("__ASSET_NAME__", assetName)
+            .Replace("__ASSET_SHA__", assetSha)
+
+    File.WriteAllText(path, json)
+    path, fileSha256 path
+
 let private setup () =
     let home = temp "home"
     let mirror = temp "mirror"
@@ -92,6 +166,82 @@ let run (check: string -> bool -> unit) =
         check "optional capabilities are not installed unless selected" (p.Optional |> List.exists (fun (id, _) -> id = "forma"))
 
     check "minimal profile installs nothing" (Profiles.resolve "minimal" |> Result.map (fun p -> p.Components.IsEmpty) = Ok true)
+
+    // Registry resolved release sets ----------------------------------------
+    let registryHome = temp "registry-home"
+    let registryMirror = temp "registry-mirror"
+    let registryAsset = bundle registryMirror "gamma" "3.0.0" (Platform.runtimeIdentifier ())
+    let registrySet, registrySetSha = resolvedSetFile registryMirror "gamma" "3.0.0" (fst registryAsset) (snd registryAsset)
+
+    check
+        "Registry resolved set refuses the wrong digest"
+        (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) registrySet (String.replicate 64 "0") |> Result.isError)
+
+    let registryProfile =
+        match ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) registrySet registrySetSha with
+        | Error e -> failwith e
+        | Ok profile -> profile
+
+    check "Registry semantic profile version is preserved" (registryProfile.Version = "0.1.0")
+    check "Registry source identity is preserved for plan authorization" (registryProfile.SourceIdentity |> Option.exists (fun s -> s.Contains($"resolved-set=sha256:{registrySetSha}")))
+    check "Registry native component becomes an exact workstation component" (registryProfile.Components |> List.map (fun x -> x.Id, x.Version) = [ "gamma", "3.0.0" ])
+
+    let registryCtx = context registryHome registryMirror None
+    let registryPlan = Engine.plan registryCtx registryProfile (Platform.runtimeIdentifier ()) [] []
+    check "Registry plan has no refusals for the supported native release" registryPlan.Refusals.IsEmpty
+    check "Registry plan carries the exact selected artifact digest" (registryPlan.Steps |> List.exists (fun s -> s.Artifact |> Option.exists (fun (_, digest) -> digest = "sha256:" + snd registryAsset)))
+    let registryApplied = applyOk registryCtx registryPlan
+    check "Registry-resolved native release installs through the normal workstation engine" registryApplied.Failed.IsNone
+    check "Registry-resolved shim reports its selected version" ((probe (Path.Combine(registryHome, ".local", "bin", "gamma")) [ "--version" ]).StandardOutput.Contains "3.0.0")
+
+    let wrongPlatformText =
+        File.ReadAllText(registrySet)
+            .Replace($"\"platform\": \"{Platform.runtimeIdentifier ()}\"", "\"platform\": \"unsupported-x64\"")
+
+    let wrongPlatformPath = Path.Combine(registryMirror, "wrong-platform.resolved.json")
+    File.WriteAllText(wrongPlatformPath, wrongPlatformText)
+
+    check
+        "Registry resolved set refuses a different target platform"
+        (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) wrongPlatformPath (fileSha256 wrongPlatformPath) |> Result.isError)
+
+    let lifecycleText =
+        File.ReadAllText(registrySet)
+            .Replace("\"role\": \"host-tool\"", "\"role\": \"repository-lifecycle\"")
+
+    let lifecyclePath = Path.Combine(registryMirror, "repository-lifecycle.resolved.json")
+    File.WriteAllText(lifecyclePath, lifecycleText)
+
+    let lifecycleResult =
+        ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) lifecyclePath (fileSha256 lifecyclePath)
+        |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id))
+
+    check
+        "Registry workstation adapter accepts native repository-lifecycle tools"
+        (lifecycleResult = Ok [ "gamma" ])
+
+    let projectBindingText =
+        File.ReadAllText(registrySet)
+            .Replace("\"role\": \"host-tool\"", "\"role\": \"project-binding\"")
+            .Replace("\"distributionClass\": \"self-contained-native-cli\"", "\"distributionClass\": \"nuget-library\"")
+
+    let projectBindingPath = Path.Combine(registryMirror, "project-binding.resolved.json")
+    File.WriteAllText(projectBindingPath, projectBindingText)
+
+    check
+        "Registry workstation adapter refuses project-bound libraries instead of guessing an install target"
+        (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) projectBindingPath (fileSha256 projectBindingPath) |> Result.isError)
+
+    let revokedText =
+        File.ReadAllText(registrySet)
+            .Replace("\"lifecycleState\": \"active\"", "\"lifecycleState\": \"security-revoked\"")
+
+    let revokedPath = Path.Combine(registryMirror, "revoked.resolved.json")
+    File.WriteAllText(revokedPath, revokedText)
+
+    check
+        "Registry workstation adapter refuses a security-revoked release"
+        (ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) revokedPath (fileSha256 revokedPath) |> Result.isError)
 
     // Dry run ---------------------------------------------------------------
     let home, mirror, profile = setup ()

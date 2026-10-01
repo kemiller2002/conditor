@@ -35,6 +35,8 @@ jobs:
         rid:
           - linux-x64
           - linux-arm64
+          - linux-musl-x64
+          - linux-musl-arm64
           - osx-x64
           - osx-arm64
           - win-x64
@@ -84,6 +86,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: conditor-*
@@ -99,27 +102,24 @@ jobs:
       - name: Create checksums
         run: |
           (cd assets && sha256sum *) > checksums.txt
+          cp checksums.txt assets/checksums.txt
           cat checksums.txt
-      - name: Generate release manifest (echelon.release/v1)
+      - name: Resolve release variables
+        id: release-vars
         shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          {
-            printf '{\n  "schema": "echelon.release/v1",\n  "systemId": "conditor",\n  "version": "%s",\n' "$VERSION"
-            printf '  "repository": "%s",\n  "tag": "%s",\n  "commit": "%s",\n' "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$GITHUB_SHA"
-            printf '  "executable": "conditor",\n  "compatibilityAliases": [],\n  "provides": [],\n'
-            printf '  "distributions": [ { "channel": "github-release", "package": null, "url": "https://github.com/%s/releases/tag/%s" } ],\n' "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
-            printf '  "artifacts": [\n'
-            first=1
-            while read -r sha name; do
-              rid="${name#conditor-}"; rid="${rid%.exe}"
-              [[ $first -eq 1 ]] || printf ',\n'
-              first=0
-              printf '    { "name": "%s", "platform": "%s", "sha256": "%s" }' "$name" "$rid" "$sha"
-            done < checksums.txt
-            printf '\n  ]\n}\n'
-          } > echelon-release.json
-          python3 -m json.tool echelon-release.json
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Generate shared Echelon release manifest
+        uses: kemiller2002/echelon-registry/actions/release-contract@73d1e87fe40c703eb1cd5e7cf7caf9d852f788b9
+        with:
+          release-input: release/echelon.release-input.json
+          artifact-dir: assets
+          output: echelon-release.json
+          version: ${{ steps.release-vars.outputs.version }}
+          tag: ${{ github.ref_name }}
+          commit: ${{ github.sha }}
+          release-stage: stable
+      - name: Inspect generated release manifest
+        run: python3 -m json.tool echelon-release.json
       - name: Create GitHub release (immutable per version)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -137,7 +137,6 @@ jobs:
           fi
           gh release create "$GITHUB_REF_NAME" \
             assets/* \
-            checksums.txt \
             echelon-release.json \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
