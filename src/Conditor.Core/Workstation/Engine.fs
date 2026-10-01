@@ -112,6 +112,9 @@ type WorkstationContext =
       /// A local mirror of release assets (`<dir>/<asset-name>`), used
       /// instead of downloading when present (offline rehearsals, tests).
       ArtifactMirror: string option
+      /// Refuse all network artifact fallback. Every required release asset
+      /// must be present in ArtifactMirror when true.
+      Offline: bool
       /// A Praxis executable that supports `installation register`, used to
       /// register installations when Project Administration is configured.
       Praxis: string option
