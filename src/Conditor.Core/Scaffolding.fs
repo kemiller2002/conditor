@@ -140,7 +140,7 @@ module Scaffolding =
 
         addCapability "folio" (fun node ->
             match resolvedVersion "folio" manifest with
-            | Some "0.3.0" -> node["sourceCommit"] <- JsonValue.Create Folio030Commit
+            | Some "0.3.0" -> node["releaseArtifact"] <- JsonValue.Create Folio030Release
             | _ -> ())
 
         addCapability "limen" ignore
