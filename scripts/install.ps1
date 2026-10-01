@@ -1,21 +1,27 @@
 param(
     [string]$Version = $(if ($env:CONDITOR_VERSION) { $env:CONDITOR_VERSION } else { "latest" }),
-    [string]$InstallDir = $(if ($env:CONDITOR_INSTALL_DIR) { $env:CONDITOR_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Conditor\bin" })
+    [string]$InstallDir = $(if ($env:CONDITOR_INSTALL_DIR) { $env:CONDITOR_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA "Conditor\bin" }),
+    [switch]$NoPathUpdate = $(if ($env:CONDITOR_NO_PATH_UPDATE -eq "1") { $true } else { $false }),
+    [string]$ReleaseBase = $env:CONDITOR_RELEASE_BASE,
+    [string[]]$Run = @()
 )
 
 $ErrorActionPreference = "Stop"
-$repository = "kemiller2002/conditor"
+$repository = $(if ($env:CONDITOR_REPOSITORY) { $env:CONDITOR_REPOSITORY } else { "kemiller2002/conditor" })
 
-switch ($env:PROCESSOR_ARCHITECTURE) {
-    "AMD64" { $arch = "x64" }
-    "ARM64" { $arch = "arm64" }
-    default { throw "Unsupported architecture: $env:PROCESSOR_ARCHITECTURE" }
+$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+switch ($architecture) {
+    "X64" { $arch = "x64" }
+    "Arm64" { $arch = "arm64" }
+    default { throw "Unsupported architecture: $architecture" }
 }
 
 $rid = "win-$arch"
 $asset = "conditor-$rid.exe"
 
-if ($Version -eq "latest") {
+if ($ReleaseBase) {
+    $base = $ReleaseBase.TrimEnd("/")
+} elseif ($Version -eq "latest") {
     $base = "https://github.com/$repository/releases/latest/download"
 } else {
     $tag = if ($Version.StartsWith("v")) { $Version } else { "v$Version" }
@@ -46,12 +52,38 @@ try {
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
     $destination = Join-Path $InstallDir "conditor.exe"
-    Move-Item -Force $binary $destination
+    $staged = Join-Path $InstallDir (".conditor.new." + [Guid]::NewGuid().ToString("N"))
+    Copy-Item $binary $staged
+    Move-Item -Force $staged $destination
 
     Write-Host "Installed Conditor to $destination"
 
+    $currentUserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+    $pathParts = @()
+    if ($currentUserPath) {
+        $pathParts = $currentUserPath -split ";" | Where-Object { $_ }
+    }
+
     if (($env:PATH -split ";") -notcontains $InstallDir) {
-        Write-Host "Add $InstallDir to PATH to run 'conditor' directly."
+        $env:PATH = "$InstallDir;$env:PATH"
+    }
+
+    if ($pathParts -notcontains $InstallDir) {
+        if ($NoPathUpdate) {
+            Write-Host "Add $InstallDir to the user PATH to run 'conditor' directly in future shells."
+        } else {
+            $newUserPath = if ($currentUserPath) { "$InstallDir;$currentUserPath" } else { $InstallDir }
+            [Environment]::SetEnvironmentVariable("PATH", $newUserPath, "User")
+            Write-Host "Added $InstallDir to the user PATH for future shells."
+        }
+    }
+
+    if ($Run.Count -gt 0) {
+        Write-Host "Running installed Conditor: $($Run -join ' ')"
+        & $destination @Run
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
     }
 }
 finally {
