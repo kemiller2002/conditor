@@ -523,6 +523,91 @@ module OfflineBundle =
                             | _ ->
                                 errors.Add "Offline bundle artifact entry needs path and valid sha256."
 
+                        let mutable projectManifestPath: string option = None
+
+                        match tryProperty "projectManifest" manifest with
+                        | None
+                        | Some project when project.ValueKind = JsonValueKind.Null -> ()
+                        | Some project when project.ValueKind = JsonValueKind.Object ->
+                            match str "path" project, str "sha256" project with
+                            | Some relativePath, Some expected when isSha256 expected ->
+                                match ensureInside root (Path.Combine(root, relativePath)) with
+                                | Error error -> errors.Add error
+                                | Ok path ->
+                                    projectManifestPath <- Some path
+
+                                    if not (File.Exists path) then
+                                        errors.Add $"Offline bundle project manifest is missing: {relativePath}."
+                                    else
+                                        let observed = sha256File path
+                                        if observed <> expected then
+                                            errors.Add $"Offline bundle project manifest digest mismatch: expected sha256:{expected}, observed sha256:{observed}."
+                            | _ ->
+                                errors.Add "Offline bundle projectManifest needs path and valid sha256."
+                        | Some _ ->
+                            errors.Add "Offline bundle projectManifest must be an object or null."
+
+                        let sources = objects "sources" manifest
+                        let sourceRoot = Path.Combine(root, "sources")
+
+                        for sourceEntry in sources do
+                            match
+                                str "repository" sourceEntry,
+                                str "commit" sourceEntry,
+                                str "entrypoint" sourceEntry,
+                                str "path" sourceEntry,
+                                str "sha256" sourceEntry
+                            with
+                            | Some repository, Some commit, Some entrypoint, Some relativePath, Some expected
+                                when isSha256 expected ->
+                                let source =
+                                    { Repository = repository
+                                      Commit = commit
+                                      Entrypoint = FileArtifact entrypoint }
+
+                                let expectedCheckout = SourceCache.mirrorCheckoutPath sourceRoot source
+                                let expectedPath = Path.GetFullPath(Path.Combine(expectedCheckout, entrypoint))
+
+                                match ensureInside expectedCheckout expectedPath, ensureInside root (Path.Combine(root, relativePath)) with
+                                | Error error, _ -> errors.Add error
+                                | _, Error error -> errors.Add error
+                                | Ok canonicalPath, Ok recordedPath ->
+                                    if canonicalPath <> recordedPath then
+                                        errors.Add $"Offline source path does not match repository/commit identity for {repository}@{commit}:{entrypoint}."
+                                    elif not (File.Exists recordedPath) then
+                                        errors.Add $"Offline source file is missing: {relativePath}."
+                                    else
+                                        let observed = sha256File recordedPath
+
+                                        if observed <> expected then
+                                            errors.Add $"Offline source digest mismatch for {repository}@{commit}:{entrypoint}. Expected sha256:{expected}, observed sha256:{observed}."
+
+                                    let metadataPath = Path.Combine(expectedCheckout, ".conditor-source.json")
+
+                                    if not (File.Exists metadataPath) then
+                                        errors.Add $"Offline source metadata is missing for {repository}@{commit}."
+                                    else
+                                        try
+                                            use sourceDocument = JsonDocument.Parse(File.ReadAllBytes metadataPath)
+                                            let sourceMetadata = sourceDocument.RootElement
+                                            let mutable filesElement = Unchecked.defaultof<JsonElement>
+                                            let mutable digestElement = Unchecked.defaultof<JsonElement>
+
+                                            if str "schema" sourceMetadata <> Some "conditor.source-mirror/v1"
+                                               || str "repository" sourceMetadata <> Some repository
+                                               || str "commit" sourceMetadata <> Some commit then
+                                                errors.Add $"Offline source metadata identity mismatch for {repository}@{commit}."
+                                            elif not (sourceMetadata.TryGetProperty("files", &filesElement))
+                                                 || filesElement.ValueKind <> JsonValueKind.Object
+                                                 || not (filesElement.TryGetProperty(entrypoint, &digestElement))
+                                                 || digestElement.ValueKind <> JsonValueKind.String
+                                                 || digestElement.GetString() <> expected then
+                                                errors.Add $"Offline source metadata does not bind {entrypoint} to sha256:{expected}."
+                                        with :? JsonException as ex ->
+                                            errors.Add $"Offline source metadata is invalid JSON for {repository}@{commit}: {ex.Message}"
+                            | _ ->
+                                errors.Add "Offline bundle source entry needs repository, commit, entrypoint, path and valid sha256."
+
                         if errors.Count > 0 then
                             Error(String.Join(" ", errors))
                         else
@@ -535,8 +620,11 @@ module OfflineBundle =
                                   ProfileId = profileId
                                   ProfileVersion = profileVersion
                                   ArtifactCount = artifacts.Length
+                                  SourceFileCount = sources.Length
+                                  ProjectManifestPath = projectManifestPath
                                   NativeMirror = Path.Combine(root, "mirror")
-                                  PackageMirror = Path.Combine(root, "packages") }
+                                  PackageMirror = Path.Combine(root, "packages")
+                                  SourceMirror = sourceRoot }
                     | _ ->
                         Error "Offline bundle manifest is missing profile/platform/resolved-set identity."
         with
