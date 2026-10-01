@@ -230,144 +230,74 @@ module Profiles =
 /// supports native host tools only. Other distribution classes require their
 /// own explicit binding/install semantics and are refused here.
 module ResolvedReleaseSets =
-    let private tryProperty (name: string) (element: JsonElement) =
-        let mutable value = Unchecked.defaultof<JsonElement>
-        if element.ValueKind = JsonValueKind.Object && element.TryGetProperty(name, &value) then Some value else None
+    let private nativeComponent (platform: string) (component: Conditor.Core.ResolvedSetComponent) =
+        match component.Role, component.DistributionClass, component.Executable with
+        | ("host-tool" | "repository-lifecycle"), "self-contained-native-cli", Some executable ->
+            let asset =
+                component.Artifacts
+                |> List.tryFind (fun artifact ->
+                    artifact.Purpose = "executable"
+                    && artifact.Platform = Some platform)
 
-    let private str name element =
-        match tryProperty name element with
-        | Some v when v.ValueKind = JsonValueKind.String -> v.GetString() |> Option.ofObj
-        | _ -> None
-
-    let private boolValue name element =
-        match tryProperty name element with
-        | Some v when v.ValueKind = JsonValueKind.True -> Some true
-        | Some v when v.ValueKind = JsonValueKind.False -> Some false
-        | _ -> None
-
-    let private objects name element =
-        match tryProperty name element with
-        | Some v when v.ValueKind = JsonValueKind.Array -> v.EnumerateArray() |> Seq.toList
-        | _ -> []
-
-    let private isSha256 (value: string) =
-        value.Length = 64 && value |> Seq.forall Char.IsAsciiHexDigitLower
-
-    let private normalizeSha256 (value: string) =
-        if value.StartsWith("sha256:", StringComparison.Ordinal) then value.Substring("sha256:".Length) else value
-
-    let private sha256Bytes (bytes: byte array) =
-        Security.Cryptography.SHA256.HashData bytes
-        |> Convert.ToHexString
-        |> fun value -> value.ToLowerInvariant()
-
-    let private parseComponent (platform: string) (element: JsonElement) : Result<ProfileComponent, string> =
-        let id = str "systemId" element |> Option.defaultValue "<unknown>"
-        let role = str "role" element
-        let distributionClass = str "distributionClass" element
-        let lifecycleState = str "lifecycleState" element
-        let executable = str "executable" element
-
-        let distributionMechanism =
-            tryProperty "distribution" element
-            |> Option.bind (str "mechanism")
-
-        let executableArtifacts =
-            objects "artifacts" element
-            |> List.choose (fun artifact ->
-                match str "purpose" artifact, str "platform" artifact, str "name" artifact, str "sha256" artifact with
-                | Some "executable", Some artifactPlatform, Some name, Some digest when artifactPlatform = platform && isSha256 digest ->
-                    Some { Name = name; Sha256 = digest }
-                | _ -> None)
-
-        match role, distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
-        | (Some "host-tool" | Some "repository-lifecycle"), Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
-            match executableArtifacts with
-            | [ asset ] ->
-                Ok
-                    { Id = id
-                      Version = version
-                      Executable = exe
-                      VersionProbe = [ "--version" ]
-                      Repository = repository
-                      Tag = tag
-                      Assets = Map.ofList [ platform, asset ] }
-            | [] -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
-            | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
-        | Some other, _, _, _, _, _, _, _ when other <> "host-tool" && other <> "repository-lifecycle" ->
-            Error $"resolved component '{id}' has role '{other}'; workstation native installation accepts only host-tool or repository-lifecycle"
-        | _, Some other, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
-            Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation currently accepts only self-contained-native-cli"
-        | _, _, Some state, _, _, _, _, _ when state <> "active" ->
-            Error $"resolved component '{id}' is {state}; normal installation accepts only active releases"
-        | _, _, _, Some mechanism, _, _, _, _ when mechanism <> "github-release" ->
-            Error $"resolved component '{id}' uses distribution mechanism '{mechanism}'; native workstation installation currently accepts only github-release"
+            match asset with
+            | Some selected ->
+                Ok(
+                    Some
+                        { Id = component.Id
+                          Version = component.Version
+                          Executable = executable
+                          VersionProbe = [ "--version" ]
+                          Repository = component.Repository
+                          Tag = component.Tag
+                          Assets =
+                            Map.ofList
+                                [ platform,
+                                  { Name = selected.Name
+                                    Sha256 = selected.Sha256 } ] }
+                )
+            | None ->
+                Error $"resolved native component '{component.Id}' has no executable artifact for {platform}"
+        | "project-binding", ("web-package" | "nuget-library"), _ ->
+            Ok None
         | _ ->
-            Error $"resolved component '{id}' is missing required native-host release facts"
+            Error
+                $"resolved component '{component.Id}' role/class '{component.Role}/{component.DistributionClass}' cannot be projected into a workstation plan"
 
     let parseVerified (expectedRuntimeIdentifier: string) (expectedSha256: string) (bytes: byte array) : Result<WorkstationProfile, string> =
-        let expected = normalizeSha256 expectedSha256
+        Conditor.Core.ResolvedReleaseSet.parseVerified expectedRuntimeIdentifier expectedSha256 bytes
+        |> Result.mapError (String.concat "; ")
+        |> Result.bind (fun resolved ->
+            let projected =
+                resolved.Components
+                |> List.map (nativeComponent resolved.Platform)
+                |> List.fold
+                    (fun state item ->
+                        state
+                        |> Result.bind (fun values ->
+                            item
+                            |> Result.map (function
+                                | Some value -> value :: values
+                                | None -> values)))
+                    (Ok [])
+                |> Result.map List.rev
 
-        if not (isSha256 expected) then
-            Error "resolved release set requires an expected 64-character lowercase SHA-256"
-        else
-            let actual = sha256Bytes bytes
-
-            if actual <> expected then
-                Error $"resolved release set digest mismatch: expected sha256:{expected}, observed sha256:{actual}"
-            else
-                try
-                    use document = JsonDocument.Parse bytes
-                    let root = document.RootElement
-
-                    if str "schema" root <> Some "echelon.resolved-release-set/v1" then
-                        Error "resolved release set must declare schema echelon.resolved-release-set/v1"
-                    else
-                        let profile = tryProperty "profile" root
-                        let snapshot = tryProperty "catalogSnapshot" root
-                        let platform = str "platform" root
-
-                        match profile, snapshot, platform with
-                        | Some profileRef, Some snapshotRef, Some resolvedPlatform when resolvedPlatform <> expectedRuntimeIdentifier ->
-                            Error $"resolved release set targets {resolvedPlatform}, but this host is {expectedRuntimeIdentifier}"
-                        | Some profileRef, Some snapshotRef, Some resolvedPlatform ->
-                            match str "id" profileRef, str "version" profileRef, str "sha256" profileRef, str "sha256" snapshotRef with
-                            | Some profileId, Some profileVersion, Some profileSha, Some snapshotSha when isSha256 profileSha && isSha256 snapshotSha ->
-                                let parsedComponents =
-                                    objects "components" root
-                                    |> List.map (parseComponent resolvedPlatform)
-                                    |> List.fold
-                                        (fun state item ->
-                                            state
-                                            |> Result.bind (fun values ->
-                                                item |> Result.map (fun value -> value :: values)))
-                                        (Ok [])
-                                    |> Result.map List.rev
-
-                                parsedComponents
-                                |> Result.bind (fun components ->
-                                    if components.IsEmpty then
-                                        Error "resolved release set contains no installable host components"
-                                    else
-                                        let ids = components |> List.map _.Id
-                                        if (ids |> List.distinct |> List.length) <> ids.Length then
-                                            Error "resolved release set contains duplicate system ids"
-                                        else
-                                            Ok
-                                                { Id = profileId
-                                                  Version = profileVersion
-                                                  SourceIdentity =
-                                                    Some $"resolved-set=sha256:{actual};profile=sha256:{profileSha};catalog=sha256:{snapshotSha}"
-                                                  Extends = None
-                                                  Description = $"Registry-resolved {profileId}@{profileVersion}"
-                                                  Prerequisites = []
-                                                  Components = components
-                                                  Optional = []
-                                                  Providers = [] })
-                            | _ -> Error "resolved release set profile/catalog identity is incomplete or has an invalid SHA-256"
-                        | _ -> Error "resolved release set needs profile, catalogSnapshot and platform"
-                with :? JsonException as ex ->
-                    Error $"resolved release set is not valid JSON: {ex.Message}"
+            projected
+            |> Result.bind (fun components ->
+                if components.IsEmpty then
+                    Error "resolved release set contains no native workstation or repository-lifecycle components"
+                else
+                    Ok
+                        { Id = resolved.ProfileId
+                          Version = resolved.ProfileVersion
+                          SourceIdentity =
+                            Some
+                                $"resolved-set=sha256:{resolved.ResolvedSetSha256};profile=sha256:{resolved.ProfileSha256};catalog=sha256:{resolved.CatalogSha256}"
+                          Extends = None
+                          Description = $"Registry-resolved {resolved.ProfileId}@{resolved.ProfileVersion}"
+                          Prerequisites = []
+                          Components = components
+                          Optional = []
+                          Providers = [] }))
 
     let loadFile (expectedRuntimeIdentifier: string) (path: string) (expectedSha256: string) =
         if not (File.Exists path) then
