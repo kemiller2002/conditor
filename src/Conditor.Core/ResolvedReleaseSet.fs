@@ -46,9 +46,9 @@ module ResolvedReleaseSet =
         | _ -> None
 
     let private requiredString context name element =
-        str name element
-        |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        |> Result.ofOption $"{context}.{name} must be a non-empty string"
+        match str name element with
+        | Some value when not (String.IsNullOrWhiteSpace value) -> Ok value
+        | _ -> Error $"{context}.{name} must be a non-empty string"
 
     let private boolValue name element =
         match tryProperty name element with
@@ -302,37 +302,46 @@ module ResolvedReleaseSet =
 
     let bindPresetJson (resolved: VerifiedResolvedReleaseSet) (json: string) =
         try
-            let root = JsonNode.Parse(json).AsObject()
-            let components = root["components"].AsArray()
-            let byId = resolved.Components |> List.map (fun item -> item.Id, item) |> Map.ofList
-            let seen = Collections.Generic.HashSet<string>(StringComparer.Ordinal)
+            let parsed = JsonNode.Parse(json)
 
-            for node in components do
-                let item = node.AsObject()
-                let id = item["id"].GetValue<string>()
-                seen.Add id |> ignore
-
-                match Map.tryFind id byId with
-                | Some selection -> item["version"] <- JsonValue.Create selection.Version
-                | None -> ()
-
-            let missing =
-                resolved.Components
-                |> List.filter (fun item -> item.Required && not (seen.Contains item.Id))
-                |> List.map _.Id
-
-            if not missing.IsEmpty then
-                Error [ $"verified resolved set requires components not present in the preset: {String.concat ", " missing}" ]
+            if isNull parsed then
+                Error [ "unable to bind resolved release set into empty Conditor preset JSON" ]
             else
-                let resolution = JsonObject()
-                resolution["schema"] <- JsonValue.Create "echelon.resolution/v1"
-                resolution["profile"] <- JsonValue.Create $"{resolved.ProfileId}@{resolved.ProfileVersion}"
-                resolution["profileSha256"] <- JsonValue.Create resolved.ProfileSha256
-                resolution["catalogSha256"] <- JsonValue.Create resolved.CatalogSha256
-                resolution["resolvedSetSha256"] <- JsonValue.Create resolved.ResolvedSetSha256
-                resolution["platform"] <- JsonValue.Create resolved.Platform
-                root["resolution"] <- resolution
+                let root = parsed.AsObject()
+                let components = root["components"].AsArray()
+                let byId = resolved.Components |> List.map (fun item -> item.Id, item) |> Map.ofList
+                let seen = Collections.Generic.HashSet<string>(StringComparer.Ordinal)
+                let errors = ResizeArray<string>()
 
-                Ok(root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + "\n")
+                for node in components do
+                    let item = node.AsObject()
+                    let id = item["id"].GetValue<string>()
+                    seen.Add id |> ignore
+
+                    match Map.tryFind id byId with
+                    | None ->
+                        errors.Add $"Conditor preset component '{id}' is absent from the verified resolved release set"
+                    | Some selection ->
+                        match validateAgainstDescriptor selection with
+                        | Error error -> errors.Add error
+                        | Ok() -> item["version"] <- JsonValue.Create selection.Version
+
+                for selection in resolved.Components do
+                    if selection.Required && not (seen.Contains selection.Id) then
+                        errors.Add $"verified resolved set requires '{selection.Id}', but the Conditor preset does not declare it"
+
+                if errors.Count > 0 then
+                    Error(List.ofSeq errors)
+                else
+                    let resolution = JsonObject()
+                    resolution["schema"] <- JsonValue.Create "echelon.resolution/v1"
+                    resolution["profile"] <- JsonValue.Create $"{resolved.ProfileId}@{resolved.ProfileVersion}"
+                    resolution["profileSha256"] <- JsonValue.Create resolved.ProfileSha256
+                    resolution["catalogSha256"] <- JsonValue.Create resolved.CatalogSha256
+                    resolution["resolvedSetSha256"] <- JsonValue.Create resolved.ResolvedSetSha256
+                    resolution["platform"] <- JsonValue.Create resolved.Platform
+                    root["resolution"] <- resolution
+
+                    Ok(root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + "\n")
         with ex ->
             Error [ $"unable to bind resolved release set into Conditor preset: {ex.Message}" ]
