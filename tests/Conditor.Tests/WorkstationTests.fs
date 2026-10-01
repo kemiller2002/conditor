@@ -136,7 +136,7 @@ let private setup () =
     home, mirror, profile
 
 let private context home mirror praxis : WorkstationContext =
-    { Home = home; ArtifactMirror = Some mirror; Praxis = praxis; TargetId = Some "ws-test" }
+    { Home = home; ArtifactMirror = Some mirror; Offline = false; Praxis = praxis; TargetId = Some "ws-test" }
 
 let private planFor ctx profilePath =
     match Profiles.resolve profilePath with
