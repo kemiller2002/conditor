@@ -36,6 +36,9 @@ type Expected =
     | FileSha256 of path: string * sha256: string
     | DirectoryWithFile of path: string * file: string
     | CommandReports of executable: string * arguments: string list * contains: string
+    /// The executable emits a JSON identity whose properties (matched
+    /// case-insensitively) equal these Registry facts exactly.
+    | IdentityReports of executable: string * arguments: string list * identity: (string * string) list
     | ManagedBlock of file: string * block: string
     | PrerequisitePresent of id: string
 
@@ -48,6 +51,10 @@ module Expected =
         | Expected.CommandReports(exe, args, contains) ->
             let joined = String.concat " " args
             $"`{exe} {joined}` exits 0 and reports {contains}"
+        | Expected.IdentityReports(exe, args, identity) ->
+            let joined = String.concat " " args
+            let facts = identity |> List.map (fun (k, v) -> $"{k}={v}") |> String.concat ", "
+            $"`{exe} {joined}` exits 0 and reports identity {facts}"
         | Expected.ManagedBlock(f, b) -> $"{f} holds exactly one current conditor:{b} block"
         | Expected.PrerequisitePresent id -> $"{id} is present and adopted, never modified"
 
@@ -261,6 +268,20 @@ module Engine =
 
     // -------------------------------------------------------------- planning
 
+    /// The Registry identity a lifecycle-contract executable must report.
+    let lifecycleIdentity (c: ProfileComponent) (lifecycle: RepositoryLifecycle) =
+        [ "systemId", c.Id
+          "repository", c.Repository
+          "executable", c.Executable
+          "releaseVersion", c.Version
+          "sourceCommit", lifecycle.SourceCommit ]
+
+    /// What proves an installed executable is the selected release.
+    let installedReceipt (executable: string) (c: ProfileComponent) =
+        match c.Lifecycle with
+        | Some lifecycle -> Expected.IdentityReports(executable, c.VersionProbe, lifecycleIdentity c lifecycle)
+        | None -> Expected.CommandReports(executable, c.VersionProbe, c.Version)
+
     let private releaseUrl (c: ProfileComponent) (asset: ReleaseAsset) =
         $"https://github.com/{c.Repository}/releases/download/{c.Tag}/{asset.Name}"
 
@@ -337,7 +358,7 @@ module Engine =
                         Artifact = None
                         Trust = Trust.IntegrityVerified
                         Command = Some(String.concat " " (c.Executable :: c.VersionProbe))
-                        Expected = Expected.CommandReports(display shim, c.VersionProbe, c.Version)
+                        Expected = installedReceipt (display shim) c
                         Ownership = owned shim
                         RequiresAuthorization = true
                         DependsOn = [ $"{c.Id}-extract" ]
@@ -429,6 +450,53 @@ module Engine =
                 if r.ExitCode = -1 then Outcome.Indeterminate, r.StandardError.Trim()
                 elif r.ExitCode = 0 && r.StandardOutput.Contains contains then Outcome.Match, r.StandardOutput.Trim()
                 else Outcome.Mismatch, $"exit {r.ExitCode}: {r.StandardOutput.Trim()}"
+        | Expected.IdentityReports(display, args, identity) ->
+            let exe = WorkstationPaths.resolve ctx display
+
+            if not (File.Exists exe) then
+                Outcome.Mismatch, "absent"
+            else
+                let r = probe exe args
+
+                if r.ExitCode = -1 then
+                    Outcome.Indeterminate, r.StandardError.Trim()
+                elif r.ExitCode <> 0 then
+                    Outcome.Mismatch, $"exit {r.ExitCode}: {r.StandardOutput.Trim()}"
+                else
+                    let reported =
+                        try
+                            match JsonNode.Parse r.StandardOutput with
+                            | :? JsonObject as o ->
+                                o
+                                |> Seq.choose (fun kv ->
+                                    match kv.Value with
+                                    | :? JsonValue as v ->
+                                        match v.TryGetValue<string>() with
+                                        | true, text -> text |> Option.ofObj |> Option.map (fun t -> kv.Key.ToLowerInvariant(), t)
+                                        | _ -> None
+                                    | _ -> None)
+                                |> Map.ofSeq
+                                |> Some
+                            | _ -> None
+                        with :? JsonException ->
+                            None
+
+                    match reported with
+                    | None -> Outcome.Mismatch, "identity output is not a JSON object"
+                    | Some facts ->
+                        let wrong =
+                            identity
+                            |> List.choose (fun (key, expected) ->
+                                match facts |> Map.tryFind (key.ToLowerInvariant()) with
+                                | Some actual when actual = expected -> None
+                                | actual ->
+                                    let shown = actual |> Option.defaultValue "<absent>"
+                                    Some $"{key}: expected {expected}, reported {shown}")
+
+                        if wrong.IsEmpty then
+                            Outcome.Match, identity |> List.map (fun (k, v) -> $"{k}={v}") |> String.concat "; "
+                        else
+                            Outcome.Mismatch, String.concat "; " wrong
         | Expected.ManagedBlock(display, block) ->
             let file = WorkstationPaths.resolve ctx display
 
