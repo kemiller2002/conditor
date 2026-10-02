@@ -1,11 +1,17 @@
 # Operator release entry point:
 #
+# Manual:
 #   gh workflow run release-orchestrator.yml -f bump=patch     (or minor|major|X.Y.Z)
 #
+# Repository-driven:
+#   update release/requested-version.txt to an exact X.Y.Z version on main.
+#
 # Updates the single authoritative version (Directory.Build.props) exactly
-# once, validates, commits and tags, then dispatches the existing native
-# release workflow (release.yml) on the new tag. Refuses to reuse a version
-# whose tag already points elsewhere.
+# once when needed, validates, tags, then dispatches the existing native
+# release workflow (release.yml) on the tag. A first release may use the
+# version already present in Directory.Build.props; in that case no empty
+# release commit is created. Refuses to reuse a version whose tag points
+# elsewhere.
 name: Release (operator)
 
 on:
@@ -19,6 +25,11 @@ on:
         description: "Validate and show the version without committing, tagging or releasing"
         type: boolean
         default: false
+  push:
+    branches:
+      - main
+    paths:
+      - release/requested-version.txt
 
 permissions:
   contents: write
@@ -43,22 +54,46 @@ jobs:
         id: version
         shell: bash
         env:
-          BUMP: ${{ inputs.bump }}
+          REQUESTED_INPUT: ${{ inputs.bump }}
         run: |
           set -euo pipefail
           current="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)"
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            BUMP="$(tr -d '[:space:]' < release/requested-version.txt)"
+            [[ "$BUMP" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+              echo "::error::release/requested-version.txt must contain an exact X.Y.Z version"
+              exit 2
+            }
+          else
+            BUMP="$REQUESTED_INPUT"
+          fi
+
           IFS=. read -r major minor patch <<<"$current"
           case "$BUMP" in
             patch) next="$major.$minor.$((patch + 1))" ;;
             minor) next="$major.$((minor + 1)).0" ;;
             major) next="$((major + 1)).0.0" ;;
             *)
-              [[ "$BUMP" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "::error::bump must be patch, minor, major or X.Y.Z"; exit 2; }
-              next="$BUMP" ;;
+              [[ "$BUMP" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+                echo "::error::bump must be patch, minor, major or X.Y.Z"
+                exit 2
+              }
+              next="$BUMP"
+              ;;
           esac
+
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "next=$next" >> "$GITHUB_OUTPUT"
+
+          if [[ "$current" == "$next" ]]; then
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
           if git ls-remote --exit-code --tags origin "refs/tags/v$next" >/dev/null; then
+            git fetch --force origin "refs/tags/v$next:refs/tags/v$next"
             tagged="$(git rev-parse "v$next^{commit}")"
             if [[ "$current" == "$next" && "$tagged" == "$(git rev-parse HEAD)" ]]; then
               echo "rerun=true" >> "$GITHUB_OUTPUT"
@@ -69,9 +104,10 @@ jobs:
           else
             echo "rerun=false" >> "$GITHUB_OUTPUT"
           fi
+
           echo "Conditor $current -> $next"
       - name: Update the authoritative version
-        if: steps.version.outputs.rerun == 'false'
+        if: steps.version.outputs.rerun == 'false' && steps.version.outputs.version_changed == 'true'
         run: sed -i "s:<Version>${{ steps.version.outputs.current }}</Version>:<Version>${{ steps.version.outputs.next }}</Version>:" Directory.Build.props
       - name: Validate
         run: |
@@ -80,15 +116,22 @@ jobs:
           dotnet run --project tests/Conditor.Tests --configuration Release --no-build
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/plan-home"
       - name: Commit and tag
-        if: steps.version.outputs.rerun == 'false' && !inputs.dry_run
+        if: steps.version.outputs.rerun == 'false' && (github.event_name == 'push' || !inputs.dry_run)
         run: |
+          set -euo pipefail
           git config user.name "Conditor Release"
           git config user.email "actions@users.noreply.github.com"
-          git commit -am "Release v${{ steps.version.outputs.next }}"
-          git tag "v${{ steps.version.outputs.next }}"
-          git push origin HEAD:main "v${{ steps.version.outputs.next }}"
+
+          if [[ "${{ steps.version.outputs.version_changed }}" == "true" ]]; then
+            git commit -am "Release v${{ steps.version.outputs.next }}"
+            git tag "v${{ steps.version.outputs.next }}"
+            git push origin HEAD:main "v${{ steps.version.outputs.next }}"
+          else
+            git tag "v${{ steps.version.outputs.next }}"
+            git push origin "v${{ steps.version.outputs.next }}"
+          fi
       - name: Dispatch native release
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.event_name == 'push' || !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v${{ steps.version.outputs.next }}"
