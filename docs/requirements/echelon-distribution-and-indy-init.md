@@ -92,6 +92,12 @@ The exact names may differ, but the roles SHALL remain distinct.
 
 **CON-DIST-035** Identity aliases and renames SHALL resolve to one canonical system id; ambiguous identities SHALL fail rather than create duplicate installations.
 
+**CON-DIST-036** Conditor SHALL consume Echelon Registry's generic repository lifecycle contract `echelon.repository-lifecycle` (`spec/repository-lifecycle-contract.md` in `kemiller2002/echelon-registry`) only from a release that declares it, as carried into a verified resolved release set's `repositoryLifecycle` field. It SHALL refuse unsupported contract versions and unknown contracts, and SHALL refuse generic lifecycle planning for a `repository-lifecycle` component whose release declares no contract.
+
+**CON-DIST-037** For a conforming component, Conditor SHALL derive every lifecycle fact — system id, exact version, repository, tag, source commit, executable, platform artifact and SHA-256, contract version — from the verified resolved release set, and SHALL plan only the contract invocations `<executable> status|init|verify|doctor|upgrade --root <repository>`. Conditor source SHALL contain no system-specific lifecycle, URL or version logic for such components.
+
+**CON-DIST-038** Before any repository invocation, Conditor SHALL revalidate the cached artifact digest and the installed executable's full contract identity (`systemId`, `repository`, `executable`, `releaseVersion`, `sourceCommit`) against the resolved release set, and SHALL execute only the invocations disclosed in a plan whose digest binds the resolved-set identity, platform and repository root.
+
 ### Installation plan and execution
 
 **CON-DIST-040** Conditor SHALL calculate the complete dependency and effect plan before mutation.
