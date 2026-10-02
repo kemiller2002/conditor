@@ -6,28 +6,41 @@ name: Registry lifecycle clean-host proof
 # published release bytes. Nothing here names the component: every fact comes
 # from the integrity-bound resolved release set at a pinned Registry commit.
 
+# The default pins are the Dokimos 0.2.0 distribution proof: Registry
+# profile dokimos-proof 0.1.0 at an immutable Registry commit, and the
+# expected digest of its linux-x64 resolved release set.
+
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/registry-lifecycle-proof.yml'
+      - 'src/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/registry-lifecycle-proof.yml'
+      - 'src/**'
   workflow_dispatch:
     inputs:
       registry-commit:
         description: Full echelon-registry commit holding the profile, catalog and resolved set.
-        required: true
+        required: false
         type: string
       profile:
         description: Registry profile path at that commit.
-        required: true
+        required: false
         type: string
       snapshot:
         description: Registry catalog snapshot path at that commit.
-        required: true
+        required: false
         type: string
       resolved-set:
         description: Checked-in resolved release set path (linux-x64) at that commit.
-        required: true
+        required: false
         type: string
       resolved-set-sha256:
         description: Expected SHA-256 of the resolved release set.
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -37,18 +50,18 @@ jobs:
   clean-host-proof:
     runs-on: ubuntu-latest
     env:
-      REGISTRY_COMMIT: ${{ inputs.registry-commit }}
-      PROFILE: ${{ inputs.profile }}
-      SNAPSHOT: ${{ inputs.snapshot }}
-      RESOLVED_SET: ${{ inputs.resolved-set }}
-      RESOLVED_SET_SHA256: ${{ inputs.resolved-set-sha256 }}
+      REGISTRY_COMMIT: ${{ inputs.registry-commit || '3f7f31895d0e480ae0d176ea34670503920d26cf' }}
+      PROFILE: ${{ inputs.profile || 'profiles/dokimos-proof.profile.json' }}
+      SNAPSHOT: ${{ inputs.snapshot || 'snapshots/dokimos-proof-0.1.0.catalog.json' }}
+      RESOLVED_SET: ${{ inputs.resolved-set || 'resolved/dokimos-proof/0.1.0/linux-x64.json' }}
+      RESOLVED_SET_SHA256: ${{ inputs.resolved-set-sha256 || '928cf98dbfff9da7594063738bb35eeeaeb55494ebf77f3510cd0056eb143d49' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/checkout@v4
         with:
           repository: kemiller2002/echelon-registry
-          ref: ${{ inputs.registry-commit }}
+          ref: ${{ env.REGISTRY_COMMIT }}
           path: registry
 
       - uses: actions/setup-dotnet@v4
