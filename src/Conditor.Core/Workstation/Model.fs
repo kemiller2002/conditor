@@ -230,11 +230,11 @@ module Profiles =
 /// supports native host tools only. Other distribution classes require their
 /// own explicit binding/install semantics and are refused here.
 module ResolvedReleaseSets =
-    let private nativeComponent (platform: string) (component: Conditor.Core.ResolvedSetComponent) =
-        match component.Role, component.DistributionClass, component.Executable with
+    let private nativeComponent (platform: string) (resolvedComponent: Conditor.Core.ResolvedSetComponent) =
+        match resolvedComponent.Role, resolvedComponent.DistributionClass, resolvedComponent.Executable with
         | ("host-tool" | "repository-lifecycle"), "self-contained-native-cli", Some executable ->
             let asset =
-                component.Artifacts
+                resolvedComponent.Artifacts
                 |> List.tryFind (fun artifact ->
                     artifact.Purpose = "executable"
                     && artifact.Platform = Some platform)
@@ -243,12 +243,12 @@ module ResolvedReleaseSets =
             | Some selected ->
                 Ok(
                     Some
-                        { Id = component.Id
-                          Version = component.Version
+                        { Id = resolvedComponent.Id
+                          Version = resolvedComponent.Version
                           Executable = executable
                           VersionProbe = [ "--version" ]
-                          Repository = component.Repository
-                          Tag = component.Tag
+                          Repository = resolvedComponent.Repository
+                          Tag = resolvedComponent.Tag
                           Assets =
                             Map.ofList
                                 [ platform,
@@ -256,12 +256,12 @@ module ResolvedReleaseSets =
                                     Sha256 = selected.Sha256 } ] }
                 )
             | None ->
-                Error $"resolved native component '{component.Id}' has no executable artifact for {platform}"
+                Error $"resolved native component '{resolvedComponent.Id}' has no executable artifact for {platform}"
         | "project-binding", ("web-package" | "nuget-library"), _ ->
             Ok None
         | _ ->
             Error
-                $"resolved component '{component.Id}' role/class '{component.Role}/{component.DistributionClass}' cannot be projected into a workstation plan"
+                $"resolved component '{resolvedComponent.Id}' role/class '{resolvedComponent.Role}/{resolvedComponent.DistributionClass}' cannot be projected into a workstation plan"
 
     let parseVerified (expectedRuntimeIdentifier: string) (expectedSha256: string) (bytes: byte array) : Result<WorkstationProfile, string> =
         Conditor.Core.ResolvedReleaseSet.parseVerified expectedRuntimeIdentifier expectedSha256 bytes
