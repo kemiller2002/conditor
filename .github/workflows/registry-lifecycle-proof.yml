@@ -1,0 +1,165 @@
+name: Registry lifecycle clean-host proof
+
+# Proves, on a clean GitHub-hosted runner, that a Registry-selected component
+# declaring echelon.repository-lifecycle is installed, initialized, verified
+# and re-applied with zero drift by Conditor's generic path, using the
+# published release bytes. Nothing here names the component: every fact comes
+# from the integrity-bound resolved release set at a pinned Registry commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry-commit:
+        description: Full echelon-registry commit holding the profile, catalog and resolved set.
+        required: true
+        type: string
+      profile:
+        description: Registry profile path at that commit.
+        required: true
+        type: string
+      snapshot:
+        description: Registry catalog snapshot path at that commit.
+        required: true
+        type: string
+      resolved-set:
+        description: Checked-in resolved release set path (linux-x64) at that commit.
+        required: true
+        type: string
+      resolved-set-sha256:
+        description: Expected SHA-256 of the resolved release set.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  clean-host-proof:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY_COMMIT: ${{ inputs.registry-commit }}
+      PROFILE: ${{ inputs.profile }}
+      SNAPSHOT: ${{ inputs.snapshot }}
+      RESOLVED_SET: ${{ inputs.resolved-set }}
+      RESOLVED_SET_SHA256: ${{ inputs.resolved-set-sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/echelon-registry
+          ref: ${{ inputs.registry-commit }}
+          path: registry
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build Conditor
+        run: dotnet build Conditor.slnx --configuration Release
+
+      - name: Re-resolve the Registry profile and verify the resolved-set identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/evidence"; mkdir -p "$evidence"
+          echo "$REGISTRY_COMMIT" > "$evidence/registry-commit.txt"
+          (cd registry && dotnet fsi tools/resolve-profile.fsx -- \
+            --profile "$PROFILE" --snapshot "$SNAPSHOT" --platform linux-x64 \
+            --output "$evidence/resolved.linux-x64.json") | tee "$evidence/resolver.txt"
+          cmp "$evidence/resolved.linux-x64.json" "registry/$RESOLVED_SET"
+          actual=$(sha256sum "registry/$RESOLVED_SET" | cut -d' ' -f1)
+          echo "resolved-set sha256: $actual" | tee "$evidence/resolved-set.sha256"
+          [ "$actual" = "$RESOLVED_SET_SHA256" ]
+
+      - name: Refuse a tampered resolved-set digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          if dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan \
+              --resolved-set "registry/$RESOLVED_SET" --resolved-set-sha256 "$(printf '0%.0s' {1..64})" --home "$RUNNER_TEMP/refused-home"; then
+            echo "::error::Conditor accepted a resolved set with the wrong digest"; exit 1
+          fi
+
+      - name: First application — install from the published release
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/evidence"; home="$RUNNER_TEMP/home"; mkdir -p "$home"
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          set_args=(--resolved-set "registry/$RESOLVED_SET" --resolved-set-sha256 "$RESOLVED_SET_SHA256" --home "$home")
+          conditor workstation plan "${set_args[@]}" --json | tee "$evidence/install-plan-1.json"
+          digest=$(jq -r .digest "$evidence/install-plan-1.json")
+          conditor workstation apply "${set_args[@]}" --authorize "$digest" | tee "$evidence/install-apply-1.txt"
+          grep -q "Workstation ready." "$evidence/install-apply-1.txt"
+
+      - name: Record installed executable identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/evidence"; home="$RUNNER_TEMP/home"
+          jq -c '.components[] | select(.role == "repository-lifecycle")' "registry/$RESOLVED_SET" | while read -r c; do
+            id=$(jq -r .systemId <<<"$c"); version=$(jq -r .version <<<"$c"); exe=$(jq -r .executable <<<"$c")
+            "$home/.local/share/echelon/$id/$version/$exe" version | tee "$evidence/$id-version.json"
+            jq -e --argjson c "$c" '
+              (with_entries(.key |= ascii_downcase)) as $v
+              | $v.systemid == $c.systemId and $v.repository == $c.repository and $v.executable == $c.executable
+                and $v.releaseversion == $c.version and $v.sourcecommit == $c.commit' "$evidence/$id-version.json"
+          done
+
+      - name: First lifecycle application on a clean repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/evidence"; home="$RUNNER_TEMP/home"; repo="$RUNNER_TEMP/repo"
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          git init -q -b main "$repo"
+          git -C "$repo" config user.name proof; git -C "$repo" config user.email proof@example.invalid
+          printf '# Proof repository\n\nUser-owned content.\n' > "$repo/README.md"
+          git -C "$repo" add -A; git -C "$repo" commit -qm "user content"
+          set_args=(--resolved-set "registry/$RESOLVED_SET" --resolved-set-sha256 "$RESOLVED_SET_SHA256" --home "$home" --root "$repo")
+          for op in init status verify doctor; do
+            conditor lifecycle plan "${set_args[@]}" --operation "$op" --json > "$evidence/lifecycle-$op-plan-1.json"
+            digest=$(jq -r .digest "$evidence/lifecycle-$op-plan-1.json")
+            conditor lifecycle apply "${set_args[@]}" --operation "$op" --authorize "$digest" --json | tee "$evidence/lifecycle-$op-1.json"
+            jq -e '.failed == ""' "$evidence/lifecycle-$op-1.json" >/dev/null
+          done
+          git -C "$repo" status --porcelain | tee "$evidence/repo-status-after-init.txt"
+          git -C "$repo" add -A; git -C "$repo" commit -qm "component-managed state after first application"
+          git -C "$repo" show --stat HEAD | tee "$evidence/repo-first-application.txt"
+          (cd "$repo" && git ls-files -s) > "$evidence/repo-tree-1.txt"
+          cp "$repo/README.md" "$evidence/readme-1.md"
+
+      - name: Second application of the same desired state
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/evidence"; home="$RUNNER_TEMP/home"; repo="$RUNNER_TEMP/repo"
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          set_args=(--resolved-set "registry/$RESOLVED_SET" --resolved-set-sha256 "$RESOLVED_SET_SHA256" --home "$home")
+          conditor workstation plan "${set_args[@]}" --json > "$evidence/install-plan-2.json"
+          [ "$(jq -r .digest "$evidence/install-plan-1.json")" = "$(jq -r .digest "$evidence/install-plan-2.json")" ]
+          conditor workstation apply "${set_args[@]}" --authorize "$(jq -r .digest "$evidence/install-plan-2.json")" | tee "$evidence/install-apply-2.txt"
+          if grep -q "completed" "$evidence/install-apply-2.txt"; then
+            echo "::error::second installation performed new effects"; exit 1
+          fi
+          for op in init upgrade verify status; do
+            conditor lifecycle plan "${set_args[@]}" --root "$repo" --operation "$op" --json > "$evidence/lifecycle-$op-plan-2.json"
+            conditor lifecycle apply "${set_args[@]}" --root "$repo" --operation "$op" \
+              --authorize "$(jq -r .digest "$evidence/lifecycle-$op-plan-2.json")" --json | tee "$evidence/lifecycle-$op-2.json"
+            jq -e '.failed == ""' "$evidence/lifecycle-$op-2.json" >/dev/null
+          done
+          [ "$(jq -r .digest "$evidence/lifecycle-init-plan-1.json")" = "$(jq -r .digest "$evidence/lifecycle-init-plan-2.json")" ]
+          git -C "$repo" status --porcelain | tee "$evidence/repo-status-after-second.txt"
+          [ -z "$(git -C "$repo" status --porcelain)" ] || { echo "::error::second application drifted the repository"; git -C "$repo" diff; exit 1; }
+          (cd "$repo" && git ls-files -s) > "$evidence/repo-tree-2.txt"
+          cmp "$evidence/repo-tree-1.txt" "$evidence/repo-tree-2.txt"
+          cmp "$evidence/readme-1.md" "$repo/README.md"
+          cp "$home/.conditor/workstation/ledger.jsonl" "$evidence/ledger.jsonl"
+          echo "Second application: zero drift." | tee "$evidence/second-application.txt"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: registry-lifecycle-proof-evidence
+          path: ${{ runner.temp }}/evidence
