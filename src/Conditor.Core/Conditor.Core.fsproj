@@ -27,6 +27,7 @@
     <Compile Include="Workstation/Model.fs" />
     <Compile Include="Workstation/OfflineBundle.fs" />
     <Compile Include="Workstation/Engine.fs" />
+    <Compile Include="Workstation/Lifecycle.fs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />

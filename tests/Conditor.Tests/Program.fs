@@ -1132,6 +1132,7 @@ withTarget
             (Mission.launchState target mission = Ok "active"))
 
 WorkstationTests.run check
+RepositoryLifecycleTests.run check
 
 let exitCode =
     if failures = 0 then

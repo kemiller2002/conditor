@@ -27,6 +27,8 @@ let private usage () =
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
+    Console.WriteLine "  conditor lifecycle plan  --operation init|status|verify|doctor|upgrade --root DIR --resolved-set PATH --resolved-set-sha256 SHA256 [--home DIR] [--json]"
+    Console.WriteLine "  conditor lifecycle apply --authorize PLAN-DIGEST --operation ... --root DIR --resolved-set PATH --resolved-set-sha256 SHA256 [--home DIR] [--json]"
     Console.WriteLine "  conditor bundle create --resolved-set PATH --resolved-set-sha256 SHA256 --output DIR [--manifest PATH]"
     Console.WriteLine "  conditor bundle verify --path DIR"
     Console.WriteLine "  conditor uninstall --plan [--home DIR] [--json]"
@@ -797,6 +799,131 @@ let private runWorkstation (args: string array) =
         usage ()
         2
 
+/// Generic repository lifecycle for Registry-resolved components that declare
+/// echelon.repository-lifecycle. Only a verified resolved release set can
+/// select them; embedded profiles carry no lifecycle contract.
+let private lifecyclePlan (args: string array) =
+    let ctx = workstationContext args
+
+    match optionValue "--resolved-set" args, optionValue "--operation" args |> Option.bind LifecycleOperation.fromWire, optionValue "--root" args with
+    | None, _, _ -> Error "lifecycle requires --resolved-set PATH --resolved-set-sha256 SHA256; lifecycle components are selected only by Registry"
+    | _, None, _ -> Error "lifecycle requires --operation init|status|verify|doctor|upgrade"
+    | _, _, None -> Error "lifecycle requires --root DIR"
+    | Some _, Some operation, Some root ->
+        workstationProfile args
+        |> Result.map (fun profile -> ctx, Lifecycle.plan ctx profile (Platform.runtimeIdentifier ()) (Path.GetFullPath root) operation)
+
+let private lifecycleJson (plan: LifecyclePlan) (result: LifecycleResult option) =
+    let o = System.Text.Json.Nodes.JsonObject()
+    o["schema"] <- System.Text.Json.Nodes.JsonValue.Create(if result.IsSome then "conditor.lifecycle-result/v1" else "conditor.lifecycle-plan/v1")
+    o["profile"] <- System.Text.Json.Nodes.JsonValue.Create $"{plan.Profile.Id}@{plan.Profile.Version}"
+    o["sourceIdentity"] <- System.Text.Json.Nodes.JsonValue.Create(plan.Profile.SourceIdentity |> Option.defaultValue "")
+    o["root"] <- System.Text.Json.Nodes.JsonValue.Create plan.Root
+    o["operation"] <- System.Text.Json.Nodes.JsonValue.Create(LifecycleOperation.toWire plan.Operation)
+    o["digest"] <- System.Text.Json.Nodes.JsonValue.Create plan.Digest
+    let components = System.Text.Json.Nodes.JsonArray()
+
+    for c in plan.Profile.Components |> List.filter (fun c -> c.Role = Some "repository-lifecycle") do
+        let n = System.Text.Json.Nodes.JsonObject()
+        n["systemId"] <- System.Text.Json.Nodes.JsonValue.Create c.Id
+        n["version"] <- System.Text.Json.Nodes.JsonValue.Create c.Version
+        n["repository"] <- System.Text.Json.Nodes.JsonValue.Create c.Repository
+        n["tag"] <- System.Text.Json.Nodes.JsonValue.Create c.Tag
+        n["executable"] <- System.Text.Json.Nodes.JsonValue.Create c.Executable
+        c.Lifecycle |> Option.iter (fun l ->
+            n["sourceCommit"] <- System.Text.Json.Nodes.JsonValue.Create l.SourceCommit
+            n["lifecycleContract"] <- System.Text.Json.Nodes.JsonValue.Create $"{RepositoryLifecycleContract.Capability}/v{l.ContractVersion}")
+        c.Assets |> Map.iter (fun rid a ->
+            n["platform"] <- System.Text.Json.Nodes.JsonValue.Create rid
+            n["artifact"] <- System.Text.Json.Nodes.JsonValue.Create a.Name
+            n["sha256"] <- System.Text.Json.Nodes.JsonValue.Create a.Sha256)
+        components.Add n
+
+    o["components"] <- components
+    let steps = System.Text.Json.Nodes.JsonArray()
+
+    for s in plan.Steps do
+        let n = System.Text.Json.Nodes.JsonObject()
+        n["sequence"] <- System.Text.Json.Nodes.JsonValue.Create s.Sequence
+        n["id"] <- System.Text.Json.Nodes.JsonValue.Create s.Id
+        n["component"] <- System.Text.Json.Nodes.JsonValue.Create s.Component
+        n["command"] <- System.Text.Json.Nodes.JsonValue.Create(String.concat " " (s.Executable :: s.Arguments))
+
+        result
+        |> Option.bind (fun r -> r.Results |> List.tryFind (fun x -> x.Step.Id = s.Id))
+        |> Option.iter (fun r ->
+            n["exitCode"] <- System.Text.Json.Nodes.JsonValue.Create r.ExitCode
+            n["output"] <-
+                try
+                    System.Text.Json.Nodes.JsonNode.Parse r.StandardOutput
+                with :? JsonException ->
+                    System.Text.Json.Nodes.JsonValue.Create r.StandardOutput)
+
+        steps.Add n
+
+    o["steps"] <- steps
+    let refusals = System.Text.Json.Nodes.JsonArray()
+    plan.Refusals |> List.iter (fun r -> refusals.Add(System.Text.Json.Nodes.JsonValue.Create r))
+    o["refusals"] <- refusals
+    result |> Option.iter (fun r -> o["failed"] <- System.Text.Json.Nodes.JsonValue.Create(r.Failed |> Option.map fst |> Option.defaultValue ""))
+    o.ToJsonString(JsonSerializerOptions(WriteIndented = true))
+
+let private runLifecycle (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "plan" ->
+        match lifecyclePlan args with
+        | Error e ->
+            Console.Error.WriteLine e
+            2
+        | Ok(_, plan) ->
+            if hasFlag "--json" args then
+                Console.WriteLine(lifecycleJson plan None)
+            else
+                Console.WriteLine $"Lifecycle plan: {LifecycleOperation.toWire plan.Operation} {plan.Root} with {plan.Profile.Id}@{plan.Profile.Version}"
+
+                for p in plan.Preconditions do
+                    Console.WriteLine $"  precondition {p.Component}: {Expected.describe p.Artifact}"
+                    Console.WriteLine $"  precondition {p.Component}: {Expected.describe p.Identity}"
+
+                for s in plan.Steps do
+                    let command = String.concat " " (s.Executable :: s.Arguments)
+                    Console.WriteLine $"  {s.Sequence,2}. {s.Component}@{s.Version}: {command}"
+
+                for r in plan.Refusals do
+                    Console.WriteLine $"  REFUSED {r}"
+
+                Console.WriteLine $"Authorize exactly these invocations with: conditor lifecycle apply --authorize {plan.Digest}"
+
+            if plan.Refusals.IsEmpty then 0 else 3
+    | Some "apply" ->
+        match lifecyclePlan args, optionValue "--authorize" args with
+        | Error e, _ ->
+            Console.Error.WriteLine e
+            2
+        | _, None ->
+            Console.Error.WriteLine "lifecycle apply requires --authorize PLAN-DIGEST; run `conditor lifecycle plan` and review it first"
+            2
+        | Ok(ctx, plan), Some digest ->
+            match Lifecycle.apply ctx probe plan digest with
+            | Error e ->
+                Console.Error.WriteLine $"REFUSED {e}"
+                3
+            | Ok result ->
+                if hasFlag "--json" args then
+                    Console.WriteLine(lifecycleJson plan (Some result))
+                else
+                    for r in result.Results do
+                        Console.WriteLine $"  {r.Step.Id}: exit {r.ExitCode}"
+
+                match result.Failed with
+                | Some(step, why) ->
+                    Console.Error.WriteLine $"  FAILED {step}: {why}"
+                    4
+                | None -> 0
+    | _ ->
+        usage ()
+        2
+
 let private runUninstall (args: string array) =
     let ctx = workstationContext args
     let plan = Engine.uninstallPlan ctx
@@ -845,6 +972,8 @@ let private execute (args: string array) =
 
         if command = "workstation" then
             runWorkstation args
+        elif command = "lifecycle" then
+            runLifecycle args
         elif command = "bundle" then
             runBundle args
         elif command = "uninstall" then

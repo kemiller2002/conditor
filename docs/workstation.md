@@ -109,6 +109,37 @@ registered separately against the same target.
 - Registration is optional. When it is unavailable, that outcome is recorded
   and the bootstrap still succeeds.
 
+## Generic repository lifecycle (CON-DIST-036..038)
+
+Registry decides **what** is installed; the component decides **how** it
+changes a repository. A release that declares Echelon Registry's
+`echelon.repository-lifecycle` v1 capability resolves with a
+`repositoryLifecycle` field, and Conditor then needs no code for that system:
+
+```
+conditor workstation plan  --resolved-set SET --resolved-set-sha256 SHA [--home DIR]
+conditor workstation apply --authorize PLAN-DIGEST --resolved-set SET --resolved-set-sha256 SHA
+conditor lifecycle plan  --operation init|status|verify|doctor|upgrade --root REPO --resolved-set SET --resolved-set-sha256 SHA [--json]
+conditor lifecycle apply --authorize LIFECYCLE-DIGEST --operation ... --root REPO --resolved-set SET --resolved-set-sha256 SHA [--json]
+```
+
+- Installation verifies the selected artifact SHA-256 and the installed
+  executable's full contract identity (`<executable> version` reports the
+  Registry `systemId`, `repository`, `executable`, `releaseVersion` and
+  `sourceCommit`).
+- The lifecycle plan lists, for every `repository-lifecycle` component, only
+  the contract invocations `<executable> <operation> --root <repo>`; `init`
+  and `upgrade` are followed by `verify`. The executable name, version and
+  path come from the resolved set.
+- The lifecycle digest binds the resolved-set identity, platform, repository
+  root, preconditions and invocations. `apply` revalidates the cached artifact
+  digest and executable identity, runs exactly the disclosed invocations,
+  stops at the first non-zero exit, and appends `lifecycle` ledger entries
+  (exit code and output digest).
+- A `repository-lifecycle` component whose release declares no contract, or
+  declares an unsupported version, is refused rather than guessed.
+- Conditor never reads or writes the component's repository state.
+
 ## Version reconciliation (evidence, 2026-09-29)
 
 | System | npm (lifecycle channel) | GitHub native release | Used where |

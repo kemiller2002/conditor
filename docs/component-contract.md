@@ -16,6 +16,15 @@ A lifecycle capability exposes these logical operations:
 
 The built-in registry is now projected from versioned component descriptor files under `components/*.component.json`. The F# registry contains no per-component package/version/source literals.
 
+## Registry-declared lifecycle contract
+
+Embedded descriptors describe legacy and bootstrap components whose lifecycle
+arguments differ per system (for example `verify --strict`). A Registry release
+that declares `echelon.repository-lifecycle` v1 needs no descriptor at all:
+Conditor derives everything from the verified resolved release set and invokes
+the standard contract (`docs/workstation.md`, CON-DIST-036..038). New
+conforming systems should use that path rather than adding a descriptor.
+
 ## Capability identity is not distribution identity
 
 Conditor deliberately keeps these separate:

@@ -22,6 +22,15 @@ type Prerequisite =
 /// A pinned native release asset for one runtime identifier.
 type ReleaseAsset = { Name: string; Sha256: string }
 
+/// The Registry-defined generic repository lifecycle contract a resolved
+/// release declared (echelon-registry spec/repository-lifecycle-contract.md).
+/// Conditor knows only the contract, never the component's repository state.
+type RepositoryLifecycle =
+    { ContractVersion: int
+      /// The immutable source commit the release was built from; the
+      /// installed executable must report it as its identity.
+      SourceCommit: string }
+
 /// A component the profile installs from a checksummed GitHub release
 /// (CON-133 pinned artifacts with integrity checks).
 type ProfileComponent =
@@ -31,7 +40,24 @@ type ProfileComponent =
       VersionProbe: string list
       Repository: string
       Tag: string
-      Assets: Map<string, ReleaseAsset> }
+      Assets: Map<string, ReleaseAsset>
+      /// The Registry environment role, when the component came from a
+      /// resolved release set.
+      Role: string option
+      /// Present only when the selected release declared a supported
+      /// repository lifecycle contract.
+      Lifecycle: RepositoryLifecycle option }
+
+module RepositoryLifecycleContract =
+    [<Literal>]
+    let Capability = "echelon.repository-lifecycle"
+
+    /// Contract versions this Conditor implements.
+    let supportedVersions = set [ 1 ]
+
+    /// Every v1 operation's executable-level verb.
+    [<Literal>]
+    let VersionOperation = "version"
 
 /// A versioned, declarative, composable workstation profile (CON-160..166).
 type WorkstationProfile =
@@ -135,7 +161,9 @@ module Profiles =
                       VersionProbe = (match strings "versionProbe" e with [] -> [ "--version" ] | p -> p)
                       Repository = repo
                       Tag = tag
-                      Assets = assets }
+                      Assets = assets
+                      Role = None
+                      Lifecycle = None }
             | _ -> Error $"component '{id}' must pin a github-release source with sha256 digests for every asset"
         | _ -> Error "a profile component needs id, version, executable and a source repository/tag"
 
@@ -261,6 +289,37 @@ module ResolvedReleaseSets =
         |> Convert.ToHexString
         |> fun value -> value.ToLowerInvariant()
 
+    let private isCommit (value: string) =
+        value.Length = 40 && value |> Seq.forall Char.IsAsciiHexDigitLower
+
+    /// The declared repository lifecycle contract, refused unless this
+    /// Conditor implements its exact version. Absent means the release
+    /// declared none.
+    let private parseLifecycle (id: string) (element: JsonElement) : Result<RepositoryLifecycle option, string> =
+        match tryProperty "repositoryLifecycle" element with
+        | None -> Ok None
+        | Some declared ->
+            let contractVersion =
+                match tryProperty "contractVersion" declared with
+                | Some v when v.ValueKind = JsonValueKind.Number ->
+                    match v.TryGetInt32() with
+                    | true, parsed -> Some parsed
+                    | _ -> None
+                | _ -> None
+
+            match str "contract" declared, contractVersion, str "commit" element with
+            | Some RepositoryLifecycleContract.Capability, Some version, Some commit when RepositoryLifecycleContract.supportedVersions.Contains version && isCommit commit ->
+                Ok(Some { ContractVersion = version; SourceCommit = commit })
+            | Some RepositoryLifecycleContract.Capability, Some version, _ when not (RepositoryLifecycleContract.supportedVersions.Contains version) ->
+                let supported = RepositoryLifecycleContract.supportedVersions |> Seq.map string |> String.concat ", "
+                Error $"resolved component '{id}' declares unsupported repository lifecycle contract version {version}; this Conditor supports {supported}"
+            | Some RepositoryLifecycleContract.Capability, Some _, _ ->
+                Error $"resolved component '{id}' declares a repository lifecycle contract without a 40-character source commit"
+            | Some other, _, _ when other <> RepositoryLifecycleContract.Capability ->
+                Error $"resolved component '{id}' declares unknown repository lifecycle contract '{other}'"
+            | _ ->
+                Error $"resolved component '{id}' has a malformed repositoryLifecycle declaration"
+
     let private parseComponent (platform: string) (element: JsonElement) : Result<ProfileComponent option, string> =
         let id = str "systemId" element |> Option.defaultValue "<unknown>"
         let role = str "role" element
@@ -295,24 +354,33 @@ module ResolvedReleaseSets =
                 Error $"resolved project binding '{id}' uses unsupported distribution mechanism '{mechanism}'"
             | _ ->
                 Error $"resolved project binding '{id}' is missing required release facts"
-        | Some ("host-tool" | "repository-lifecycle") ->
+        | Some(("host-tool" | "repository-lifecycle") as environmentRole) ->
             match distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
             | Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->
-                match executableArtifacts with
-                | [ asset ] ->
+                match executableArtifacts, parseLifecycle id element with
+                | _, Error e -> Error e
+                | [ asset ], Ok lifecycle ->
                     Ok(
                         Some
                             { Id = id
                               Version = version
                               Executable = exe
-                              VersionProbe = [ "--version" ]
+                              // The contract defines the identity probe; other releases keep the conventional flag.
+                              VersionProbe =
+                                match lifecycle with
+                                | Some _ -> [ RepositoryLifecycleContract.VersionOperation ]
+                                | None -> [ "--version" ]
                               Repository = repository
                               Tag = tag
-                              Assets = Map.ofList [ platform, asset ] }
+                              Assets = Map.ofList [ platform, asset ]
+                              Role = Some environmentRole
+                              Lifecycle = lifecycle }
                     )
-                | [] -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
-                | _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
-            | Some other, _, _, _, _, _, _ ->
+                | [], _ -> Error $"resolved component '{id}' has no digest-verified executable artifact for {platform}"
+                | _, _ -> Error $"resolved component '{id}' has more than one executable artifact for {platform}; selection is ambiguous"
+            | Some "self-contained-native-cli", Some "active", Some "github-release", None, _, _, _ ->
+                Error $"resolved component '{id}' has no executable; a native release must name the executable Conditor installs"
+            | Some other, _, _, _, _, _, _ when other <> "self-contained-native-cli" ->
                 Error $"resolved component '{id}' has distribution class '{other}'; workstation native installation accepts only self-contained-native-cli"
             | _, Some state, _, _, _, _, _ when state <> "active" ->
                 Error $"resolved component '{id}' is {state}; normal installation accepts only active releases"
