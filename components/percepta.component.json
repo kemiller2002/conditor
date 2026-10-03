@@ -8,6 +8,9 @@
   "qualifiedVersions": [
     "0.1.0"
   ],
+  "versionArguments": [
+    "--version"
+  ],
   "command": "percepta-repo",
   "initArguments": [
     "init"

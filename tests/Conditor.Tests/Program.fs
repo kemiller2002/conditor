@@ -1133,6 +1133,7 @@ withTarget
 
 WorkstationTests.run check
 RepositoryLifecycleTests.run check
+AdoptionTests.run check
 
 let exitCode =
     if failures = 0 then

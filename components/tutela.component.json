@@ -17,6 +17,9 @@
       "path": "bin/tutela.mjs"
     }
   },
+  "versionArguments": [
+    "--version"
+  ],
   "command": "tutela",
   "initArguments": [
     "init"

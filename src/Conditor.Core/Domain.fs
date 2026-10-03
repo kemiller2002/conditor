@@ -66,6 +66,7 @@ type ComponentDefinition =
       ApplicationBinding: ApplicationBinding option
       Command: string option
       DefaultVersion: string
+      VersionArguments: string list
       InitArguments: string list
       VerifyArguments: string list
       DoctorArguments: string list

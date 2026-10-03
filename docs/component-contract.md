@@ -71,3 +71,19 @@ Conditor must first know which generated application/project owns the dependency
 Qualified component versions now come from the descriptors. Conditor also maintains orchestration-level dependency rules that are not owned by any single component, such as `fsharp-limen-web -> limen` and `execution:enabled -> praxis`.
 
 Planning rejects an unqualified version or missing required capability before mutation. Future descriptor revisions should carry component-owned compatibility constraints such as minimum runtime or peer-capability versions.
+
+
+## Adoption discovery contract
+
+Lifecycle component descriptors used for existing-repository adoption declare `versionArguments`, a read-only command argument vector that reports the installed component version without changing repository state.
+
+Conditor adoption executes the already-installed command directly, first with `versionArguments` and then with the component's existing `verifyArguments`. It does not invoke package-manager resolution, `init`, `upgrade`, or a remote source during discovery.
+
+A component is eligible for adoption only when:
+
+1. its command is already available on PATH or the target repository's `node_modules/.bin`;
+2. the version probe identifies exactly one embedded qualified version;
+3. the verification contract exits successfully; and
+4. Conditor can preserve the immutable source identity required by its component descriptor.
+
+This probe is evidence for adoption, not authentication, and does not transfer ownership of component-managed files to Conditor.

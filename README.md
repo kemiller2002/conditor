@@ -32,6 +32,29 @@ dotnet build Conditor.slnx
 dotnet run --project tests/Conditor.Tests
 ```
 
+## Adopt an existing Echelon repository
+
+Conditor can take governance of an existing repository without reinstalling healthy lifecycle components.
+
+Start with the read-only proposal:
+
+```bash
+cd existing-repository
+conditor adopt --target .
+```
+
+Adoption probes only lifecycle components declared by Conditor's embedded component contracts. Each adoptable contract declares a read-only `versionArguments` probe. A component is proposed only when its command is already available, its reported version matches exactly one version qualified by this Conditor build, and its existing `verify` contract succeeds.
+
+The proposal prints every observation, the proposed `conditor.json`, any refusal, and a digest that binds the observed component identities and descriptor versions. Nothing is written during planning. After review:
+
+```bash
+conditor adopt --target . --authorize <plan-digest>
+```
+
+Authorized adoption writes only `conditor.json` and `.conditor/lock.json`; it does not invoke component `init` or rewrite component-owned state. Conditor refuses unknown or ambiguous versions, unhealthy components, stale authorization digests, and repositories that already contain Conditor governance.
+
+Application-package bindings such as Forma, Folio, Limen, and Aegis are reported but not inferred automatically because Conditor will not guess their project/scaffold target.
+
 ## Empty-repository quick start
 
 Built-in presets are embedded in the native Conditor executable, so a target repository does not need a Conditor source checkout or a manually copied manifest.
@@ -59,6 +82,8 @@ Use `conditor start --check --preset indy-init` only after initialization when y
 ```bash
 conditor presets
 conditor compatibility [--json]
+conditor adopt --target .
+conditor adopt --target . --authorize <plan-digest>
 conditor plan   --preset indy-init --target .
 conditor init   --preset indy-init --target .
 conditor start  --preset indy-init --target .

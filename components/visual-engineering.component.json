@@ -11,6 +11,9 @@
   "lifecycleSource": {
     "kind": "registry"
   },
+  "versionArguments": [
+    "--version"
+  ],
   "command": "visual-engineering",
   "initArguments": [
     "init"

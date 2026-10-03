@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="WorkstationTests.fs" />
     <Compile Include="RepositoryLifecycleTests.fs" />
+    <Compile Include="AdoptionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>

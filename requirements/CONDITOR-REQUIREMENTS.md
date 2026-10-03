@@ -366,3 +366,16 @@ Tracked by GitHub issue #5.
 - **CON-254** Workstation setup SHALL keep each installed Echelon component
   independently identifiable and lifecycle-managed so removal or upgrade of one
   component does not require deleting the entire Echelon environment.
+
+
+## Existing repository adoption
+
+- **CON-260** Conditor SHALL provide a read-only adoption plan for repositories that already contain Echelon lifecycle components and do not yet contain Conditor governance.
+- **CON-261** Adoption discovery SHALL use component-declared read-only version probes and component-owned verification contracts; it SHALL NOT run initialization, upgrade, package installation, or other mutation during discovery.
+- **CON-262** A lifecycle component SHALL be adoptable only when its installed command is observable, its version resolves unambiguously to exactly one version qualified by the current Conditor build, and its verification contract succeeds.
+- **CON-263** Unknown, unsupported, ambiguous, unhealthy, or source-unmappable lifecycle state SHALL remain an explicit refusal and SHALL NOT be guessed into the generated declaration.
+- **CON-264** The adoption plan SHALL disclose all observations, the exact proposed `conditor.json`, descriptor-bound component identities, refusals, and an authorization digest covering the proposal.
+- **CON-265** Adoption mutation SHALL require an authorization digest that still matches a fresh observation of the repository; stale authorization SHALL fail before writing durable state.
+- **CON-266** Successful adoption SHALL write Conditor governance and lock evidence without invoking component initialization or claiming ownership of component-owned repository state.
+- **CON-267** Conditor SHALL refuse adoption when existing `conditor.json` or `.conditor/lock.json` governance is present; established repositories SHALL use status, repair, or upgrade instead.
+- **CON-268** Application-package bindings whose target cannot be proven uniquely SHALL be reported but SHALL NOT be auto-adopted or assigned a guessed scaffold/package target.
