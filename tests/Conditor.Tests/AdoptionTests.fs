@@ -337,6 +337,17 @@ let run check =
                                     (Installer.execute target adopted.ManifestPath verifyPlan
                                      |> Result.isOk)
 
+                            File.AppendAllText(authorityPath, Environment.NewLine)
+
+                            check
+                                "future planning refuses tampered persisted Registry authority"
+                                (match Planner.create target Verify manifest with
+                                 | Error errors ->
+                                     errors
+                                     |> List.exists (fun error ->
+                                         error.Contains("resolved release set digest mismatch"))
+                                 | Ok _ -> false)
+
                     let wrongIdentityRunner workingDirectory command arguments =
                         if command = executable && arguments = [ "version" ] then
                             result
