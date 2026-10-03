@@ -716,7 +716,7 @@ withTarget
                     let schemaVersion = root.GetProperty("schemaVersion").GetInt32()
                     let lockedManifest = root.GetProperty("manifest")
 
-                    check "lock schema v3 is written" (schemaVersion = 3)
+                    check "lock schema v4 is written" (schemaVersion = 4)
                     check
                         "lock stores the exact governing declaration"
                         (lockedManifest.GetProperty("name").GetString() = "lock-snapshot-demo"
