@@ -19,7 +19,7 @@ let private withTarget action =
         if Directory.Exists target then
             Directory.Delete(target, true)
 
-let private healthyPraxisRunner _ executable arguments =
+let private healthyPraxisRunner _ (executable: string) (arguments: string list) =
     let name = Path.GetFileName executable
 
     if name = "praxis" && arguments = [ "--version" ] then
@@ -84,7 +84,7 @@ let run check =
                  |> List.exists (fun refusal -> refusal.Contains("already contains Conditor governance"))))
 
     withTarget (fun target ->
-        let unknownVersionRunner _ executable arguments =
+        let unknownVersionRunner _ (executable: string) (arguments: string list) =
             let name = Path.GetFileName executable
 
             if name = "praxis" && arguments = [ "--version" ] then
@@ -101,7 +101,7 @@ let run check =
         check "unqualified component is not adopted" (plan.Components |> List.forall (fun item -> item.Id <> "praxis")))
 
     withTarget (fun target ->
-        let unhealthyRunner _ executable arguments =
+        let unhealthyRunner _ (executable: string) (arguments: string list) =
             let name = Path.GetFileName executable
 
             if name = "praxis" && arguments = [ "--version" ] then
@@ -122,7 +122,7 @@ let run check =
             (not (File.Exists(Path.Combine(target, "conditor.json")))))
 
     withTarget (fun target ->
-        let ambiguousRunner _ executable arguments =
+        let ambiguousRunner _ (executable: string) (arguments: string list) =
             let name = Path.GetFileName executable
 
             if name = "praxis" && arguments = [ "--version" ] then
