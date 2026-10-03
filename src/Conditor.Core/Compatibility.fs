@@ -92,7 +92,16 @@ module Compatibility =
         List.ofSeq errors
 
     let validate (manifest: ProjectManifest) =
-        validateWithExternalIds Set.empty manifest
+        let externallyResolvable =
+            if manifest.RegistryAuthority.IsSome then
+                manifest.Components
+                |> List.choose (fun request ->
+                    if Registry.tryFind request.Id |> Option.isNone then Some request.Id else None)
+                |> Set.ofList
+            else
+                Set.empty
+
+        validateWithExternalIds externallyResolvable manifest
 
     let describe () =
         supported
