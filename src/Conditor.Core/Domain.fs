@@ -28,6 +28,11 @@ type ComponentRequest =
       Version: string option
       Required: bool }
 
+type RegistryAuthority =
+    { Kind: string
+      Path: string
+      Sha256: string }
+
 type ScaffoldRequest =
     { Kind: string
       Name: string option }
@@ -53,6 +58,7 @@ type ProjectManifest =
     { SchemaVersion: int
       Name: string
       Components: ComponentRequest list
+      RegistryAuthority: RegistryAuthority option
       Scaffold: ScaffoldRequest option
       Requirements: RequirementSource list
       Execution: ExecutionRequest option }
