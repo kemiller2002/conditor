@@ -13,6 +13,7 @@ let private usage () =
     Console.WriteLine "  conditor presets"
     Console.WriteLine "  conditor components [--json]"
     Console.WriteLine "  conditor compatibility [--json]"
+    Console.WriteLine "  conditor adopt [--target PATH] [--name NAME] [--json] [--authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
@@ -953,6 +954,91 @@ let private runUninstall (args: string array) =
                 registrations |> List.iter (fun (c, o) -> Console.WriteLine $"  removal registration {c}: {o}")
                 if results |> List.forall (fun (_, _, o) -> o = "match") then 0 else 4
 
+let private writeAdoptionJson (plan: AdoptionPlan) =
+    let root = System.Text.Json.Nodes.JsonObject()
+    root["schema"] <- System.Text.Json.Nodes.JsonValue.Create "conditor.adoption-plan/v1"
+    root["target"] <- System.Text.Json.Nodes.JsonValue.Create plan.Target
+    root["project"] <- System.Text.Json.Nodes.JsonValue.Create plan.ProjectName
+    root["digest"] <- System.Text.Json.Nodes.JsonValue.Create plan.Digest
+
+    let observations = System.Text.Json.Nodes.JsonArray()
+
+    for observation in plan.Observations do
+        let item = System.Text.Json.Nodes.JsonObject()
+        item["component"] <- System.Text.Json.Nodes.JsonValue.Create observation.ComponentId
+        item["status"] <- System.Text.Json.Nodes.JsonValue.Create observation.Status
+        item["detail"] <- System.Text.Json.Nodes.JsonValue.Create observation.Detail
+        observation.Version
+        |> Option.iter (fun version -> item["version"] <- System.Text.Json.Nodes.JsonValue.Create version)
+        observation.Command
+        |> Option.iter (fun command -> item["command"] <- System.Text.Json.Nodes.JsonValue.Create command)
+        observations.Add item
+
+    root["observations"] <- observations
+
+    let components = System.Text.Json.Nodes.JsonArray()
+
+    for component in plan.Components do
+        let item = System.Text.Json.Nodes.JsonObject()
+        item["id"] <- System.Text.Json.Nodes.JsonValue.Create component.Id
+        item["version"] <- System.Text.Json.Nodes.JsonValue.Create component.Version
+        components.Add item
+
+    root["components"] <- components
+
+    let refusals = System.Text.Json.Nodes.JsonArray()
+    plan.Refusals
+    |> List.iter (fun refusal -> refusals.Add(System.Text.Json.Nodes.JsonValue.Create refusal))
+    root["refusals"] <- refusals
+    root["manifest"] <- System.Text.Json.Nodes.JsonNode.Parse plan.ManifestText
+    Console.WriteLine(root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
+
+let private runAdopt (args: string array) =
+    let target =
+        optionValue "--target" args
+        |> Option.defaultValue (Directory.GetCurrentDirectory())
+        |> Path.GetFullPath
+
+    let requestedName = optionValue "--name" args
+    let plan = Adoption.plan target requestedName
+
+    if hasFlag "--json" args then
+        writeAdoptionJson plan
+    else
+        Console.WriteLine $"Adoption plan for '{plan.ProjectName}' at {plan.Target}"
+
+        for observation in plan.Observations do
+            let version = observation.Version |> Option.map (fun value -> $" @{value}") |> Option.defaultValue ""
+            Console.WriteLine $"  {observation.Status,-10} {observation.ComponentId}{version}: {observation.Detail}"
+
+        Console.WriteLine ""
+        Console.WriteLine "Proposed conditor.json:"
+        Console.WriteLine plan.ManifestText
+
+        for refusal in plan.Refusals do
+            Console.WriteLine $"  REFUSED {refusal}"
+
+        if plan.Refusals.IsEmpty then
+            Console.WriteLine $"Authorize exactly this observed state with: conditor adopt --target \"{plan.Target}\" --authorize {plan.Digest}"
+
+    match optionValue "--authorize" args with
+    | None ->
+        if plan.Refusals.IsEmpty then 0 else 3
+    | Some digest ->
+        match Adoption.apply target requestedName digest with
+        | Error errors ->
+            writeErrors errors
+            3
+        | Ok result ->
+            Console.WriteLine $"Repository adopted without reinitializing component-owned state."
+            Console.WriteLine $"  manifest: {result.ManifestPath}"
+            Console.WriteLine $"  lock:     {result.LockPath}"
+
+            for component in result.Components do
+                Console.WriteLine $"  adopted:  {component.Id}@{component.Version}"
+
+            0
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -984,6 +1070,8 @@ let private execute (args: string array) =
             printComponents (hasFlag "--json" args)
         elif command = "compatibility" then
             printCompatibility (hasFlag "--json" args)
+        elif command = "adopt" then
+            runAdopt args
         else
             let target =
                 optionValue "--target" args
