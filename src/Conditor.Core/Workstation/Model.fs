@@ -66,8 +66,8 @@ module RepositoryLifecycleContract =
           "releaseVersion", release.Version
           "sourceCommit", lifecycle.SourceCommit ]
 
-    let sourceReference (profile: WorkstationProfile) (release: ProfileComponent) (lifecycle: RepositoryLifecycle) =
-        let authority = profile.SourceIdentity |> Option.defaultValue "resolved-set=<unknown>"
+    let sourceReference sourceIdentity (release: ProfileComponent) (lifecycle: RepositoryLifecycle) =
+        let authority = sourceIdentity |> Option.defaultValue "resolved-set=<unknown>"
         $"{authority};systemId={release.Id};version={release.Version};repository={release.Repository};tag={release.Tag};sourceCommit={lifecycle.SourceCommit};contract={Capability}/v{lifecycle.ContractVersion}"
 
 /// A versioned, declarative, composable workstation profile (CON-160..166).
