@@ -19,6 +19,8 @@ module Upgrade =
               yield "schemaVersion"
           if previous.Name <> current.Name then
               yield "name"
+          if previous.RegistryAuthority <> current.RegistryAuthority then
+              yield "registryAuthority"
           if previous.Scaffold <> current.Scaffold then
               yield "scaffold"
           if previous.Requirements <> current.Requirements then
