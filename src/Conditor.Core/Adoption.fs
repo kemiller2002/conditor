@@ -79,7 +79,7 @@ module Adoption =
                 Error
                     $"Component '{definition.Id}' version '{version}' is installed, but its descriptor has no immutable source mapping for that version."
             | None ->
-                Error $"Lifecycle component '{definition.Id}' has no immutable distribution source."
+                Error $"Lifecycle adoptedComponent '{definition.Id}' has no immutable distribution source."
         | NpmPackage
         | NugetPackage -> Ok None
 
@@ -90,10 +90,10 @@ module Adoption =
 
         let componentArray = JsonArray()
 
-        for component in components |> List.sortBy _.Id do
+        for adoptedComponent in components |> List.sortBy _.Id do
             let item = JsonObject()
-            item["id"] <- JsonValue.Create component.Id
-            item["version"] <- JsonValue.Create component.Version
+            item["id"] <- JsonValue.Create adoptedComponent.Id
+            item["version"] <- JsonValue.Create adoptedComponent.Version
             item["required"] <- JsonValue.Create true
             componentArray.Add item
 
@@ -104,12 +104,12 @@ module Adoption =
         root["execution"] <- execution
         root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine
 
-    let private resolved (component: AdoptionComponent) =
-        { Id = component.Id
-          Version = component.Version
-          Distribution = component.Distribution
-          Package = component.Package
-          SourceReference = component.SourceReference }
+    let private resolved (adoptedComponent: AdoptionComponent) =
+        { Id = adoptedComponent.Id
+          Version = adoptedComponent.Version
+          Distribution = adoptedComponent.Distribution
+          Package = adoptedComponent.Package
+          SourceReference = adoptedComponent.SourceReference }
 
     let private projectManifest projectName (components: AdoptionComponent list) =
         { SchemaVersion = 1
@@ -117,9 +117,9 @@ module Adoption =
           Components =
             components
             |> List.sortBy _.Id
-            |> List.map (fun component ->
-                { Id = component.Id
-                  Version = Some component.Version
+            |> List.map (fun adoptedComponent ->
+                { Id = adoptedComponent.Id
+                  Version = Some adoptedComponent.Version
                   Required = true })
           Scaffold = None
           Requirements = []
@@ -264,11 +264,11 @@ module Adoption =
                 match descriptor.Definition.Distribution with
                 | HostTool
                 | LifecycleNpm ->
-                    let component, observation, componentRefusals =
+                    let adoptedComponent, observation, componentRefusals =
                         observeLifecycle runner fullTarget descriptor
 
                     observations.Add observation
-                    component |> Option.iter components.Add
+                    adoptedComponent |> Option.iter components.Add
                     componentRefusals |> List.iter refusals.Add
                 | NpmPackage
                 | NugetPackage ->
@@ -304,8 +304,8 @@ module Adoption =
                    fullTarget
                    manifestText ]
                  @ (componentList
-                    |> List.map (fun component ->
-                        $"{component.Id}|{component.Version}|{distributionText component.Distribution}|{component.DescriptorSha256}")))
+                    |> List.map (fun adoptedComponent ->
+                        $"{adoptedComponent.Id}|{adoptedComponent.Version}|{distributionText adoptedComponent.Distribution}|{adoptedComponent.DescriptorSha256}")))
 
         { Target = fullTarget
           ProjectName = name
