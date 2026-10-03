@@ -107,7 +107,7 @@ module Adoption =
         | NpmPackage
         | NugetPackage -> Ok None
 
-    let private parseIdentity (text: string) =
+    let private parseIdentity (text: string) : Map<string, string> option =
         try
             match JsonNode.Parse text with
             | :? JsonObject as root ->
@@ -128,7 +128,7 @@ module Adoption =
         with :? JsonException ->
             None
 
-    let private identityDifferences expected output =
+    let private identityDifferences (expected: (string * string) list) output =
         match parseIdentity output with
         | None -> [ "identity output is not a JSON object" ]
         | Some actual ->
