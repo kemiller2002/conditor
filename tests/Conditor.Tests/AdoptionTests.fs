@@ -305,10 +305,10 @@ let run check =
                             check
                                 "Registry-adopted manifest records durable authority"
                                 (manifest.RegistryAuthority
-                                 = Some
-                                     { Kind = "resolved-release-set"
-                                       Path = ".conditor/authority/resolved-release-set.json"
-                                       Sha256 = digest })
+                                 |> Option.exists (fun authorityRef ->
+                                     authorityRef.Kind = "resolved-release-set"
+                                     && authorityRef.Path = ".conditor/authority/resolved-release-set.json"
+                                     && authorityRef.Sha256 = digest))
 
                             match Planner.create target Verify manifest with
                             | Error errors ->
@@ -321,11 +321,11 @@ let run check =
                                      |> List.exists (fun action ->
                                          action.ComponentId = systemId
                                          && action.ComponentVersion = version
-                                         && match action.Execution with
-                                            | ExternalProcess(command, arguments) ->
-                                                command = executable
-                                                && arguments = [ "verify"; "--root"; target ]
-                                            | _ -> false))
+                                         && (match action.Execution with
+                                             | ExternalProcess(command, arguments) ->
+                                                 command = executable
+                                                 && arguments = [ "verify"; "--root"; target ]
+                                             | _ -> false)))
 
                                 check
                                     "Registry-adopted lock revalidates against durable authority"
