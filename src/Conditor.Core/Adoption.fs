@@ -83,7 +83,7 @@ module Adoption =
         | NpmPackage
         | NugetPackage -> Ok None
 
-    let private renderManifest projectName (components: AdoptionComponent list) =
+    let private renderManifest (projectName: string) (components: AdoptionComponent list) =
         let root = JsonObject()
         root["schemaVersion"] <- JsonValue.Create 1
         root["name"] <- JsonValue.Create projectName
@@ -111,7 +111,7 @@ module Adoption =
           Package = adoptedComponent.Package
           SourceReference = adoptedComponent.SourceReference }
 
-    let private projectManifest projectName (components: AdoptionComponent list) =
+    let private projectManifest (projectName: string) (components: AdoptionComponent list) =
         { SchemaVersion = 1
           Name = projectName
           Components =
