@@ -87,3 +87,21 @@ A component is eligible for adoption only when:
 4. Conditor can preserve the immutable source identity required by its component descriptor.
 
 This probe is evidence for adoption, not authentication, and does not transfer ownership of component-managed files to Conditor.
+
+
+## Registry-authorized adoption
+
+An existing repository MAY supply a Registry `echelon.resolved-release-set/v1` as additional adoption authority. The caller must provide the expected SHA-256 separately; Conditor rejects the set before discovery if the bytes, platform, profile/catalog identity, distribution facts, or lifecycle contract do not validate.
+
+Only resolved entries with role `repository-lifecycle`, distribution class `self-contained-native-cli`, active lifecycle state, GitHub-release distribution, and a supported `echelon.repository-lifecycle` contract participate in repository adoption.
+
+For each such entry Conditor runs only:
+
+1. the contract-defined `version` identity probe; and
+2. `verify --root <repository>`.
+
+The identity probe must exactly report the Registry-selected `systemId`, `repository`, `executable`, `releaseVersion`, and immutable `sourceCommit`. Discovery never invokes `init` or `upgrade`.
+
+After authorization, the exact resolved-set bytes are copied to `.conditor/authority/resolved-release-set.json` and their SHA-256 is recorded in `conditor.json`. Future repository lifecycle planning resolves non-embedded components from this authority. The resolved set therefore remains part of durable project governance rather than transient CLI input.
+
+A Registry-resolved component identity and an embedded descriptor with the same system id are never blended. The explicit Registry authority owns discovery for that id.

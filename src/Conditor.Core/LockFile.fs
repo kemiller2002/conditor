@@ -36,7 +36,7 @@ module LockFile =
 
                 if schemaVersion < 3 then
                     Error
-                        [ $"Conditor lock schema {schemaVersion} does not contain the component descriptor identity required for safe upgrade."
+                        [ $"Conditor lock schema {schemaVersion} does not contain the component authority identity required for safe upgrade."
                           "Run 'conditor repair' against the unchanged manifest to adopt the current descriptor set and migrate the lock before upgrading." ]
                 elif not (root.TryGetProperty("manifest", &manifestElement))
                      || manifestElement.ValueKind <> JsonValueKind.Object then
@@ -107,7 +107,7 @@ module LockFile =
 
                 if schemaVersion < 3 then
                     Error
-                        [ $"Conditor lock schema {schemaVersion} does not record component descriptor identity."
+                        [ $"Conditor lock schema {schemaVersion} does not record component authority identity."
                           "Run 'conditor repair' against the unchanged manifest before relying on component identity verification." ]
                 elif not (root.TryGetProperty("components", &componentsElement))
                      || componentsElement.ValueKind <> JsonValueKind.Array then
@@ -176,7 +176,7 @@ module LockFile =
         options.Indented <- true
         use writer = new Utf8JsonWriter(stream, options)
         writer.WriteStartObject()
-        writer.WriteNumber("schemaVersion", 3)
+        writer.WriteNumber("schemaVersion", 4)
         writer.WriteString("project", plan.ProjectName)
         writer.WriteString("manifestSha256", manifestHash manifestPath)
         writer.WritePropertyName("manifest")
@@ -197,8 +197,11 @@ module LockFile =
             writer.WriteString("package", resolved.Package)
 
             match Registry.descriptorSha256 resolved.Id with
-            | Some descriptorSha256 -> writer.WriteString("descriptorSha256", descriptorSha256)
-            | None -> invalidOp $"Resolved component '{resolved.Id}' has no embedded descriptor identity."
+            | Some descriptorSha256 ->
+                writer.WriteString("descriptorSha256", descriptorSha256)
+                writer.WriteString("authority", "embedded-component-descriptor")
+            | None ->
+                writer.WriteString("authority", "registry-resolved-set")
 
             match resolved.SourceReference with
             | Some source -> writer.WriteString("sourceReference", source)

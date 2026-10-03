@@ -59,15 +59,15 @@ module Compatibility =
     let private componentIds (manifest: ProjectManifest) =
         manifest.Components |> List.map _.Id |> Set.ofList
 
-    let validate (manifest: ProjectManifest) =
+    let validateWithExternalIds (externalIds: Set<string>) (manifest: ProjectManifest) =
         let errors = ResizeArray<string>()
         let ids = componentIds manifest
 
         for request in manifest.Components do
             match Map.tryFind request.Id supportedMap with
             | None ->
-                if request.Required then
-                    errors.Add $"Component '{request.Id}' has no Conditor compatibility declaration."
+                if request.Required && not (externalIds.Contains request.Id) then
+                    errors.Add $"Component '{request.Id}' has no Conditor compatibility declaration or verified Registry authority."
             | Some support ->
                 let version = requestedVersion request
 
@@ -90,6 +90,18 @@ module Compatibility =
                 "Enabled execution requires component 'praxis'. Conditor will not create or launch untracked work."
 
         List.ofSeq errors
+
+    let validate (manifest: ProjectManifest) =
+        let externallyResolvable =
+            if manifest.RegistryAuthority.IsSome then
+                manifest.Components
+                |> List.choose (fun request ->
+                    if Registry.tryFind request.Id |> Option.isNone then Some request.Id else None)
+                |> Set.ofList
+            else
+                Set.empty
+
+        validateWithExternalIds externallyResolvable manifest
 
     let describe () =
         supported

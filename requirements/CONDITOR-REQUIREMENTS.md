@@ -379,3 +379,15 @@ Tracked by GitHub issue #5.
 - **CON-266** Successful adoption SHALL write Conditor governance and lock evidence without invoking component initialization or claiming ownership of component-owned repository state.
 - **CON-267** Conditor SHALL refuse adoption when existing `conditor.json` or `.conditor/lock.json` governance is present; established repositories SHALL use status, repair, or upgrade instead.
 - **CON-268** Application-package bindings whose target cannot be proven uniquely SHALL be reported but SHALL NOT be auto-adopted or assigned a guessed scaffold/package target.
+
+
+## Registry authority for existing-repository adoption
+
+- **CON-269** `conditor adopt` SHALL accept an optional Registry resolved release set only when its expected SHA-256 is supplied and successfully verified.
+- **CON-270** Registry-assisted adoption SHALL consider only resolved components with repository-lifecycle role and a supported `echelon.repository-lifecycle` contract; host tools and project bindings SHALL NOT gain repository ownership semantics by implication.
+- **CON-271** A Registry-resolved lifecycle component SHALL be adoptable only when its installed executable reports the exact selected system id, repository, executable name, release version, and immutable source commit and its repository `verify` operation succeeds.
+- **CON-272** Registry-assisted discovery SHALL remain read-only: it SHALL NOT download, install, initialize, upgrade, or otherwise mutate the selected component before adoption authorization.
+- **CON-273** Successful Registry-assisted adoption SHALL preserve the exact resolved-set bytes inside the repository, record their digest in `conditor.json`, and bind the adopted component source identity to that resolved set.
+- **CON-274** Later repository plan, verify, status, doctor, repair, and lock-identity verification SHALL be able to resolve an adopted Registry lifecycle component from the persisted authority without adding a system-specific Conditor descriptor.
+- **CON-275** A changed or missing persisted Registry authority, a requested component version differing from the authority, or a stale authorization digest SHALL fail closed before component mutation.
+- **CON-276** When an explicit Registry authority and an embedded Conditor descriptor name the same system id, adoption SHALL use one authoritative identity and SHALL NOT merge or guess between the two.

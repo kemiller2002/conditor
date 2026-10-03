@@ -36,22 +36,30 @@ dotnet run --project tests/Conditor.Tests
 
 Conditor can take governance of an existing repository without reinstalling healthy lifecycle components.
 
-Start with the read-only proposal:
+For components already known to this Conditor build, start with the read-only proposal:
 
 ```bash
 cd existing-repository
 conditor adopt --target .
 ```
 
-Adoption probes only lifecycle components declared by Conditor's embedded component contracts. Each adoptable contract declares a read-only `versionArguments` probe. A component is proposed only when its command is already available, its reported version matches exactly one version qualified by this Conditor build, and its existing `verify` contract succeeds.
-
-The proposal prints every observation, the proposed `conditor.json`, any refusal, and a digest that binds the observed component identities and descriptor versions. Nothing is written during planning. After review:
+For Registry-defined systems that are not embedded in Conditor, provide an integrity-bound resolved release set:
 
 ```bash
-conditor adopt --target . --authorize <plan-digest>
+conditor adopt --target . \
+  --resolved-set /path/to/resolved-release-set.json \
+  --resolved-set-sha256 <sha256>
 ```
 
-Authorized adoption writes only `conditor.json` and `.conditor/lock.json`; it does not invoke component `init` or rewrite component-owned state. Conditor refuses unknown or ambiguous versions, unhealthy components, stale authorization digests, and repositories that already contain Conditor governance.
+The resolved set is discovery authority, not an instruction to install everything it contains. Conditor considers only entries with the `repository-lifecycle` role and a supported `echelon.repository-lifecycle` contract. If the executable is present, Conditor requires its `version` operation to report the exact Registry-selected system id, repository, executable, release version, and source commit, then requires the component's existing repository `verify` operation to pass.
+
+Embedded lifecycle components continue to use their declared read-only `versionArguments` and `verifyArguments`. Registry authority takes precedence for the same system id so Conditor never merges two competing identities.
+
+The proposal prints every observation, the proposed `conditor.json`, any refusal, and a digest binding the observed state and exact authority. Nothing is written during planning. After review, rerun the printed authorization command.
+
+Authorized adoption does not invoke component `init` or rewrite component-owned state. When Registry authority is used, Conditor copies the exact resolved set to `.conditor/authority/resolved-release-set.json`, records its SHA-256 in `conditor.json`, and writes the lock only after the authority and manifest are safely materialized. Later `plan`, `verify`, `status`, `doctor`, and `repair` resolve Registry-only lifecycle components from that repository-local authority.
+
+Conditor refuses unknown or ambiguous versions, mismatched Registry identities, unhealthy components, changed authority bytes, stale authorization digests, and repositories that already contain Conditor governance.
 
 Application-package bindings such as Forma, Folio, Limen, and Aegis are reported but not inferred automatically because Conditor will not guess their project/scaffold target.
 
@@ -83,6 +91,7 @@ Use `conditor start --check --preset indy-init` only after initialization when y
 conditor presets
 conditor compatibility [--json]
 conditor adopt --target .
+conditor adopt --target . --resolved-set ./resolved.json --resolved-set-sha256 <sha256>
 conditor adopt --target . --authorize <plan-digest>
 conditor plan   --preset indy-init --target .
 conditor init   --preset indy-init --target .
@@ -158,7 +167,7 @@ The compatibility graph is intentionally conservative. A newer upstream release 
 
 ## Upgrade
 
-Conditor lock schema v3 stores the complete governing declaration and the SHA-256 identity of every embedded component descriptor that produced the installed state. `conditor upgrade` compares that prior declaration with the current `conditor.json` before any mutation.
+Conditor lock schema v4 stores the complete governing declaration and preserves either the embedded component-descriptor identity or the integrity-bound Registry authority that produced each resolved component. `conditor upgrade` compares that prior declaration with the current `conditor.json` before any mutation.
 
 The initial upgrade implementation deliberately supports one change class:
 

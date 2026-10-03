@@ -34,6 +34,29 @@ module Manifest =
                   Version = optionalString "version" element
                   Required = optionalBool true "required" element }
 
+    let private parseRegistryAuthority (root: JsonElement) =
+        match tryProperty "registryAuthority" root with
+        | None -> Ok None
+        | Some value when value.ValueKind = JsonValueKind.Object ->
+            match requiredString "kind" value, requiredString "path" value, requiredString "sha256" value with
+            | Ok "resolved-release-set", Ok path, Ok sha256 ->
+                if Path.IsPathRooted path then
+                    Error "'registryAuthority.path' must be repository-relative."
+                elif not (sha256.Length = 64 && sha256 |> Seq.forall Char.IsAsciiHexDigitLower) then
+                    Error "'registryAuthority.sha256' must be a 64-character lowercase SHA-256."
+                else
+                    Ok(
+                        Some
+                            { Kind = "resolved-release-set"
+                              Path = path.Replace('\\', '/')
+                              Sha256 = sha256 }
+                    )
+            | Ok other, _, _ -> Error $"Unsupported registryAuthority kind '{other}'."
+            | Error error, _, _
+            | _, Error error, _
+            | _, _, Error error -> Error $"registryAuthority {error}"
+        | Some _ -> Error "'registryAuthority' must be an object."
+
     let private parseScaffold (root: JsonElement) =
         match tryProperty "scaffold" root with
         | None -> Ok None
@@ -221,6 +244,13 @@ module Manifest =
                 for duplicate in duplicates do
                     errors.Add $"Component '{duplicate}' is declared more than once."
 
+                let registryAuthority =
+                    match parseRegistryAuthority root with
+                    | Ok value -> value
+                    | Error error ->
+                        errors.Add error
+                        None
+
                 let scaffold =
                     match parseScaffold root with
                     | Ok value -> value
@@ -249,6 +279,7 @@ module Manifest =
                         { SchemaVersion = schemaVersion
                           Name = name
                           Components = components
+                          RegistryAuthority = registryAuthority
                           Scaffold = scaffold
                           Requirements = requirements
                           Execution = execution }

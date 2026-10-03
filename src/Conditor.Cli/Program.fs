@@ -13,7 +13,7 @@ let private usage () =
     Console.WriteLine "  conditor presets"
     Console.WriteLine "  conditor components [--json]"
     Console.WriteLine "  conditor compatibility [--json]"
-    Console.WriteLine "  conditor adopt [--target PATH] [--name NAME] [--json] [--authorize PLAN-DIGEST]"
+    Console.WriteLine "  conditor adopt [--target PATH] [--name NAME] [--resolved-set PATH --resolved-set-sha256 SHA256] [--json] [--authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor plan   [--preset NAME | --manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
     Console.WriteLine "  conditor init   [--preset NAME | --manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
     Console.WriteLine "  conditor verify [--manifest PATH] [--target PATH] [--source-mirror DIR] [--offline]"
@@ -956,10 +956,22 @@ let private runUninstall (args: string array) =
 
 let private writeAdoptionJson (plan: AdoptionPlan) =
     let root = System.Text.Json.Nodes.JsonObject()
-    root["schema"] <- System.Text.Json.Nodes.JsonValue.Create "conditor.adoption-plan/v1"
+    root["schema"] <- System.Text.Json.Nodes.JsonValue.Create "conditor.adoption-plan/v2"
     root["target"] <- System.Text.Json.Nodes.JsonValue.Create plan.Target
     root["project"] <- System.Text.Json.Nodes.JsonValue.Create plan.ProjectName
     root["digest"] <- System.Text.Json.Nodes.JsonValue.Create plan.Digest
+
+    plan.RegistryAuthority
+    |> Option.iter (fun authority ->
+        let item = System.Text.Json.Nodes.JsonObject()
+        item["kind"] <- System.Text.Json.Nodes.JsonValue.Create "resolved-release-set"
+        item["sourcePath"] <- System.Text.Json.Nodes.JsonValue.Create authority.SourcePath
+        item["targetPath"] <- System.Text.Json.Nodes.JsonValue.Create authority.TargetPath
+        item["sha256"] <- System.Text.Json.Nodes.JsonValue.Create authority.Sha256
+        item["profile"] <- System.Text.Json.Nodes.JsonValue.Create $"{authority.Profile.Id}@{authority.Profile.Version}"
+        item["sourceIdentity"] <-
+            System.Text.Json.Nodes.JsonValue.Create(authority.Profile.SourceIdentity |> Option.defaultValue "")
+        root["registryAuthority"] <- item)
 
     let observations = System.Text.Json.Nodes.JsonArray()
 
@@ -993,6 +1005,17 @@ let private writeAdoptionJson (plan: AdoptionPlan) =
     root["manifest"] <- System.Text.Json.Nodes.JsonNode.Parse plan.ManifestText
     Console.WriteLine(root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
 
+let private adoptionRegistryAuthority target (args: string array) =
+    match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
+    | None, None -> Ok None
+    | Some _, None ->
+        Error "--resolved-set requires --resolved-set-sha256 SHA256 so adoption authority is integrity-bound."
+    | None, Some _ ->
+        Error "--resolved-set-sha256 requires --resolved-set PATH."
+    | Some path, Some digest ->
+        Adoption.loadRegistryAuthority target path digest
+        |> Result.map Some
+
 let private runAdopt (args: string array) =
     let target =
         optionValue "--target" args
@@ -1000,44 +1023,75 @@ let private runAdopt (args: string array) =
         |> Path.GetFullPath
 
     let requestedName = optionValue "--name" args
-    let plan = Adoption.plan target requestedName
 
-    if hasFlag "--json" args then
-        writeAdoptionJson plan
-    else
-        Console.WriteLine $"Adoption plan for '{plan.ProjectName}' at {plan.Target}"
+    match adoptionRegistryAuthority target args with
+    | Error error ->
+        Console.Error.WriteLine error
+        2
+    | Ok registryAuthority ->
+        let plan =
+            Adoption.planWithAuthority
+                ProcessRunner.runProcess
+                target
+                requestedName
+                registryAuthority
 
-        for observation in plan.Observations do
-            let version = observation.Version |> Option.map (fun value -> $" @{value}") |> Option.defaultValue ""
-            Console.WriteLine $"  {observation.Status,-10} {observation.ComponentId}{version}: {observation.Detail}"
+        if hasFlag "--json" args then
+            writeAdoptionJson plan
+        else
+            Console.WriteLine $"Adoption plan for '{plan.ProjectName}' at {plan.Target}"
 
-        Console.WriteLine ""
-        Console.WriteLine "Proposed conditor.json:"
-        Console.WriteLine plan.ManifestText
+            plan.RegistryAuthority
+            |> Option.iter (fun authority ->
+                Console.WriteLine $"  authority  {authority.Profile.Id}@{authority.Profile.Version}: sha256:{authority.Sha256}")
 
-        for refusal in plan.Refusals do
-            Console.WriteLine $"  REFUSED {refusal}"
+            for observation in plan.Observations do
+                let version = observation.Version |> Option.map (fun value -> $" @{value}") |> Option.defaultValue ""
+                Console.WriteLine $"  {observation.Status,-10} {observation.ComponentId}{version}: {observation.Detail}"
 
-        if plan.Refusals.IsEmpty then
-            Console.WriteLine $"Authorize exactly this observed state with: conditor adopt --target \"{plan.Target}\" --authorize {plan.Digest}"
+            Console.WriteLine ""
+            Console.WriteLine "Proposed conditor.json:"
+            Console.WriteLine plan.ManifestText
 
-    match optionValue "--authorize" args with
-    | None ->
-        if plan.Refusals.IsEmpty then 0 else 3
-    | Some digest ->
-        match Adoption.apply target requestedName digest with
-        | Error errors ->
-            writeErrors errors
-            3
-        | Ok result ->
-            Console.WriteLine $"Repository adopted without reinitializing component-owned state."
-            Console.WriteLine $"  manifest: {result.ManifestPath}"
-            Console.WriteLine $"  lock:     {result.LockPath}"
+            for refusal in plan.Refusals do
+                Console.WriteLine $"  REFUSED {refusal}"
 
-            for adoptedComponent in result.Components do
-                Console.WriteLine $"  adopted:  {adoptedComponent.Id}@{adoptedComponent.Version}"
+            if plan.Refusals.IsEmpty then
+                let authorityArgs =
+                    plan.RegistryAuthority
+                    |> Option.map (fun authority ->
+                        $" --resolved-set \"{authority.SourcePath}\" --resolved-set-sha256 {authority.Sha256}")
+                    |> Option.defaultValue ""
 
-            0
+                Console.WriteLine
+                    $"Authorize exactly this observed state with: conditor adopt --target \"{plan.Target}\"{authorityArgs} --authorize {plan.Digest}"
+
+        match optionValue "--authorize" args with
+        | None ->
+            if plan.Refusals.IsEmpty then 0 else 3
+        | Some digest ->
+            match
+                Adoption.applyWithAuthority
+                    ProcessRunner.runProcess
+                    target
+                    requestedName
+                    registryAuthority
+                    digest
+            with
+            | Error errors ->
+                writeErrors errors
+                3
+            | Ok result ->
+                Console.WriteLine "Repository adopted without reinitializing component-owned state."
+                Console.WriteLine $"  manifest: {result.ManifestPath}"
+                Console.WriteLine $"  lock:     {result.LockPath}"
+                result.RegistryAuthorityPath
+                |> Option.iter (fun path -> Console.WriteLine $"  authority:{path}")
+
+                for adoptedEntry in result.Components do
+                    Console.WriteLine $"  adopted:  {adoptedEntry.Id}@{adoptedEntry.Version}"
+
+                0
 
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
