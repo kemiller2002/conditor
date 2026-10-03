@@ -9,6 +9,9 @@
     "1.3.0",
     "1.4.0"
   ],
+  "versionArguments": [
+    "--version"
+  ],
   "command": "ordo",
   "initArguments": [
     "init"
