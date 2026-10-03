@@ -137,8 +137,8 @@ module Adoption =
                 match actual |> Map.tryFind (key.ToLowerInvariant()) with
                 | Some actualValue when actualValue = expectedValue -> None
                 | actualValue ->
-                    Some
-                        $"{key}: expected {expectedValue}, reported {actualValue |> Option.defaultValue "<absent>"}")
+                    let shown = actualValue |> Option.defaultValue "<absent>"
+                    Some $"{key}: expected {expectedValue}, reported {shown}")
 
     let private renderManifest
         (projectName: string)
@@ -510,7 +510,8 @@ module Adoption =
         let authorityDigest =
             registryAuthority
             |> Option.map (fun authority ->
-                $"{authority.TargetPath}|sha256:{authority.Sha256}|{authority.Profile.SourceIdentity |> Option.defaultValue "-"}")
+                let sourceIdentity = authority.Profile.SourceIdentity |> Option.defaultValue "-"
+                $"{authority.TargetPath}|sha256:{authority.Sha256}|{sourceIdentity}")
             |> Option.defaultValue "-"
 
         let digestMaterial =
@@ -522,7 +523,8 @@ module Adoption =
                    manifestText ]
                  @ (componentList
                     |> List.map (fun adoptedEntry ->
-                        $"{adoptedEntry.Id}|{adoptedEntry.Version}|{distributionText adoptedEntry.Distribution}|{adoptedEntry.AuthorityIdentity}|{adoptedEntry.SourceReference |> Option.defaultValue "-"}")))
+                        let source = adoptedEntry.SourceReference |> Option.defaultValue "-"
+                        $"{adoptedEntry.Id}|{adoptedEntry.Version}|{distributionText adoptedEntry.Distribution}|{adoptedEntry.AuthorityIdentity}|{source}")))
 
         { Target = fullTarget
           ProjectName = name
