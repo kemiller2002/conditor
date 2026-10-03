@@ -10,6 +10,9 @@
     "3.1.4",
     "3.6.0"
   ],
+  "versionArguments": [
+    "--version"
+  ],
   "command": "praxis",
   "initArguments": [
     "init"
