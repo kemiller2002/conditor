@@ -69,10 +69,10 @@ let run check =
                 check
                     "adopted manifest records only proven lifecycle component"
                     (manifest.Components
-                     |> List.exists (fun component ->
-                         component.Id = "praxis"
-                         && component.Version = Some "3.6.0"
-                         && component.Required))
+                     |> List.exists (fun entry ->
+                         entry.Id = "praxis"
+                         && entry.Version = Some "3.6.0"
+                         && entry.Required))
 
             let second = Adoption.planWith healthyPraxisRunner target None
 
