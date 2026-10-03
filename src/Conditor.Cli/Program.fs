@@ -978,10 +978,10 @@ let private writeAdoptionJson (plan: AdoptionPlan) =
 
     let components = System.Text.Json.Nodes.JsonArray()
 
-    for component in plan.Components do
+    for adoptedComponent in plan.Components do
         let item = System.Text.Json.Nodes.JsonObject()
-        item["id"] <- System.Text.Json.Nodes.JsonValue.Create component.Id
-        item["version"] <- System.Text.Json.Nodes.JsonValue.Create component.Version
+        item["id"] <- System.Text.Json.Nodes.JsonValue.Create adoptedComponent.Id
+        item["version"] <- System.Text.Json.Nodes.JsonValue.Create adoptedComponent.Version
         components.Add item
 
     root["components"] <- components
@@ -1034,8 +1034,8 @@ let private runAdopt (args: string array) =
             Console.WriteLine $"  manifest: {result.ManifestPath}"
             Console.WriteLine $"  lock:     {result.LockPath}"
 
-            for component in result.Components do
-                Console.WriteLine $"  adopted:  {component.Id}@{component.Version}"
+            for adoptedComponent in result.Components do
+                Console.WriteLine $"  adopted:  {adoptedComponent.Id}@{adoptedComponent.Version}"
 
             0
 
