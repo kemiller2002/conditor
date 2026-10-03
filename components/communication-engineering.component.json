@@ -17,6 +17,9 @@
       "path": "bin/communication-engineering.mjs"
     }
   },
+  "versionArguments": [
+    "--version"
+  ],
   "command": "communication-engineering",
   "initArguments": [
     "init"
