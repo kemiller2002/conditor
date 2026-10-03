@@ -177,7 +177,10 @@ module ComponentDescriptors =
                     []
 
             let qualifiedVersions = collectArray "qualifiedVersions" |> Set.ofList
-            let versionArguments = collectArray "versionArguments"
+            let versionArguments =
+                match tryProperty "versionArguments" root with
+                | None -> []
+                | Some _ -> collectArray "versionArguments"
             let initArguments = collectArray "initArguments"
             let verifyArguments = collectArray "verifyArguments"
             let doctorArguments = collectArray "doctorArguments"
