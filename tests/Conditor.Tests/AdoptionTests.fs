@@ -57,14 +57,16 @@ let run check =
 
         match Adoption.applyWith healthyPraxisRunner target None plan.Digest with
         | Error errors ->
-            check $"authorized adoption succeeds: {String.concat "; " errors}" false
+            let details = String.concat "; " errors
+            check $"authorized adoption succeeds: {details}" false
         | Ok adopted ->
             check "authorized adoption writes manifest" (File.Exists adopted.ManifestPath)
             check "authorized adoption writes lock" (File.Exists adopted.LockPath)
 
             match Manifest.load adopted.ManifestPath with
             | Error errors ->
-                check $"adopted manifest parses: {String.concat "; " errors}" false
+                let details = String.concat "; " errors
+                check $"adopted manifest parses: {details}" false
             | Ok manifest ->
                 check
                     "adopted manifest records only proven lifecycle component"
