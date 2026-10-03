@@ -177,6 +177,7 @@ module ComponentDescriptors =
                     []
 
             let qualifiedVersions = collectArray "qualifiedVersions" |> Set.ofList
+            let versionArguments = collectArray "versionArguments"
             let initArguments = collectArray "initArguments"
             let verifyArguments = collectArray "verifyArguments"
             let doctorArguments = collectArray "doctorArguments"
@@ -193,12 +194,18 @@ module ComponentDescriptors =
 
                 if command.IsNone then
                     errors.Add $"Host-tool component '{id}' must declare command."
+
+                if versionArguments.IsEmpty then
+                    errors.Add $"Host-tool component '{id}' must declare versionArguments for safe adoption."
             | LifecycleNpm ->
                 if lifecycleSource.IsNone then
                     errors.Add $"Lifecycle component '{id}' must declare lifecycleSource."
 
                 if command.IsNone then
                     errors.Add $"Lifecycle component '{id}' must declare command."
+
+                if versionArguments.IsEmpty then
+                    errors.Add $"Lifecycle component '{id}' must declare versionArguments for safe adoption."
             | NpmPackage ->
                 if binding <> Some NpmDependency then
                     errors.Add $"Npm component '{id}' must declare applicationBinding 'npm'."
@@ -225,6 +232,7 @@ module ComponentDescriptors =
                           ApplicationBinding = binding
                           Command = command
                           DefaultVersion = defaultVersion
+                          VersionArguments = versionArguments
                           InitArguments = initArguments
                           VerifyArguments = verifyArguments
                           DoctorArguments = doctorArguments
