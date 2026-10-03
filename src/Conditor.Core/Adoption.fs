@@ -418,8 +418,7 @@ module Adoption =
                           Command = Some executable },
                         []
 
-    let loadRegistryAuthority target sourcePath expectedSha256 =
-        let fullTarget = Path.GetFullPath target
+    let loadRegistryAuthority _ sourcePath expectedSha256 =
         let fullSource = Path.GetFullPath sourcePath
         let normalized = normalizeSha256 expectedSha256
 
