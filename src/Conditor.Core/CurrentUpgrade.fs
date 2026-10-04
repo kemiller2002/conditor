@@ -173,6 +173,10 @@ module CurrentUpgrade =
         let normalizedDigest = normalizeSha256 targetDigest
         let rid = Platform.runtimeIdentifier ()
 
+        LockFile.verifyManifest target manifestPath
+        |> Result.mapError (List.iter errors.Add)
+        |> ignore
+
         let targetProfile =
             match ResolvedReleaseSets.loadFile rid targetSetPath normalizedDigest with
             | Ok profile -> Some profile
