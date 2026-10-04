@@ -1,6 +1,9 @@
 module CurrentChannelTests
 
+open System
+open System.IO
 open Conditor.Core
+open Conditor.Core.Workstation
 
 let run check =
     let valid =
@@ -76,3 +79,20 @@ let run check =
     check
         "current channel refuses malformed resolved-set digest"
         (CurrentChannel.parse malformedDigest |> Result.isError)
+
+
+    if Environment.GetEnvironmentVariable("CONDITOR_TEST_CURRENT_CHANNEL") = "1" then
+        let home = Path.Combine(Path.GetTempPath(), $"conditor-current-channel-{Guid.NewGuid():N}")
+        Directory.CreateDirectory home |> ignore
+
+        try
+            match CurrentChannel.resolve home CurrentChannel.DefaultBaseUrl (Platform.runtimeIdentifier ()) with
+            | Error error ->
+                check $"canonical Registry current channel resolves: {error}" false
+            | Ok resolved ->
+                check "canonical current channel id" (resolved.ChannelId = "echelon-current")
+                check "canonical current profile id" (resolved.ProfileId = "echelon-current")
+                check "canonical current set is cached" (File.Exists resolved.ResolvedSetPath)
+                check "canonical current set digest is present" (resolved.ResolvedSetSha256.Length = 64)
+        finally
+            if Directory.Exists home then Directory.Delete(home, true)
