@@ -43,7 +43,7 @@ let private lifecycleBundle mirror id version repository commit rid =
               "  init)"
               "    root=\"$3\""
               "    mkdir -p \"$root/.gamma\""
-              $"    printf '%s\\n' '{version}' > \"$root/.gamma/version\""
+              $"    echo '{version}' > \"$root/.gamma/version\""
               "    ;;"
               "  *) exit 2 ;;"
               "esac"
