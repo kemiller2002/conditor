@@ -34,6 +34,7 @@ type CurrentUpgradePlan =
       GenericUpgradePlan: LifecyclePlan option
       GenericVerifyPlan: LifecyclePlan option
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
+      EmbeddedVerifications: (ComponentDefinition * ProfileComponent) list
       FileChanges: CurrentUpgradeFileChange list
       Refusals: string list
       Digest: string }
@@ -380,6 +381,7 @@ module CurrentUpgrade =
 
         let transitions = ResizeArray<CurrentUpgradeTransition>()
         let embeddedTransitions = ResizeArray<CurrentUpgradeTransition * ComponentDefinition * ProfileComponent>()
+        let embeddedVerifications = ResizeArray<ComponentDefinition * ProfileComponent>()
 
         for request in manifest.Components do
             match request.Version, entryMap |> Map.tryFind request.Id with
@@ -461,6 +463,12 @@ module CurrentUpgrade =
         | Error error -> errors.Add error
 
         let manifestIds = manifest.Components |> List.map _.Id |> Set.ofList
+
+        for request in manifest.Components do
+            match profileMap |> Map.tryFind request.Id, Registry.tryFind request.Id with
+            | Some release, Some definition when release.Lifecycle.IsNone && definition.Command.IsSome ->
+                embeddedVerifications.Add(definition, release)
+            | _ -> ()
 
         let workstationProfile =
             targetProfile
@@ -579,6 +587,7 @@ module CurrentUpgrade =
               GenericUpgradePlan = genericUpgradePlan
               GenericVerifyPlan = genericVerifyPlan
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
+              EmbeddedVerifications = embeddedVerifications |> Seq.toList
               FileChanges = fileChanges |> Seq.toList
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
