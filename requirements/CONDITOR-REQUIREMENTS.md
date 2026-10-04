@@ -391,3 +391,21 @@ Tracked by GitHub issue #5.
 - **CON-274** Later repository plan, verify, status, doctor, repair, and lock-identity verification SHALL be able to resolve an adopted Registry lifecycle component from the persisted authority without adding a system-specific Conditor descriptor.
 - **CON-275** A changed or missing persisted Registry authority, a requested component version differing from the authority, or a stale authorization digest SHALL fail closed before component mutation.
 - **CON-276** When an explicit Registry authority and an embedded Conditor descriptor name the same system id, adoption SHALL use one authoritative identity and SHALL NOT merge or guess between the two.
+
+
+## Registry-current repository upgrade
+
+- **CON-277** Conditor SHALL provide a plan-first current-repository upgrade operation whose target state is an integrity-verified Registry resolved release set, not moving product-repository tags or locally inferred latest versions.
+- **CON-278** A current-upgrade plan SHALL require an existing Conditor lock and SHALL bind the current manifest SHA-256, target resolved-set SHA-256, Registry profile/catalog identity, every selected component version transition, and the nested host/lifecycle plan digests into one authorization digest.
+- **CON-279** Current upgrade SHALL compare only components already declared by the repository by default; a Registry set containing additional systems SHALL NOT silently add those systems to repository governance.
+- **CON-280** Current upgrade SHALL refuse a Registry selection that would downgrade any explicitly declared component version.
+- **CON-281** Exact native target releases SHALL be installed or reused through Conditor's integrity-verified workstation plan before repository lifecycle migration depends on them.
+- **CON-282** A Registry release declaring a supported `echelon.repository-lifecycle` contract SHALL be upgraded through that component's standard repository `upgrade` operation and SHALL be verified through the standard repository `verify` operation.
+- **CON-283** A native lifecycle release without the generic repository-lifecycle contract MAY be upgraded only when the current Conditor build explicitly qualifies the exact target version and its lifecycle command contract; otherwise current upgrade SHALL refuse it.
+- **CON-284** A project-binding or application-package version transition SHALL be refused unless a generic, target-specific migration contract proves how to update that binding without overwriting user-owned project state.
+- **CON-285** Current-upgrade planning and stale-authorization refusal SHALL be read-only with respect to both repository state and persistent Registry authority.
+- **CON-286** After component migration, Conditor SHALL verify pinned requirements and the complete target repository using the proposed Registry authority before replacing existing `conditor.json`, persisted authority, or lock state.
+- **CON-287** Conditor SHALL verify that the target resolved-set bytes and the current manifest have not changed after authorization and before governance commit.
+- **CON-288** Successful current upgrade SHALL persist the exact target resolved-set bytes in the repository, update declared component versions and authority digest, and write a fresh lock only after full verification succeeds.
+- **CON-289** After a successful current upgrade, Conditor SHALL recalculate the current plan and require zero remaining version transitions as the idempotency completion proof.
+- **CON-290** Failure before the final governance commit SHALL preserve the prior Conditor manifest and Registry authority; any component-owned partial migration SHALL remain explicit remediation evidence rather than being hidden by a false lock update.
