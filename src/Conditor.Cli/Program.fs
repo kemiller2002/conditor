@@ -2,6 +2,7 @@ open System
 open System.IO
 open System.Text.Json
 open Conditor.Core
+open Conditor.Core.Workstation
 open Aegis
 
 type private ManifestSelection =
@@ -21,6 +22,7 @@ let private usage () =
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
+    Console.WriteLine "  conditor upgrade --current --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--check | --authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
@@ -303,41 +305,180 @@ let private runStart checkOnly launcherOverride target selection =
             else
                 runEstablishedStart false launcherOverride target targetManifest
 
-let private runUpgrade checkOnly target manifestPath =
-    match Manifest.load manifestPath with
-    | Error errors ->
-        writeErrors errors
+let private currentUpgradeContext (args: string array) : WorkstationContext =
+    let home =
+        optionValue "--home" args
+        |> Option.orElse (Environment.GetEnvironmentVariable "HOME" |> Option.ofObj)
+        |> Option.defaultValue (Environment.GetFolderPath Environment.SpecialFolder.UserProfile)
+        |> Path.GetFullPath
+
+    { Home = home
+      ArtifactMirror = optionValue "--artifact-mirror" args |> Option.map Path.GetFullPath
+      Offline = hasFlag "--offline" args
+      Praxis = optionValue "--praxis" args |> Option.orElse (Environment.GetEnvironmentVariable "CONDITOR_PRAXIS" |> Option.ofObj)
+      TargetId = optionValue "--target-id" args }
+
+let private currentUpgradeProbe (executable: string) (arguments: string list) =
+    ProcessRunner.runProcess (Directory.GetCurrentDirectory()) executable arguments
+
+let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
+    Console.WriteLine $"Current upgrade plan: {plan.TargetProfile.Id}@{plan.TargetProfile.Version}"
+    Console.WriteLine $"  target set: sha256:{plan.TargetSetSha256}"
+    Console.WriteLine $"  manifest:   sha256:{plan.CurrentManifestSha256}"
+
+    if plan.Transitions.IsEmpty then
+        Console.WriteLine "  version transitions: none"
+    else
+        Console.WriteLine "  version transitions:"
+
+        for transition in plan.Transitions do
+            Console.WriteLine
+                $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} [{transition.Mode}]"
+
+    match plan.WorkstationPlan with
+    | Some workstation ->
+        Console.WriteLine $"  workstation effects: {workstation.Steps.Length} (nested plan {workstation.Digest})"
+
+        for step in workstation.Steps do
+            Console.WriteLine
+                $"    {step.Sequence,2}. {StepOperation.toWire step.Operation,-12} {step.Resource} :: {Expected.describe step.Expected}"
+    | None ->
+        Console.WriteLine "  workstation effects: none"
+
+    match plan.GenericUpgradePlan with
+    | Some lifecycle ->
+        Console.WriteLine $"  repository lifecycle upgrades: {lifecycle.Steps.Length} (nested plan {lifecycle.Digest})"
+
+        for step in lifecycle.Steps do
+            let arguments = String.concat " " step.Arguments
+            Console.WriteLine $"    {step.Component}@{step.Version}: {step.Executable} {arguments}"
+    | None ->
+        Console.WriteLine "  repository lifecycle upgrades: none"
+
+    if not plan.EmbeddedTransitions.IsEmpty then
+        Console.WriteLine "  qualified legacy lifecycle upgrades:"
+
+        for transition, _, release in plan.EmbeddedTransitions do
+            Console.WriteLine $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} via {release.Executable}"
+
+    Console.WriteLine "  final verification: complete repository verify, then authority + lock commit"
+
+    for refusal in plan.Refusals do
+        Console.WriteLine $"  REFUSED {refusal}"
+
+    Console.WriteLine $"Plan digest: {plan.Digest}"
+
+let private runCurrentUpgrade (args: string array) checkOnly target manifestPath =
+    match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
+    | None, _ ->
+        writeErrors [ "--current requires --resolved-set PATH --resolved-set-sha256 SHA256 from the Registry current selection." ]
         2
-    | Ok manifest when checkOnly ->
-        match Upgrade.preview target manifest with
+    | _, None ->
+        writeErrors [ "--current requires --resolved-set-sha256 SHA256 so the target Registry selection is immutable." ]
+        2
+    | Some resolvedSet, Some resolvedSetDigest ->
+        match Manifest.load manifestPath with
         | Error errors ->
             writeErrors errors
-            9
-        | Ok preview ->
-            if preview.ChangedComponents.IsEmpty then
-                Console.WriteLine "Upgrade preview: no lifecycle version changes are required."
-            else
-                let changed = String.Join(", ", preview.ChangedComponents)
-                Console.WriteLine $"Upgrade preview: {changed}"
+            2
+        | Ok manifest ->
+            let ctx = currentUpgradeContext args
+            let resolvedPath = Path.GetFullPath resolvedSet
 
-            Installer.describe preview.Plan
-            |> List.iter (fun line -> Console.WriteLine $"  {line}")
+            match
+                CurrentUpgrade.preview
+                    target
+                    manifestPath
+                    manifest
+                    resolvedPath
+                    resolvedSetDigest
+                    ctx
+                    currentUpgradeProbe
+            with
+            | Error errors ->
+                writeErrors errors
+                9
+            | Ok plan ->
+                printCurrentUpgradePlan plan
 
-            0
-    | Ok manifest ->
-        match Upgrade.apply target manifestPath manifest with
+                if not plan.Refusals.IsEmpty then
+                    9
+                else
+                    match optionValue "--authorize" args with
+                    | None ->
+                        Console.WriteLine
+                            $"Authorize exactly this current selection with: conditor upgrade --current --target \"{target}\" --resolved-set \"{resolvedPath}\" --resolved-set-sha256 {plan.TargetSetSha256} --authorize {plan.Digest}"
+                        0
+                    | Some _ when checkOnly ->
+                        Console.WriteLine "--check is read-only; authorization was not used."
+                        0
+                    | Some authorization ->
+                        match
+                            CurrentUpgrade.apply
+                                target
+                                manifestPath
+                                manifest
+                                resolvedPath
+                                resolvedSetDigest
+                                ctx
+                                currentUpgradeProbe
+                                authorization
+                        with
+                        | Error errors ->
+                            writeErrors errors
+                            9
+                        | Ok result ->
+                            if result.ChangedComponents.IsEmpty then
+                                Console.WriteLine "Current upgrade completed: all Registry-governed component versions were already current."
+                            else
+                                let changed = String.Join(", ", result.ChangedComponents)
+                                Console.WriteLine $"Current upgrade completed: {changed}"
+
+                            Console.WriteLine $"  authority: {result.AuthorityPath}"
+                            Console.WriteLine $"  lock:      {result.LockPath}"
+                            Console.WriteLine
+                                $"  second-plan version drift: {if result.NoRemainingVersionChanges then "none" else "still present"}"
+
+                            if result.NoRemainingVersionChanges then 0 else 9
+
+let private runUpgrade (args: string array) checkOnly target manifestPath =
+    if hasFlag "--current" args then
+        runCurrentUpgrade args checkOnly target manifestPath
+    else
+        match Manifest.load manifestPath with
         | Error errors ->
             writeErrors errors
-            9
-        | Ok result ->
-            if result.ChangedComponents.IsEmpty then
-                Console.WriteLine "Conditor upgrade completed: no lifecycle version changes were required."
-            else
-                let changed = String.Join(", ", result.ChangedComponents)
-                Console.WriteLine $"Conditor upgraded lifecycle components: {changed}"
+            2
+        | Ok manifest when checkOnly ->
+            match Upgrade.preview target manifest with
+            | Error errors ->
+                writeErrors errors
+                9
+            | Ok preview ->
+                if preview.ChangedComponents.IsEmpty then
+                    Console.WriteLine "Upgrade preview: no lifecycle version changes are required."
+                else
+                    let changed = String.Join(", ", preview.ChangedComponents)
+                    Console.WriteLine $"Upgrade preview: {changed}"
 
-            Console.WriteLine $"Updated lock: {result.LockPath}"
-            0
+                Installer.describe preview.Plan
+                |> List.iter (fun line -> Console.WriteLine $"  {line}")
+
+                0
+        | Ok manifest ->
+            match Upgrade.apply target manifestPath manifest with
+            | Error errors ->
+                writeErrors errors
+                9
+            | Ok result ->
+                if result.ChangedComponents.IsEmpty then
+                    Console.WriteLine "Conditor upgrade completed: no lifecycle version changes were required."
+                else
+                    let changed = String.Join(", ", result.ChangedComponents)
+                    Console.WriteLine $"Conditor upgraded lifecycle components: {changed}"
+
+                Console.WriteLine $"Updated lock: {result.LockPath}"
+                0
 
 let private writeDoctorJson (report: Doctor.Report) =
     use stream = Console.OpenStandardOutput()
@@ -1144,7 +1285,7 @@ let private execute (args: string array) =
                 | "doctor" -> runDoctor (hasFlag "--json" args) target selection.ManifestPath
                 | "status" -> runStatus (hasFlag "--json" args) target selection.ManifestPath
                 | "repair" -> runRepair target selection.ManifestPath
-                | "upgrade" -> runUpgrade (hasFlag "--check" args) target selection.ManifestPath
+                | "upgrade" -> runUpgrade args (hasFlag "--check" args) target selection.ManifestPath
                 | "resume" -> runResume (optionValue "--launcher" args) target selection.ManifestPath
                 | "handoff" ->
                     runHandoff
