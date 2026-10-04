@@ -22,7 +22,10 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
-      - run: dotnet run --project tests/Conditor.Tests --configuration Release --no-build
+      - name: Run tests
+        env:
+          CONDITOR_TEST_CURRENT_CHANNEL: '1'
+        run: dotnet run --project tests/Conditor.Tests --configuration Release --no-build
       - name: CLI plan smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-plan"
