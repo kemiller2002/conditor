@@ -15,6 +15,12 @@ type CurrentUpgradeTransition =
       Role: string
       Mode: string }
 
+type CurrentUpgradeFileChange =
+    { Path: string
+      BeforeSha256: string
+      AfterSha256: string
+      Content: string }
+
 type CurrentUpgradePlan =
     { Target: string
       ManifestPath: string
@@ -28,11 +34,13 @@ type CurrentUpgradePlan =
       GenericUpgradePlan: LifecyclePlan option
       GenericVerifyPlan: LifecyclePlan option
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
+      FileChanges: CurrentUpgradeFileChange list
       Refusals: string list
       Digest: string }
 
 type CurrentUpgradeResult =
     { ChangedComponents: string list
+      UpdatedFiles: string list
       LockPath: string
       AuthorityPath: string
       NoRemainingVersionChanges: bool }
@@ -46,6 +54,11 @@ module CurrentUpgrade =
           Version: string
           Role: string
           DistributionClass: string
+          Repository: string
+          Tag: string
+          DistributionMechanism: string option
+          DistributionPackage: string option
+          PrimaryArtifactName: string option
           HasLifecycle: bool }
 
     let private normalizeSha256 (value: string) =
@@ -74,6 +87,11 @@ module CurrentUpgrade =
         |> Option.bind (fun value ->
             if value.ValueKind = JsonValueKind.String then value.GetString() |> Option.ofObj else None)
 
+    let private objects name element =
+        match tryProperty name element with
+        | Some value when value.ValueKind = JsonValueKind.Array -> value.EnumerateArray() |> Seq.toList
+        | _ -> []
+
     let private targetEntries (path: string) : Result<TargetEntry list, string> =
         try
             use document = JsonDocument.Parse(File.ReadAllBytes path)
@@ -86,13 +104,34 @@ module CurrentUpgrade =
             Ok(
                 components
                 |> List.choose (fun item ->
-                    match str "systemId" item, str "version" item, str "role" item, str "distributionClass" item with
-                    | Some id, Some version, Some role, Some distributionClass ->
+                    match
+                        str "systemId" item,
+                        str "version" item,
+                        str "role" item,
+                        str "distributionClass" item,
+                        str "repository" item,
+                        str "tag" item
+                    with
+                    | Some id, Some version, Some role, Some distributionClass, Some repository, Some tag ->
+                        let distribution = tryProperty "distribution" item
+
+                        let primaryArtifact =
+                            objects "artifacts" item
+                            |> List.tryPick (fun artifact ->
+                                match str "purpose" artifact, str "name" artifact with
+                                | Some ("package" | "executable"), Some name -> Some name
+                                | _ -> None)
+
                         Some
                             { Id = id
                               Version = version
                               Role = role
                               DistributionClass = distributionClass
+                              Repository = repository
+                              Tag = tag
+                              DistributionMechanism = distribution |> Option.bind (str "mechanism")
+                              DistributionPackage = distribution |> Option.bind (str "package")
+                              PrimaryArtifactName = primaryArtifact
                               HasLifecycle = (tryProperty "repositoryLifecycle" item).IsSome }
                     | _ -> None)
             )
