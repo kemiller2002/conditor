@@ -30,7 +30,6 @@
     <Compile Include="Workstation/Engine.fs" />
     <Compile Include="Workstation/Lifecycle.fs" />
     <Compile Include="CurrentUpgrade.fs" />
-    <Compile Include="CurrentUpgrade.fs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />
