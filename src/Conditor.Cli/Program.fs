@@ -22,7 +22,7 @@ let private usage () =
     Console.WriteLine "  conditor status [--json] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
-    Console.WriteLine "  conditor upgrade --current --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--check | --authorize PLAN-DIGEST]"
+    Console.WriteLine "  conditor upgrade --current [--registry-base-url URL | --resolved-set PATH --resolved-set-sha256 SHA256] [--target PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--check | --authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
@@ -321,6 +321,40 @@ let private currentUpgradeContext (args: string array) : WorkstationContext =
 let private currentUpgradeProbe (executable: string) (arguments: string list) =
     ProcessRunner.runProcess (Directory.GetCurrentDirectory()) executable arguments
 
+type private CurrentUpgradeSelection =
+    { Path: string
+      Sha256: string
+      Source: string
+      Explicit: bool }
+
+let private resolveCurrentUpgradeSelection (args: string array) (ctx: WorkstationContext) =
+    match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
+    | Some path, Some digest ->
+        Ok
+            { Path = Path.GetFullPath path
+              Sha256 = digest
+              Source = "explicit resolved set"
+              Explicit = true }
+    | Some _, None ->
+        Error "--resolved-set requires --resolved-set-sha256 SHA256 so the selected Registry state is immutable."
+    | None, Some _ ->
+        Error "--resolved-set-sha256 requires --resolved-set PATH."
+    | None, None when ctx.Offline ->
+        Error "Offline current upgrade requires --resolved-set PATH --resolved-set-sha256 SHA256."
+    | None, None ->
+        let baseUrl =
+            optionValue "--registry-base-url" args
+            |> Option.orElse (Environment.GetEnvironmentVariable "ECHELON_REGISTRY_BASE_URL" |> Option.ofObj)
+            |> Option.defaultValue CurrentChannel.DefaultBaseUrl
+
+        CurrentChannel.resolve ctx.Home baseUrl (Platform.runtimeIdentifier ())
+        |> Result.map (fun resolved ->
+            { Path = resolved.ResolvedSetPath
+              Sha256 = resolved.ResolvedSetSha256
+              Source =
+                $"{resolved.ChannelId} {resolved.ProfileId}@{resolved.ProfileVersion} ({resolved.SourceUrl})"
+              Explicit = false })
+
 let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
     Console.WriteLine $"Current upgrade plan: {plan.TargetProfile.Id}@{plan.TargetProfile.Version}"
     Console.WriteLine $"  target set: sha256:{plan.TargetSetSha256}"
@@ -361,6 +395,13 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
         for transition, _, release in plan.EmbeddedTransitions do
             Console.WriteLine $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} via {release.Executable}"
 
+    if not plan.FileChanges.IsEmpty then
+        Console.WriteLine "  project binding changes:"
+
+        for change in plan.FileChanges do
+            let relative = Path.GetRelativePath(plan.Target, change.Path).Replace('\\', '/')
+            Console.WriteLine $"    {relative}: sha256:{change.BeforeSha256} -> sha256:{change.AfterSha256}"
+
     Console.WriteLine "  final verification: complete repository verify, then authority + lock commit"
 
     for refusal in plan.Refusals do
@@ -369,29 +410,28 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
     Console.WriteLine $"Plan digest: {plan.Digest}"
 
 let private runCurrentUpgrade (args: string array) checkOnly target manifestPath =
-    match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
-    | None, _ ->
-        writeErrors [ "--current requires --resolved-set PATH --resolved-set-sha256 SHA256 from the Registry current selection." ]
+    let ctx = currentUpgradeContext args
+
+    match resolveCurrentUpgradeSelection args ctx with
+    | Error error ->
+        writeErrors [ error ]
         2
-    | _, None ->
-        writeErrors [ "--current requires --resolved-set-sha256 SHA256 so the target Registry selection is immutable." ]
-        2
-    | Some resolvedSet, Some resolvedSetDigest ->
+    | Ok selected ->
+        Console.WriteLine $"Current Registry selection: {selected.Source}"
+        Console.WriteLine $"  resolved set: sha256:{selected.Sha256}"
+
         match Manifest.load manifestPath with
         | Error errors ->
             writeErrors errors
             2
         | Ok manifest ->
-            let ctx = currentUpgradeContext args
-            let resolvedPath = Path.GetFullPath resolvedSet
-
             match
                 CurrentUpgrade.preview
                     target
                     manifestPath
                     manifest
-                    resolvedPath
-                    resolvedSetDigest
+                    selected.Path
+                    selected.Sha256
                     ctx
                     currentUpgradeProbe
             with
@@ -406,8 +446,16 @@ let private runCurrentUpgrade (args: string array) checkOnly target manifestPath
                 else
                     match optionValue "--authorize" args with
                     | None ->
+                        let selectionArgs =
+                            if selected.Explicit then
+                                $" --resolved-set \"{selected.Path}\" --resolved-set-sha256 {plan.TargetSetSha256}"
+                            else
+                                optionValue "--registry-base-url" args
+                                |> Option.map (fun value -> $" --registry-base-url \"{value}\"")
+                                |> Option.defaultValue ""
+
                         Console.WriteLine
-                            $"Authorize exactly this current selection with: conditor upgrade --current --target \"{target}\" --resolved-set \"{resolvedPath}\" --resolved-set-sha256 {plan.TargetSetSha256} --authorize {plan.Digest}"
+                            $"Authorize exactly this current selection with: conditor upgrade --current --target \"{target}\"{selectionArgs} --authorize {plan.Digest}"
                         0
                     | Some _ when checkOnly ->
                         Console.WriteLine "--check is read-only; authorization was not used."
@@ -418,8 +466,8 @@ let private runCurrentUpgrade (args: string array) checkOnly target manifestPath
                                 target
                                 manifestPath
                                 manifest
-                                resolvedPath
-                                resolvedSetDigest
+                                selected.Path
+                                selected.Sha256
                                 ctx
                                 currentUpgradeProbe
                                 authorization
@@ -434,12 +482,16 @@ let private runCurrentUpgrade (args: string array) checkOnly target manifestPath
                                 let changed = String.Join(", ", result.ChangedComponents)
                                 Console.WriteLine $"Current upgrade completed: {changed}"
 
+                            for relativePath in result.UpdatedFiles do
+                                Console.WriteLine $"  project binding: {relativePath}"
+
                             Console.WriteLine $"  authority: {result.AuthorityPath}"
                             Console.WriteLine $"  lock:      {result.LockPath}"
+
                             let driftText =
                                 if result.NoRemainingVersionChanges then "none" else "still present"
 
-                            Console.WriteLine $"  second-plan version drift: {driftText}"
+                            Console.WriteLine $"  second-plan drift: {driftText}"
 
                             if result.NoRemainingVersionChanges then 0 else 9
 
