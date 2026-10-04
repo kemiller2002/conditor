@@ -110,12 +110,19 @@ module Planner =
             match resolveRepositoryRelativePath target "Registry authority path" authority.Path with
             | Error error -> Error error
             | Ok path ->
-                ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) path authority.Sha256
-                |> Result.map Some
+                let rid = Platform.runtimeIdentifier ()
 
-    let private registryLifecycleComponents (profile: WorkstationProfile option) =
-        profile
-        |> Option.map (fun resolvedProfile ->
+                match
+                    ResolvedReleaseSets.loadFile rid path authority.Sha256,
+                    ResolvedReleaseSets.loadSelectionFile rid path authority.Sha256
+                with
+                | Ok profile, Ok selection -> Ok(Some(profile, selection))
+                | Error error, _
+                | _, Error error -> Error error
+
+    let private registryLifecycleComponents (authority: (WorkstationProfile * ResolvedSelection) option) =
+        authority
+        |> Option.map (fun (resolvedProfile, _) ->
             resolvedProfile.Components
             |> List.filter (fun release -> release.Role = Some "repository-lifecycle")
             |> List.map (fun release -> release.Id, release)
@@ -145,16 +152,25 @@ module Planner =
         let actions = ResizeArray<PlanAction>()
         let mutable sequence = 1
 
-        let authorityProfile =
+        let authority =
             match loadRegistryAuthority target manifest with
-            | Ok profile -> profile
+            | Ok resolved -> resolved
             | Error error ->
                 errors.Add $"Registry authority: {error}"
                 None
 
-        let registryLifecycle = registryLifecycleComponents authorityProfile
-        let externalIds = registryLifecycle |> Map.toSeq |> Seq.map fst |> Set.ofSeq
-        Compatibility.validateWithExternalIds externalIds manifest |> List.iter errors.Add
+        let registryLifecycle = registryLifecycleComponents authority
+
+        let authorityVersions =
+            authority
+            |> Option.map (fun (_, selection) ->
+                selection.Components
+                |> List.map (fun item -> item.Id, item.Version)
+                |> Map.ofList)
+            |> Option.defaultValue Map.empty
+
+        let externalIds = authorityVersions |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+        Compatibility.validateWithAuthorityVersions authorityVersions externalIds manifest |> List.iter errors.Add
 
         for requirement in manifest.Requirements do
             validateRequirement target requirement |> List.iter errors.Add
@@ -241,8 +257,8 @@ module Planner =
         for request in manifest.Components do
             match Registry.tryFind request.Id with
             | None ->
-                match registryLifecycle |> Map.tryFind request.Id, authorityProfile with
-                | Some release, Some profile ->
+                match registryLifecycle |> Map.tryFind request.Id, authority with
+                | Some release, Some(profile, _) ->
                     match release.Lifecycle with
                     | None ->
                         if request.Required then

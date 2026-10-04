@@ -6,6 +6,7 @@ open System.Security.Cryptography
 open System.Text
 open System.Text.Json
 open System.Text.Json.Nodes
+open System.Text.RegularExpressions
 open Conditor.Core.Workstation
 
 type CurrentUpgradeTransition =
@@ -14,6 +15,12 @@ type CurrentUpgradeTransition =
       ToVersion: string
       Role: string
       Mode: string }
+
+type CurrentUpgradeFileChange =
+    { Path: string
+      BeforeSha256: string
+      AfterSha256: string
+      Content: string }
 
 type CurrentUpgradePlan =
     { Target: string
@@ -28,11 +35,14 @@ type CurrentUpgradePlan =
       GenericUpgradePlan: LifecyclePlan option
       GenericVerifyPlan: LifecyclePlan option
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
+      EmbeddedVerifications: (ComponentDefinition * ProfileComponent) list
+      FileChanges: CurrentUpgradeFileChange list
       Refusals: string list
       Digest: string }
 
 type CurrentUpgradeResult =
     { ChangedComponents: string list
+      UpdatedFiles: string list
       LockPath: string
       AuthorityPath: string
       NoRemainingVersionChanges: bool }
@@ -46,6 +56,11 @@ module CurrentUpgrade =
           Version: string
           Role: string
           DistributionClass: string
+          Repository: string
+          Tag: string
+          DistributionMechanism: string option
+          DistributionPackage: string option
+          PrimaryArtifactName: string option
           HasLifecycle: bool }
 
     let private normalizeSha256 (value: string) =
@@ -74,6 +89,11 @@ module CurrentUpgrade =
         |> Option.bind (fun value ->
             if value.ValueKind = JsonValueKind.String then value.GetString() |> Option.ofObj else None)
 
+    let private objects name element =
+        match tryProperty name element with
+        | Some value when value.ValueKind = JsonValueKind.Array -> value.EnumerateArray() |> Seq.toList
+        | _ -> []
+
     let private targetEntries (path: string) : Result<TargetEntry list, string> =
         try
             use document = JsonDocument.Parse(File.ReadAllBytes path)
@@ -86,13 +106,34 @@ module CurrentUpgrade =
             Ok(
                 components
                 |> List.choose (fun item ->
-                    match str "systemId" item, str "version" item, str "role" item, str "distributionClass" item with
-                    | Some id, Some version, Some role, Some distributionClass ->
+                    match
+                        str "systemId" item,
+                        str "version" item,
+                        str "role" item,
+                        str "distributionClass" item,
+                        str "repository" item,
+                        str "tag" item
+                    with
+                    | Some id, Some version, Some role, Some distributionClass, Some repository, Some tag ->
+                        let distribution = tryProperty "distribution" item
+
+                        let primaryArtifact =
+                            objects "artifacts" item
+                            |> List.tryPick (fun artifact ->
+                                match str "purpose" artifact, str "name" artifact with
+                                | Some ("package" | "executable"), Some name -> Some name
+                                | _ -> None)
+
                         Some
                             { Id = id
                               Version = version
                               Role = role
                               DistributionClass = distributionClass
+                              Repository = repository
+                              Tag = tag
+                              DistributionMechanism = distribution |> Option.bind (str "mechanism")
+                              DistributionPackage = distribution |> Option.bind (str "package")
+                              PrimaryArtifactName = primaryArtifact
                               HasLifecycle = (tryProperty "repositoryLifecycle" item).IsSome }
                     | _ -> None)
             )
@@ -163,6 +204,145 @@ module CurrentUpgrade =
             | _ -> None
         | _ -> None
 
+
+    let private packageSpecifier (entry: TargetEntry) =
+        match entry.DistributionMechanism with
+        | Some "npm" -> Ok entry.Version
+        | Some "github-release" ->
+            match entry.PrimaryArtifactName with
+            | Some artifact when entry.DistributionClass = "web-package" ->
+                Ok $"https://github.com/{entry.Repository}/releases/download/{entry.Tag}/{artifact}"
+            | _ ->
+                Error
+                    $"Project binding '{entry.Id}' uses github-release but exposes no package artifact."
+        | Some mechanism ->
+            Error $"Project binding '{entry.Id}' uses unsupported package mechanism '{mechanism}'."
+        | None ->
+            Error $"Project binding '{entry.Id}' is missing a distribution mechanism."
+
+    let private npmBindingChange target (definition: ComponentDefinition) (entry: TargetEntry) =
+        let path = Path.Combine(Path.GetFullPath target, "src", "kernel", "package.json")
+
+        if not (File.Exists path) then
+            Error
+                $"Project binding '{definition.Id}' expects src/kernel/package.json; Conditor will not guess another npm target."
+        else
+            packageSpecifier entry
+            |> Result.bind (fun specifier ->
+                try
+                    match JsonNode.Parse(File.ReadAllText path) with
+                    | :? JsonObject as root ->
+                        match root["dependencies"] with
+                        | :? JsonObject as dependencies when dependencies.ContainsKey definition.Package ->
+                            dependencies[definition.Package] <- JsonValue.Create specifier
+                            let content = root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine
+                            Ok
+                                { Path = path
+                                  BeforeSha256 = sha256File path
+                                  AfterSha256 = sha256Text content
+                                  Content = content }
+                        | _ ->
+                            Error
+                                $"Project binding '{definition.Id}' expects dependency '{definition.Package}' in src/kernel/package.json; Conditor will not add an unproven binding."
+                    | _ -> Error "src/kernel/package.json must contain a JSON object."
+                with :? JsonException as ex ->
+                    Error $"Unable to parse src/kernel/package.json: {ex.Message}")
+
+    let private nugetBindingChange target (definition: ComponentDefinition) (entry: TargetEntry) =
+        let path = Path.Combine(Path.GetFullPath target, "src", "engine", "App.Engine.fsproj")
+
+        if not (File.Exists path) then
+            Error
+                $"Project binding '{definition.Id}' expects src/engine/App.Engine.fsproj; Conditor will not guess another NuGet target."
+        else
+            let before = File.ReadAllText path
+            let escaped = Regex.Escape definition.Package
+            let pattern =
+                $"(<PackageReference\\s+[^>]*Include=\\\"{escaped}\\\"[^>]*Version=\\\")[^\\\"]+(\\\")"
+            let matches = Regex.Matches(before, pattern, RegexOptions.CultureInvariant)
+
+            if matches.Count <> 1 then
+                Error
+                    $"Project binding '{definition.Id}' expected exactly one Version attribute for '{definition.Package}'; found {matches.Count}."
+            else
+                let content = Regex.Replace(before, pattern, $"$1{entry.Version}$2", RegexOptions.CultureInvariant)
+                Ok
+                    { Path = path
+                      BeforeSha256 = sha256File path
+                      AfterSha256 = sha256Text content
+                      Content = content }
+
+    let private foundationsChange target (transitions: CurrentUpgradeTransition list) =
+        let path = Path.Combine(Path.GetFullPath target, ".echelon", "foundations.json")
+
+        if not (File.Exists path) then
+            Ok None
+        else
+            try
+                match JsonNode.Parse(File.ReadAllText path) with
+                | :? JsonObject as root ->
+                    match root["capabilities"] with
+                    | :? JsonObject as capabilities ->
+                        for transition in transitions do
+                            match capabilities[transition.Id] with
+                            | :? JsonObject as capability ->
+                                capability["version"] <- JsonValue.Create transition.ToVersion
+                            | _ -> ()
+
+                        let content = root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine
+
+                        if sha256Text content = sha256File path then Ok None
+                        else
+                            Ok(
+                                Some
+                                    { Path = path
+                                      BeforeSha256 = sha256File path
+                                      AfterSha256 = sha256Text content
+                                      Content = content }
+                            )
+                    | _ -> Ok None
+                | _ -> Ok None
+            with :? JsonException as ex ->
+                Error $"Unable to parse .echelon/foundations.json: {ex.Message}"
+
+    let private writeTextAtomically (path: string) (content: string) =
+        let bytes = Encoding.UTF8.GetBytes content
+        let parent = Path.GetDirectoryName path |> Option.ofObj |> Option.defaultValue "."
+        Directory.CreateDirectory parent |> ignore
+        let temporary = $"{path}.conditor-current-{Guid.NewGuid():N}.tmp"
+
+        try
+            File.WriteAllBytes(temporary, bytes)
+            File.Move(temporary, path, true)
+        finally
+            if File.Exists temporary then File.Delete temporary
+
+    let private applyFileChanges (changes: CurrentUpgradeFileChange list) =
+        let backups = ResizeArray<string * string>()
+
+        try
+            for change in changes do
+                if sha256File change.Path <> change.BeforeSha256 then
+                    raise (
+                        InvalidOperationException(
+                            $"Project binding '{change.Path}' changed after planning."
+                        )
+                    )
+
+                backups.Add(change.Path, File.ReadAllText change.Path)
+                writeTextAtomically change.Path change.Content
+
+            Ok(List.ofSeq backups)
+        with ex ->
+            for path, content in backups do
+                writeTextAtomically path content
+
+            Error [ $"Unable to apply planned project-binding changes: {ex.Message}" ]
+
+    let private restoreFileChanges backups =
+        for path, content in backups do
+            writeTextAtomically path content
+
     let private prepare
         target
         manifestPath
@@ -202,6 +382,7 @@ module CurrentUpgrade =
 
         let transitions = ResizeArray<CurrentUpgradeTransition>()
         let embeddedTransitions = ResizeArray<CurrentUpgradeTransition * ComponentDefinition * ProfileComponent>()
+        let embeddedVerifications = ResizeArray<ComponentDefinition * ProfileComponent>()
 
         for request in manifest.Components do
             match request.Version, entryMap |> Map.tryFind request.Id with
@@ -232,8 +413,12 @@ module CurrentUpgrade =
                             errors.Add
                                 $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is a native change, but the target release declares no {RepositoryLifecycleContract.Capability} contract and this Conditor build has not qualified that exact lifecycle version."
                     | None ->
-                        errors.Add
-                            $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is selected by Registry as {targetEntry.Role}/{targetEntry.DistributionClass}, but Conditor has no safe repository upgrade contract for that distribution."
+                        match Registry.tryFind request.Id with
+                        | Some definition when targetEntry.Role = "project-binding" && definition.ApplicationBinding.IsSome ->
+                            mode <- "project-binding"
+                        | _ ->
+                            errors.Add
+                                $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is selected by Registry as {targetEntry.Role}/{targetEntry.DistributionClass}, but Conditor has no safe repository upgrade contract for that distribution."
 
                     transitions.Add
                         { Id = request.Id
@@ -254,7 +439,37 @@ module CurrentUpgrade =
             |> Seq.toList
             |> List.filter (fun transition -> transition.Mode <> "refused")
 
+        let fileChanges = ResizeArray<CurrentUpgradeFileChange>()
+
+        for transition in transitionList |> List.filter (fun item -> item.Mode = "project-binding") do
+            match Registry.tryFind transition.Id, entryMap |> Map.tryFind transition.Id with
+            | Some definition, Some entry ->
+                match definition.ApplicationBinding with
+                | Some NpmDependency ->
+                    match npmBindingChange target definition entry with
+                    | Ok change -> fileChanges.Add change
+                    | Error error -> errors.Add error
+                | Some NugetReference ->
+                    match nugetBindingChange target definition entry with
+                    | Ok change -> fileChanges.Add change
+                    | Error error -> errors.Add error
+                | None ->
+                    errors.Add $"Project binding '{transition.Id}' has no embedded target-binding declaration."
+            | _ ->
+                errors.Add $"Project binding '{transition.Id}' could not be resolved for a safe file edit."
+
+        match foundationsChange target transitionList with
+        | Ok(Some change) -> fileChanges.Add change
+        | Ok None -> ()
+        | Error error -> errors.Add error
+
         let manifestIds = manifest.Components |> List.map _.Id |> Set.ofList
+
+        for request in manifest.Components do
+            match profileMap |> Map.tryFind request.Id, Registry.tryFind request.Id with
+            | Some release, Some definition when release.Lifecycle.IsNone && definition.Command.IsSome ->
+                embeddedVerifications.Add(definition, release)
+            | _ -> ()
 
         let workstationProfile =
             targetProfile
@@ -330,6 +545,14 @@ module CurrentUpgrade =
                 $"{transition.Id}|{transition.FromVersion}|{transition.ToVersion}|{transition.Role}|{transition.Mode}")
             |> String.concat "\n"
 
+        let fileChangeText =
+            fileChanges
+            |> Seq.sortBy (fun change -> change.Path)
+            |> Seq.map (fun change ->
+                let relative = Path.GetRelativePath(Path.GetFullPath target, change.Path).Replace('\\', '/')
+                $"{relative}|{change.BeforeSha256}|{change.AfterSha256}")
+            |> String.concat "\n"
+
         let profileIdentity =
             targetProfile
             |> Option.map (fun profile ->
@@ -348,7 +571,8 @@ module CurrentUpgrade =
                   workstationPlan |> Option.map (fun plan -> $"workstation={plan.Digest}") |> Option.defaultValue "workstation=-"
                   genericUpgradePlan |> Option.map (fun plan -> $"lifecycleUpgrade={plan.Digest}") |> Option.defaultValue "lifecycleUpgrade=-"
                   genericVerifyPlan |> Option.map (fun plan -> $"lifecycleVerify={plan.Digest}") |> Option.defaultValue "lifecycleVerify=-"
-                  transitionText ]
+                  transitionText
+                  fileChangeText ]
 
         targetProfile
         |> Option.map (fun profile ->
@@ -364,6 +588,8 @@ module CurrentUpgrade =
               GenericUpgradePlan = genericUpgradePlan
               GenericVerifyPlan = genericVerifyPlan
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
+              EmbeddedVerifications = embeddedVerifications |> Seq.toList
+              FileChanges = fileChanges |> Seq.toList
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
 
@@ -415,6 +641,20 @@ module CurrentUpgrade =
             else
                 Ok()
 
+    let private verifyEmbedded target ctx (definition: ComponentDefinition, release: ProfileComponent) =
+        let executable = installedExecutable ctx release
+        let verify = ProcessRunner.runProcess target executable definition.VerifyArguments
+
+        if verify.ExitCode = 0 then
+            Ok()
+        else
+            Error
+                [ $"Post-upgrade verification failed for {release.Id}@{release.Version}."
+                  $"Executable: {executable}"
+                  verify.StandardOutput.Trim()
+                  verify.StandardError.Trim() ]
+            |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
+
     let apply
         target
         manifestPath
@@ -434,122 +674,204 @@ module CurrentUpgrade =
         | Ok plan when not plan.Refusals.IsEmpty ->
             Error plan.Refusals
         | Ok plan ->
-            let workstationResult =
-                match plan.WorkstationPlan with
-                | None -> Ok()
-                | Some workstation ->
-                    match Engine.apply ctx probe workstation workstation.Digest true with
-                    | Error error -> Error [ $"Workstation current-upgrade failed: {error}" ]
-                    | Ok result ->
-                        match result.Failed with
-                        | Some(step, detail) -> Error [ $"Workstation current-upgrade failed at {step}: {detail}" ]
+            let gitStatus = ProcessRunner.runProcess target "git" [ "status"; "--porcelain" ]
+
+            if gitStatus.ExitCode <> 0 then
+                Error [ "Current upgrade requires a Git repository so repository mutations have a recoverable baseline." ]
+            elif not (String.IsNullOrWhiteSpace gitStatus.StandardOutput) then
+                Error
+                    [ "Current upgrade requires a clean Git working tree."
+                      "Commit or stash existing work, then re-run the exact authorized plan." ]
+            else
+                let mutable fileBackups: (string * string) list = []
+
+                let workstationResult =
+                    match plan.WorkstationPlan with
+                    | None -> Ok()
+                    | Some workstation ->
+                        match Engine.apply ctx probe workstation workstation.Digest true with
+                        | Error error ->
+                            Error [ $"Workstation current-upgrade failed: {error}" ]
+                        | Ok result ->
+                            match result.Failed with
+                            | Some(step, detail) ->
+                                Error [ $"Workstation current-upgrade failed at {step}: {detail}" ]
+                            | None -> Ok()
+
+                let genericUpgradeResult =
+                    workstationResult
+                    |> Result.bind (fun () ->
+                        match plan.GenericUpgradePlan with
                         | None -> Ok()
+                        | Some lifecycle ->
+                            match Lifecycle.apply ctx probe lifecycle lifecycle.Digest with
+                            | Error error ->
+                                Error [ $"Repository lifecycle current-upgrade failed: {error}" ]
+                            | Ok result ->
+                                match result.Failed with
+                                | Some(step, detail) ->
+                                    Error [ $"Repository lifecycle current-upgrade failed at {step}: {detail}" ]
+                                | None -> Ok())
 
-            workstationResult
-            |> Result.bind (fun () ->
-                match plan.GenericUpgradePlan with
-                | None -> Ok()
-                | Some lifecycle ->
-                    match Lifecycle.apply ctx probe lifecycle lifecycle.Digest with
-                    | Error error -> Error [ $"Repository lifecycle current-upgrade failed: {error}" ]
-                    | Ok result ->
-                        match result.Failed with
-                        | Some(step, detail) -> Error [ $"Repository lifecycle current-upgrade failed at {step}: {detail}" ]
-                        | None -> Ok())
-            |> Result.bind (fun () ->
-                plan.EmbeddedTransitions
-                |> List.fold
-                    (fun state transition ->
-                        state |> Result.bind (fun () -> executeEmbedded target ctx transition))
-                    (Ok()))
-            |> Result.bind (fun () ->
-                match plan.GenericVerifyPlan with
-                | None -> Ok()
-                | Some lifecycle ->
-                    match Lifecycle.apply ctx probe lifecycle lifecycle.Digest with
-                    | Error error -> Error [ $"Post-upgrade generic verification failed: {error}" ]
-                    | Ok result ->
-                        match result.Failed with
-                        | Some(step, detail) -> Error [ $"Post-upgrade generic verification failed at {step}: {detail}" ]
-                        | None -> Ok())
-            |> Result.bind (fun () ->
-                let authorityBytes = File.ReadAllBytes plan.TargetSetPath
-                let observed = sha256Bytes authorityBytes
+                let embeddedUpgradeResult =
+                    genericUpgradeResult
+                    |> Result.bind (fun () ->
+                        plan.EmbeddedTransitions
+                        |> List.fold
+                            (fun state transition ->
+                                state |> Result.bind (fun () -> executeEmbedded target ctx transition))
+                            (Ok()))
 
-                if observed <> plan.TargetSetSha256 then
-                    Error
-                        [ $"Target Registry authority changed after authorization: expected sha256:{plan.TargetSetSha256}, observed sha256:{observed}." ]
-                elif sha256File manifestPath <> plan.CurrentManifestSha256 then
-                    Error [ "conditor.json changed after current-upgrade authorization; governance was not modified." ]
-                else
-                    let pendingRelative = $".conditor/authority/current-upgrade-{Guid.NewGuid():N}.json"
-                    let pendingPath = Path.Combine(Path.GetFullPath target, pendingRelative)
-                    Directory.CreateDirectory(Path.GetDirectoryName pendingPath |> Option.ofObj |> Option.defaultValue target) |> ignore
-                    File.WriteAllBytes(pendingPath, authorityBytes)
+                let fileResult =
+                    embeddedUpgradeResult
+                    |> Result.bind (fun () ->
+                        match applyFileChanges plan.FileChanges with
+                        | Ok backups ->
+                            fileBackups <- backups
+                            Ok()
+                        | Error errors -> Error errors)
 
-                    match Manifest.parseText plan.TargetManifestText with
-                    | Error errors ->
-                        File.Delete pendingPath
-                        Error errors
-                    | Ok targetManifest ->
-                        let verificationManifest =
-                            { targetManifest with
-                                RegistryAuthority =
+                let genericVerifyResult =
+                    fileResult
+                    |> Result.bind (fun () ->
+                        match plan.GenericVerifyPlan with
+                        | None -> Ok()
+                        | Some lifecycle ->
+                            match Lifecycle.apply ctx probe lifecycle lifecycle.Digest with
+                            | Error error ->
+                                Error [ $"Post-upgrade generic verification failed: {error}" ]
+                            | Ok result ->
+                                match result.Failed with
+                                | Some(step, detail) ->
+                                    Error [ $"Post-upgrade generic verification failed at {step}: {detail}" ]
+                                | None -> Ok())
+
+                let embeddedVerifyResult =
+                    genericVerifyResult
+                    |> Result.bind (fun () ->
+                        plan.EmbeddedVerifications
+                        |> List.fold
+                            (fun state verification ->
+                                state |> Result.bind (fun () -> verifyEmbedded target ctx verification))
+                            (Ok()))
+
+                let governanceResult =
+                    embeddedVerifyResult
+                    |> Result.bind (fun () ->
+                        let fileDrift =
+                            plan.FileChanges
+                            |> List.choose (fun change ->
+                                let observed = sha256File change.Path
+
+                                if observed = change.AfterSha256 then None
+                                else
                                     Some
-                                        { Kind = "resolved-release-set"
-                                          Path = pendingRelative.Replace('\\', '/')
-                                          Sha256 = plan.TargetSetSha256 } }
+                                        $"Planned project binding '{Path.GetRelativePath(Path.GetFullPath target, change.Path)}' changed after application.")
 
-                        let verification =
-                            Requirements.verify target verificationManifest
-                            |> Result.bind (fun () ->
-                                Planner.create target Verify verificationManifest
-                                |> Result.bind (fun verifyPlan ->
-                                    Installer.execute target String.Empty verifyPlan |> Result.map ignore))
+                        if not fileDrift.IsEmpty then
+                            Error fileDrift
+                        else
+                            let authorityBytes = File.ReadAllBytes plan.TargetSetPath
+                            let observed = sha256Bytes authorityBytes
 
-                        match verification with
-                        | Error errors ->
-                            File.Delete pendingPath
-                            Error(
-                                "Full repository verification failed after component upgrades; existing Conditor governance was left unchanged."
-                                :: errors
-                            )
-                        | Ok() ->
-                            let finalAuthorityPath = Path.Combine(Path.GetFullPath target, AuthorityPath)
-                            let oldAuthority =
-                                if File.Exists finalAuthorityPath then Some(File.ReadAllBytes finalAuthorityPath) else None
-                            let oldManifest = File.ReadAllBytes manifestPath
+                            if observed <> plan.TargetSetSha256 then
+                                Error
+                                    [ $"Target Registry authority changed after authorization: expected sha256:{plan.TargetSetSha256}, observed sha256:{observed}." ]
+                            elif sha256File manifestPath <> plan.CurrentManifestSha256 then
+                                Error [ "conditor.json changed after current-upgrade authorization; governance was not modified." ]
+                            else
+                                let pendingRelative = $".conditor/authority/current-upgrade-{Guid.NewGuid():N}.json"
+                                let pendingPath = Path.Combine(Path.GetFullPath target, pendingRelative)
+                                let pendingParent =
+                                    Path.GetDirectoryName pendingPath
+                                    |> Option.ofObj
+                                    |> Option.defaultValue target
 
-                            let commitResult =
-                                try
-                                    writeAtomically finalAuthorityPath authorityBytes
-                                    writeAtomically manifestPath (Encoding.UTF8.GetBytes plan.TargetManifestText)
+                                Directory.CreateDirectory pendingParent |> ignore
+                                File.WriteAllBytes(pendingPath, authorityBytes)
 
-                                    match Manifest.load manifestPath with
+                                let verificationResult =
+                                    match Manifest.parseText plan.TargetManifestText with
                                     | Error errors -> Error errors
-                                    | Ok committedManifest ->
-                                        match Planner.create target Init committedManifest with
-                                        | Error errors -> Error errors
-                                        | Ok lockPlan ->
-                                            let lockPath = LockFile.write target manifestPath lockPlan
-                                            let remaining =
-                                                match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
-                                                | Ok second -> second.Transitions.IsEmpty
-                                                | Error _ -> false
+                                    | Ok targetManifest ->
+                                        let verificationManifest =
+                                            { targetManifest with
+                                                RegistryAuthority =
+                                                    Some
+                                                        { Kind = "resolved-release-set"
+                                                          Path = pendingRelative.Replace('\\', '/')
+                                                          Sha256 = plan.TargetSetSha256 } }
 
-                                            Ok
-                                                { ChangedComponents = plan.Transitions |> List.map _.Id
-                                                  LockPath = lockPath
-                                                  AuthorityPath = finalAuthorityPath
-                                                  NoRemainingVersionChanges = remaining }
-                                with ex ->
-                                    writeAtomically manifestPath oldManifest
+                                        Requirements.verify target verificationManifest
+                                        |> Result.bind (fun () ->
+                                            Planner.create target Verify verificationManifest
+                                            |> Result.map ignore)
 
-                                    match oldAuthority with
-                                    | Some bytes -> writeAtomically finalAuthorityPath bytes
-                                    | None -> if File.Exists finalAuthorityPath then File.Delete finalAuthorityPath
+                                match verificationResult with
+                                | Error errors ->
+                                    if File.Exists pendingPath then File.Delete pendingPath
 
-                                    Error [ $"Unable to commit current-upgrade governance atomically: {ex.Message}" ]
+                                    Error(
+                                        "Full repository governance verification failed after component upgrades; existing Conditor authority was left unchanged."
+                                        :: errors
+                                    )
+                                | Ok() ->
+                                    let finalAuthorityPath = Path.Combine(Path.GetFullPath target, AuthorityPath)
 
-                            if File.Exists pendingPath then File.Delete pendingPath
-                            commitResult)
+                                    let oldAuthority =
+                                        if File.Exists finalAuthorityPath then
+                                            Some(File.ReadAllBytes finalAuthorityPath)
+                                        else
+                                            None
+
+                                    let oldManifest = File.ReadAllBytes manifestPath
+
+                                    let commitResult =
+                                        try
+                                            writeAtomically finalAuthorityPath authorityBytes
+                                            writeAtomically manifestPath (Encoding.UTF8.GetBytes plan.TargetManifestText)
+
+                                            match Manifest.load manifestPath with
+                                            | Error errors -> Error errors
+                                            | Ok committedManifest ->
+                                                match Planner.create target Init committedManifest with
+                                                | Error errors -> Error errors
+                                                | Ok lockPlan ->
+                                                    let lockPath = LockFile.write target manifestPath lockPlan
+
+                                                    let noRemainingChanges =
+                                                        match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
+                                                        | Ok second ->
+                                                            second.Transitions.IsEmpty
+                                                            && second.FileChanges.IsEmpty
+                                                            && second.Refusals.IsEmpty
+                                                        | Error _ -> false
+
+                                                    Ok
+                                                        { ChangedComponents = plan.Transitions |> List.map _.Id
+                                                          UpdatedFiles =
+                                                            plan.FileChanges
+                                                            |> List.map (fun change ->
+                                                                Path.GetRelativePath(Path.GetFullPath target, change.Path).Replace('\\', '/'))
+                                                          LockPath = lockPath
+                                                          AuthorityPath = finalAuthorityPath
+                                                          NoRemainingVersionChanges = noRemainingChanges }
+                                        with ex ->
+                                            writeAtomically manifestPath oldManifest
+
+                                            match oldAuthority with
+                                            | Some bytes -> writeAtomically finalAuthorityPath bytes
+                                            | None ->
+                                                if File.Exists finalAuthorityPath then
+                                                    File.Delete finalAuthorityPath
+
+                                            Error [ $"Unable to commit current-upgrade governance atomically: {ex.Message}" ]
+
+                                    if File.Exists pendingPath then File.Delete pendingPath
+                                    commitResult)
+
+                governanceResult
+                |> Result.mapError (fun errors ->
+                    restoreFileChanges fileBackups
+                    errors)
+

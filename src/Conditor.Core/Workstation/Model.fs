@@ -268,6 +268,28 @@ module Profiles =
 /// installation engine. This is deliberately strict: the first integration
 /// supports native host tools only. Other distribution classes require their
 /// own explicit binding/install semantics and are refused here.
+type ResolvedSelectionComponent =
+    { Id: string
+      Role: string
+      Required: bool
+      Version: string
+      Repository: string
+      Tag: string
+      Commit: string
+      DistributionClass: string
+      Executable: string option
+      DistributionMechanism: string
+      DistributionPackage: string option
+      DistributionUrl: string option
+      PrimaryArtifact: ReleaseAsset option
+      Lifecycle: RepositoryLifecycle option }
+
+type ResolvedSelection =
+    { ProfileId: string
+      ProfileVersion: string
+      SourceIdentity: string
+      Components: ResolvedSelectionComponent list }
+
 module ResolvedReleaseSets =
     let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
@@ -473,6 +495,108 @@ module ResolvedReleaseSets =
             Error $"resolved release set not found: {path}"
         else
             parseVerified expectedRuntimeIdentifier expectedSha256 (File.ReadAllBytes path)
+
+
+    let loadSelectionFile (expectedRuntimeIdentifier: string) (path: string) (expectedSha256: string) =
+        if not (File.Exists path) then
+            Error $"resolved release set not found: {path}"
+        else
+            let bytes = File.ReadAllBytes path
+
+            parseVerified expectedRuntimeIdentifier expectedSha256 bytes
+            |> Result.bind (fun verified ->
+                try
+                    use document = JsonDocument.Parse bytes
+                    let root = document.RootElement
+
+                    let requiredString label name element =
+                        match str name element with
+                        | Some value -> Ok value
+                        | None -> Error $"resolved {label} is missing string '{name}'"
+
+                    let requiredBool label name element =
+                        match boolValue name element with
+                        | Some value -> Ok value
+                        | None -> Error $"resolved {label} is missing boolean '{name}'"
+
+                    let profileResult =
+                        match tryProperty "profile" root with
+                        | Some profile ->
+                            match requiredString "profile" "id" profile, requiredString "profile" "version" profile with
+                            | Ok id, Ok version -> Ok(id, version)
+                            | Error error, _
+                            | _, Error error -> Error error
+                        | None -> Error "resolved release set is missing profile"
+
+                    let componentResults =
+                        objects "components" root
+                        |> List.map (fun item ->
+                            let id = str "systemId" item |> Option.defaultValue "<unknown>"
+                            let distribution = tryProperty "distribution" item
+
+                            match
+                                requiredString $"component '{id}'" "systemId" item,
+                                requiredString $"component '{id}'" "role" item,
+                                requiredBool $"component '{id}'" "required" item,
+                                requiredString $"component '{id}'" "version" item,
+                                requiredString $"component '{id}'" "repository" item,
+                                requiredString $"component '{id}'" "tag" item,
+                                requiredString $"component '{id}'" "commit" item,
+                                requiredString $"component '{id}'" "distributionClass" item,
+                                distribution
+                            with
+                            | Ok systemId, Ok role, Ok required, Ok version, Ok repository, Ok tag, Ok commit, Ok distributionClass, Some dist ->
+                                match requiredString $"component '{id}' distribution" "mechanism" dist, parseLifecycle id item with
+                                | Ok mechanism, Ok lifecycle ->
+                                    let primary =
+                                        objects "artifacts" item
+                                        |> List.tryPick (fun artifact ->
+                                            match str "purpose" artifact, str "name" artifact, str "sha256" artifact with
+                                            | Some ("executable" | "package"), Some name, Some digest ->
+                                                Some { Name = name; Sha256 = digest }
+                                            | _ -> None)
+
+                                    Ok
+                                        { Id = systemId
+                                          Role = role
+                                          Required = required
+                                          Version = version
+                                          Repository = repository
+                                          Tag = tag
+                                          Commit = commit
+                                          DistributionClass = distributionClass
+                                          Executable = str "executable" item
+                                          DistributionMechanism = mechanism
+                                          DistributionPackage = str "package" dist
+                                          DistributionUrl = str "url" dist
+                                          PrimaryArtifact = primary
+                                          Lifecycle = lifecycle }
+                                | Error error, _
+                                | _, Error error -> Error error
+                            | Error error, _, _, _, _, _, _, _, _
+                            | _, Error error, _, _, _, _, _, _, _
+                            | _, _, Error error, _, _, _, _, _, _
+                            | _, _, _, Error error, _, _, _, _, _
+                            | _, _, _, _, Error error, _, _, _, _
+                            | _, _, _, _, _, Error error, _, _, _
+                            | _, _, _, _, _, _, Error error, _, _
+                            | _, _, _, _, _, _, _, Error error, _ -> Error error
+                            | _, _, _, _, _, _, _, _, None ->
+                                Error $"resolved component '{id}' is missing distribution")
+
+                    let errors = componentResults |> List.choose (function Error error -> Some error | _ -> None)
+
+                    match profileResult, errors with
+                    | Error error, _ -> Error error
+                    | _, head :: tail -> Error(String.concat "; " (head :: tail))
+                    | Ok(profileId, profileVersion), [] ->
+                        Ok
+                            { ProfileId = profileId
+                              ProfileVersion = profileVersion
+                              SourceIdentity = verified.SourceIdentity |> Option.defaultValue ""
+                              Components = componentResults |> List.choose (function Ok item -> Some item | _ -> None) }
+                with :? JsonException as ex ->
+                    Error $"resolved release set is not valid JSON: {ex.Message}")
 
 /// The runtime identifier used to pick a release asset.
 module Platform =
