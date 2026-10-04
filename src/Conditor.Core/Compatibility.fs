@@ -59,22 +59,29 @@ module Compatibility =
     let private componentIds (manifest: ProjectManifest) =
         manifest.Components |> List.map _.Id |> Set.ofList
 
-    let validateWithExternalIds (externalIds: Set<string>) (manifest: ProjectManifest) =
+    let validateWithAuthorityVersions (authorityVersions: Map<string, string>) (externalIds: Set<string>) (manifest: ProjectManifest) =
         let errors = ResizeArray<string>()
         let ids = componentIds manifest
 
         for request in manifest.Components do
-            match Map.tryFind request.Id supportedMap with
-            | None ->
-                if request.Required && not (externalIds.Contains request.Id) then
-                    errors.Add $"Component '{request.Id}' has no Conditor compatibility declaration or verified Registry authority."
-            | Some support ->
-                let version = requestedVersion request
+            let version = requestedVersion request
 
-                if not (support.Versions.Contains version) then
-                    let known = support.Versions |> Seq.sort |> String.concat ", "
-                    errors.Add
-                        $"Component '{request.Id}' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: {known}."
+            match authorityVersions |> Map.tryFind request.Id with
+            | Some authoritativeVersion when authoritativeVersion <> version ->
+                errors.Add
+                    $"Component '{request.Id}' version '{version}' differs from verified Registry authority '{authoritativeVersion}'."
+            | Some _ ->
+                ()
+            | None ->
+                match Map.tryFind request.Id supportedMap with
+                | None ->
+                    if request.Required && not (externalIds.Contains request.Id) then
+                        errors.Add $"Component '{request.Id}' has no Conditor compatibility declaration or verified Registry authority."
+                | Some support ->
+                    if not (support.Versions.Contains version) then
+                        let known = support.Versions |> Seq.sort |> String.concat ", "
+                        errors.Add
+                            $"Component '{request.Id}' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: {known}."
 
         match manifest.Scaffold with
         | Some scaffold when scaffold.Kind = "fsharp-limen-web" && not (ids.Contains "limen") ->
@@ -90,6 +97,9 @@ module Compatibility =
                 "Enabled execution requires component 'praxis'. Conditor will not create or launch untracked work."
 
         List.ofSeq errors
+
+    let validateWithExternalIds (externalIds: Set<string>) (manifest: ProjectManifest) =
+        validateWithAuthorityVersions Map.empty externalIds manifest
 
     let validate (manifest: ProjectManifest) =
         let externallyResolvable =
