@@ -130,9 +130,12 @@ module CurrentUpgrade =
                             match entry["id"] with
                             | :? JsonValue as idValue ->
                                 match idValue.TryGetValue<string>() with
-                                | true, id when not (isNull id) ->
-                                    match transitionMap |> Map.tryFind (id.ToLowerInvariant()) with
-                                    | Some version -> entry["version"] <- JsonValue.Create<string>(version)
+                                | true, id ->
+                                    match id |> Option.ofObj with
+                                    | Some nonNullId ->
+                                        match transitionMap |> Map.tryFind (nonNullId.ToLowerInvariant()) with
+                                        | Some version -> entry["version"] <- JsonValue.Create<string>(version)
+                                        | None -> ()
                                     | None -> ()
                                 | _ -> ()
                             | _ -> ()
