@@ -147,6 +147,18 @@ let private context home mirror : WorkstationContext =
       Praxis = None
       TargetId = Some "current-upgrade-test" }
 
+let private establishCleanGit target =
+    let run args =
+        let result = ProcessRunner.runProcess target "git" args
+        if result.ExitCode <> 0 then
+            failwith $"git {String.concat " " args} failed: {result.StandardError}"
+
+    run [ "init"; "-q" ]
+    run [ "config"; "user.email"; "conditor-tests@example.invalid" ]
+    run [ "config"; "user.name"; "Conditor Tests" ]
+    run [ "add"; "." ]
+    run [ "commit"; "-q"; "-m"; "fixture baseline" ]
+
 let private establishLock target manifestPath id version =
     let plan =
         { ProjectName = "current-upgrade-test"
@@ -194,6 +206,7 @@ let run (check: string -> bool -> unit) =
         Directory.CreateDirectory(Path.Combine(target, ".gamma")) |> ignore
         File.WriteAllText(Path.Combine(target, ".gamma", "version"), "1.0.0\n")
         establishLock target manifestPath id "1.0.0"
+        establishCleanGit target
 
         let ctx = context home mirror
         let priorPath = Environment.GetEnvironmentVariable "PATH"
@@ -384,6 +397,19 @@ let run (check: string -> bool -> unit) =
             bindingManifestPath,
             """{"schemaVersion":1,"name":"binding","components":[{"id":"forma","version":"0.3.0","required":true}],"requirements":[],"execution":{"enabled":false}}"""
         )
+        let kernel = Path.Combine(bindingTarget, "src", "kernel")
+        Directory.CreateDirectory kernel |> ignore
+        File.WriteAllText(
+            Path.Combine(kernel, "package.json"),
+            """{
+  "name": "binding-fixture",
+  "private": true,
+  "dependencies": {
+    "@echelon-foundry/design-system": "0.3.0"
+  }
+}
+"""
+        )
         establishLock bindingTarget bindingManifestPath "forma" "0.3.0"
 
         match Manifest.load bindingManifestPath with
@@ -397,6 +423,25 @@ let run (check: string -> bool -> unit) =
                 check $"project binding current plan is produced: {details}" false
             | Ok bindingPlan ->
                 check
-                    "current upgrade refuses uncontracted project-binding version mutation"
+                    "current upgrade plans Registry project-binding transition"
+                    (bindingPlan.Transitions
+                     |> List.exists (fun transition ->
+                         transition.Id = "forma"
+                         && transition.FromVersion = "0.3.0"
+                         && transition.ToVersion = "9.0.0"
+                         && transition.Mode = "project-binding"))
+
+                check
+                    "current upgrade plans exact npm binding edit"
+                    (bindingPlan.FileChanges
+                     |> List.exists (fun change ->
+                         Path.GetFileName change.Path = "package.json"
+                         && change.Content.Contains(
+                             "https://github.com/example/forma/releases/download/v9.0.0/forma.tgz",
+                             StringComparison.Ordinal
+                         )))
+
+                check
+                    "current upgrade project-binding plan has no unsafe-contract refusal"
                     (bindingPlan.Refusals
-                     |> List.exists (fun error -> error.Contains("no safe repository upgrade contract")))
+                     |> List.forall (fun error -> not (error.Contains("no safe repository upgrade contract"))))
