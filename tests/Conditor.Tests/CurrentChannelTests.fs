@@ -59,8 +59,8 @@ let run check =
 
     let duplicate =
         valid.Replace(
-            """"platform": "osx-arm64"""",
-            """"platform": "linux-x64""""
+            "\"platform\": \"osx-arm64\"",
+            "\"platform\": \"linux-x64\""
         )
 
     check
