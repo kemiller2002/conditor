@@ -354,7 +354,7 @@ let run (check: string -> bool -> unit) =
                 .Replace("__RELEASE_SHA__", releaseSha)
                 .Replace("__PACKAGE_SHA__", packageSha)
 
-        File.WriteAllText(bindingResolved, bindingJson)     )
+        File.WriteAllText(bindingResolved, bindingJson)
 
         let bindingSha = sha256File bindingResolved
         File.WriteAllText(
