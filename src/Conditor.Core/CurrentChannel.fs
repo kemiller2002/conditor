@@ -32,7 +32,7 @@ module CurrentChannel =
     let DefaultBaseUrl =
         "https://raw.githubusercontent.com/kemiller2002/echelon-registry/main"
 
-    let private tryProperty name (element: JsonElement) =
+    let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
         if element.ValueKind = JsonValueKind.Object && element.TryGetProperty(name, &value) then Some value else None
 
@@ -138,7 +138,7 @@ module CurrentChannel =
         with ex ->
             Error $"Unable to fetch Registry current channel resource '{url}': {ex.Message}"
 
-    let resolve home baseUrl runtimeIdentifier =
+    let resolve (home: string) (baseUrl: string) (runtimeIdentifier: string) =
         let root = baseUrl.TrimEnd('/')
         let channelUrl = $"{root}/channels/echelon-current/channel.json"
 
