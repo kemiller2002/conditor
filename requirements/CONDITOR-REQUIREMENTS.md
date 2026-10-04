@@ -402,10 +402,22 @@ Tracked by GitHub issue #5.
 - **CON-281** Exact native target releases SHALL be installed or reused through Conditor's integrity-verified workstation plan before repository lifecycle migration depends on them.
 - **CON-282** A Registry release declaring a supported `echelon.repository-lifecycle` contract SHALL be upgraded through that component's standard repository `upgrade` operation and SHALL be verified through the standard repository `verify` operation.
 - **CON-283** A native lifecycle release without the generic repository-lifecycle contract MAY be upgraded only when the current Conditor build explicitly qualifies the exact target version and its lifecycle command contract; otherwise current upgrade SHALL refuse it.
-- **CON-284** A project-binding or application-package version transition SHALL be refused unless a generic, target-specific migration contract proves how to update that binding without overwriting user-owned project state.
+- **CON-284** A project-binding or application-package version transition SHALL be permitted only when Conditor has an explicit target-binding contract for the existing repository shape or the component provides a generic target-specific migration contract. Unknown, missing, or ambiguous binding targets SHALL be refused rather than guessed.
 - **CON-285** Current-upgrade planning and stale-authorization refusal SHALL be read-only with respect to both repository state and persistent Registry authority.
 - **CON-286** After component migration, Conditor SHALL verify pinned requirements and the complete target repository using the proposed Registry authority before replacing existing `conditor.json`, persisted authority, or lock state.
 - **CON-287** Conditor SHALL verify that the target resolved-set bytes and the current manifest have not changed after authorization and before governance commit.
 - **CON-288** Successful current upgrade SHALL persist the exact target resolved-set bytes in the repository, update declared component versions and authority digest, and write a fresh lock only after full verification succeeds.
 - **CON-289** After a successful current upgrade, Conditor SHALL recalculate the current plan and require zero remaining version transitions as the idempotency completion proof.
 - **CON-290** Failure before the final governance commit SHALL preserve the prior Conditor manifest and Registry authority; any component-owned partial migration SHALL remain explicit remediation evidence rather than being hidden by a false lock update.
+
+
+## Registry current channel resolution
+
+- **CON-291** When `upgrade --current` is invoked without an explicit resolved set, Conditor SHALL resolve the Echelon Registry `echelon-current` channel for the running platform.
+- **CON-292** A Registry current-channel document SHALL select a platform-specific resolved release set by repository-relative path and SHA-256; Conditor SHALL reject unsafe paths, duplicate platforms, malformed digests, and unsupported platforms.
+- **CON-293** Conditor SHALL verify downloaded current resolved-set bytes against the channel SHA-256 before caching or planning and SHALL then pass those bytes through the normal resolved-release-set validation contract.
+- **CON-294** The moving current-channel pointer SHALL NOT weaken plan authorization: the outer current-upgrade digest SHALL bind the exact resolved-set SHA-256 selected at plan time, so a later channel advance invalidates prior authorization.
+- **CON-295** Offline current upgrade SHALL require an explicit local `--resolved-set` and `--resolved-set-sha256`; Conditor SHALL NOT silently fall back to network resolution.
+- **CON-296** Conditor SHALL support an explicit Registry base-URL override for controlled mirrors and tests while defaulting to the canonical Echelon Registry current channel.
+- **CON-297** Project-binding edits performed by current upgrade SHALL be disclosed with before/after file digests, limited to previously proven target files, included in the authorization digest, and restored if later upgrade verification fails before governance commit.
+- **CON-298** Current upgrade SHALL require a clean Git working tree before repository mutation so component-owned partial migrations remain inspectable and recoverable rather than being mixed with unrelated user changes.
