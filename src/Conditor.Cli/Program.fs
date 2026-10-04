@@ -436,8 +436,10 @@ let private runCurrentUpgrade (args: string array) checkOnly target manifestPath
 
                             Console.WriteLine $"  authority: {result.AuthorityPath}"
                             Console.WriteLine $"  lock:      {result.LockPath}"
-                            Console.WriteLine
-                                $"  second-plan version drift: {if result.NoRemainingVersionChanges then "none" else "still present"}"
+                            let driftText =
+                                if result.NoRemainingVersionChanges then "none" else "still present"
+
+                            Console.WriteLine $"  second-plan version drift: {driftText}"
 
                             if result.NoRemainingVersionChanges then 0 else 9
 
