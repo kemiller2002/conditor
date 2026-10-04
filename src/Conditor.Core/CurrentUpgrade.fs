@@ -54,7 +54,7 @@ module CurrentUpgrade =
         else
             value
 
-    let private sha256Bytes bytes =
+    let private sha256Bytes (bytes: byte array) =
         bytes
         |> SHA256.HashData
         |> Convert.ToHexString
@@ -63,7 +63,7 @@ module CurrentUpgrade =
     let private sha256Text (value: string) =
         value |> Encoding.UTF8.GetBytes |> sha256Bytes
 
-    let private sha256File path = File.ReadAllBytes path |> sha256Bytes
+    let private sha256File (path: string) = File.ReadAllBytes path |> sha256Bytes
 
     let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
@@ -74,7 +74,7 @@ module CurrentUpgrade =
         |> Option.bind (fun value ->
             if value.ValueKind = JsonValueKind.String then value.GetString() |> Option.ofObj else None)
 
-    let private targetEntries path =
+    let private targetEntries (path: string) : Result<TargetEntry list, string> =
         try
             use document = JsonDocument.Parse(File.ReadAllBytes path)
 
@@ -116,7 +116,7 @@ module CurrentUpgrade =
         | Some fromValue, Some toValue -> toValue < fromValue
         | _ -> false
 
-    let private renderTargetManifest manifestPath targetDigest transitions =
+    let private renderTargetManifest (manifestPath: string) (targetDigest: string) (transitions: CurrentUpgradeTransition list) =
         try
             match JsonNode.Parse(File.ReadAllText manifestPath) with
             | :? JsonObject as root ->
@@ -130,9 +130,9 @@ module CurrentUpgrade =
                             match entry["id"] with
                             | :? JsonValue as idValue ->
                                 match idValue.TryGetValue<string>() with
-                                | true, id ->
+                                | true, id when not (isNull id) ->
                                     match transitionMap |> Map.tryFind (id.ToLowerInvariant()) with
-                                    | Some version -> entry["version"] <- JsonValue.Create version
+                                    | Some version -> entry["version"] <- JsonValue.Create<string>(version)
                                     | None -> ()
                                 | _ -> ()
                             | _ -> ()
@@ -142,7 +142,7 @@ module CurrentUpgrade =
                 let authority = JsonObject()
                 authority["kind"] <- JsonValue.Create "resolved-release-set"
                 authority["path"] <- JsonValue.Create AuthorityPath
-                authority["sha256"] <- JsonValue.Create targetDigest
+                authority["sha256"] <- JsonValue.Create<string>(targetDigest)
                 root["registryAuthority"] <- authority
                 Ok(root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine)
             | _ -> Error "conditor.json must be a JSON object"
@@ -152,7 +152,7 @@ module CurrentUpgrade =
     let private installedExecutable (ctx: WorkstationContext) (release: ProfileComponent) =
         Path.Combine(WorkstationPaths.installRoot ctx, release.Id, release.Version, release.Executable)
 
-    let private qualifiedEmbeddedTarget id version =
+    let private qualifiedEmbeddedTarget (id: string) (version: string) =
         match Registry.tryFind id, Registry.qualifiedVersions id with
         | Some definition, Some versions when versions.Contains version ->
             match definition.Distribution with
@@ -246,7 +246,7 @@ module CurrentUpgrade =
                     $"Component '{request.Id}' has no explicit installed version; current upgrade requires an exact old version before selecting {targetEntry.Version}."
             | _ -> ()
 
-        let transitionList =
+        let transitionList : CurrentUpgradeTransition list =
             transitions
             |> Seq.toList
             |> List.filter (fun transition -> transition.Mode <> "refused")
@@ -322,8 +322,8 @@ module CurrentUpgrade =
         let currentManifestSha = sha256File manifestPath
         let transitionText =
             transitionList
-            |> List.sortBy _.Id
-            |> List.map (fun transition ->
+            |> List.sortBy (fun (transition: CurrentUpgradeTransition) -> transition.Id)
+            |> List.map (fun (transition: CurrentUpgradeTransition) ->
                 $"{transition.Id}|{transition.FromVersion}|{transition.ToVersion}|{transition.Role}|{transition.Mode}")
             |> String.concat "\n"
 
@@ -374,7 +374,7 @@ module CurrentUpgrade =
             | None -> Error [ "Unable to construct a current-upgrade plan from the target Registry release set." ]
             | Some plan -> Ok plan
 
-    let private writeAtomically path bytes =
+    let private writeAtomically (path: string) (bytes: byte array) =
         let parent = Path.GetDirectoryName path |> Option.ofObj |> Option.defaultValue "."
         Directory.CreateDirectory parent |> ignore
         let temporary = $"{path}.conditor-current-{Guid.NewGuid():N}.tmp"
@@ -385,7 +385,11 @@ module CurrentUpgrade =
         finally
             if File.Exists temporary then File.Delete temporary
 
-    let private executeEmbedded target ctx (transition, definition, release) =
+    let private executeEmbedded
+        (target: string)
+        (ctx: WorkstationContext)
+        ((transition, definition, release): CurrentUpgradeTransition * ComponentDefinition * ProfileComponent)
+        =
         let executable = installedExecutable ctx release
         let upgrade = ProcessRunner.runProcess target executable definition.UpgradeArguments
 
