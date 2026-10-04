@@ -151,7 +151,8 @@ let private establishCleanGit target =
     let run args =
         let result = ProcessRunner.runProcess target "git" args
         if result.ExitCode <> 0 then
-            failwith $"git {String.concat " " args} failed: {result.StandardError}"
+            let rendered = String.concat " " args
+            failwith $"git {rendered} failed: {result.StandardError}"
 
     run [ "init"; "-q" ]
     run [ "config"; "user.email"; "conditor-tests@example.invalid" ]
