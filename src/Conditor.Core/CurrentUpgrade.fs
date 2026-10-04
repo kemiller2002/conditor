@@ -6,6 +6,7 @@ open System.Security.Cryptography
 open System.Text
 open System.Text.Json
 open System.Text.Json.Nodes
+open System.Text.RegularExpressions
 open Conditor.Core.Workstation
 
 type CurrentUpgradeTransition =
@@ -271,7 +272,7 @@ module CurrentUpgrade =
                       AfterSha256 = sha256Text content
                       Content = content }
 
-    let private foundationsChange target transitions =
+    let private foundationsChange target (transitions: CurrentUpgradeTransition list) =
         let path = Path.Combine(Path.GetFullPath target, ".echelon", "foundations.json")
 
         if not (File.Exists path) then
@@ -304,7 +305,7 @@ module CurrentUpgrade =
             with :? JsonException as ex ->
                 Error $"Unable to parse .echelon/foundations.json: {ex.Message}"
 
-    let private writeTextAtomically path content =
+    let private writeTextAtomically (path: string) (content: string) =
         let bytes = Encoding.UTF8.GetBytes content
         let parent = Path.GetDirectoryName path |> Option.ofObj |> Option.defaultValue "."
         Directory.CreateDirectory parent |> ignore
@@ -316,7 +317,7 @@ module CurrentUpgrade =
         finally
             if File.Exists temporary then File.Delete temporary
 
-    let private applyFileChanges changes =
+    let private applyFileChanges (changes: CurrentUpgradeFileChange list) =
         let backups = ResizeArray<string * string>()
 
         try
