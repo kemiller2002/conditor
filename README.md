@@ -167,26 +167,46 @@ The compatibility graph is intentionally conservative. A newer upstream release 
 
 ## Upgrade
 
-Conditor lock schema v4 stores the complete governing declaration and preserves either the embedded component-descriptor identity or the integrity-bound Registry authority that produced each resolved component. `conditor upgrade` compares that prior declaration with the current `conditor.json` before any mutation.
+Conditor lock schema v4 stores the complete governing declaration and preserves either the embedded component-descriptor identity or the integrity-bound Registry authority that produced each resolved component.
 
-The initial upgrade implementation deliberately supports one change class:
+### Bring an existing repository to a Registry current set
 
-- an explicit version change for an existing registry-distributed lifecycle component that has no application-package binding.
+Use an exact Registry resolved release set as the definition of "current". Conditor does not scrape product repositories for moving tags or infer that the highest GitHub release is compatible.
 
-It currently rejects, before mutation:
+First review the complete plan:
 
-- component addition or removal;
-- required/optional policy changes;
-- scaffold changes;
-- requirement-source or target changes;
-- execution-policy/mission/contract changes;
-- Forma, Folio, Aegis, Limen, or other application-bound version changes;
-- fixed-source lifecycle version changes without an immutable mapping;
-- repositories that still have a lock schema older than v3.
+```bash
+conditor upgrade --current --check --target . \
+  --resolved-set /path/to/current.resolved.json \
+  --resolved-set-sha256 <sha256>
+```
 
-For a v1 or v2 lock, run `conditor repair` against the unchanged manifest first. Repair proves the current declaration still matches the recorded manifest identity and deliberately adopts the current descriptor set into a v3 lock.
+The plan compares the versions already declared in `conditor.json` with the exact Registry selection, refuses downgrades, discloses host-level artifact changes and repository lifecycle operations, and emits one outer authorization digest. Planning is read-only.
 
-A successful lifecycle upgrade runs the target component's own `upgrade` contract using the newly declared exact version, verifies the resulting lifecycle environment, verifies pinned requirements, and writes a new lock snapshot.
+To apply the exact reviewed plan:
+
+```bash
+conditor upgrade --current --target . \
+  --resolved-set /path/to/current.resolved.json \
+  --resolved-set-sha256 <sha256> \
+  --authorize <plan-digest>
+```
+
+For each already-declared system, Conditor uses the strongest available generic contract:
+
+- exact native releases are installed or reused through the integrity-verified workstation engine;
+- releases declaring `echelon.repository-lifecycle` use their standard `upgrade --root` and `verify --root` operations;
+- legacy native lifecycle systems are upgraded only when this Conditor build has explicitly qualified the exact target version and lifecycle command contract.
+
+Conditor never silently adds a new component to a repository during `--current`, never downgrades a declared component, and never guesses a project-binding migration. A changed Forma, Folio, Limen, Aegis, or other application binding is refused until its distribution exposes a safe generic migration contract.
+
+After component upgrades, Conditor verifies the complete target repository against a staged copy of the new Registry authority. Only after that succeeds does it atomically replace the persisted authority and `conditor.json`, write a fresh lock, and calculate the same current plan again. A successful operation requires that second plan to contain zero remaining version transitions.
+
+### Explicit declaration upgrade
+
+The original `conditor upgrade` command remains available for a deliberately edited `conditor.json`. It compares the prior lock declaration with the current manifest and supports the existing conservative version-only lifecycle upgrade boundary. It rejects membership, scaffold, requirements, execution-policy, unsafe application-binding, and unmapped source changes before mutation.
+
+For locks older than schema v4, run `conditor repair` against the unchanged manifest first. Repair proves the current declaration still matches the recorded manifest identity and migrates the lock to the current schema before upgrade.
 
 ## Canonical execution contract
 
