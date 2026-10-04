@@ -650,7 +650,18 @@ module CurrentUpgrade =
         | Ok plan when not plan.Refusals.IsEmpty ->
             Error plan.Refusals
         | Ok plan ->
-            let workstationResult =
+            let gitStatus = ProcessRunner.runProcess target "git" [ "status"; "--porcelain" ]
+
+            if gitStatus.ExitCode <> 0 then
+                Error [ "Current upgrade requires a Git repository so repository mutations have a recoverable baseline." ]
+            elif not (String.IsNullOrWhiteSpace gitStatus.StandardOutput) then
+                Error
+                    [ "Current upgrade requires a clean Git working tree."
+                      "Commit or stash existing work, then re-run the exact authorized plan." ]
+            else
+                let mutable fileBackups: (string * string) list = []
+
+                let workstationResult =
                 match plan.WorkstationPlan with
                 | None -> Ok()
                 | Some workstation ->
@@ -661,8 +672,8 @@ module CurrentUpgrade =
                         | Some(step, detail) -> Error [ $"Workstation current-upgrade failed at {step}: {detail}" ]
                         | None -> Ok()
 
-            workstationResult
-            |> Result.bind (fun () ->
+                workstationResult
+                |> Result.bind (fun () ->
                 match plan.GenericUpgradePlan with
                 | None -> Ok()
                 | Some lifecycle ->
@@ -672,14 +683,20 @@ module CurrentUpgrade =
                         match result.Failed with
                         | Some(step, detail) -> Error [ $"Repository lifecycle current-upgrade failed at {step}: {detail}" ]
                         | None -> Ok())
-            |> Result.bind (fun () ->
-                plan.EmbeddedTransitions
-                |> List.fold
-                    (fun state transition ->
-                        state |> Result.bind (fun () -> executeEmbedded target ctx transition))
-                    (Ok()))
-            |> Result.bind (fun () ->
-                match plan.GenericVerifyPlan with
+                |> Result.bind (fun () ->
+                    plan.EmbeddedTransitions
+                    |> List.fold
+                        (fun state transition ->
+                            state |> Result.bind (fun () -> executeEmbedded target ctx transition))
+                        (Ok()))
+                |> Result.bind (fun () ->
+                    match applyFileChanges plan.FileChanges with
+                    | Ok backups ->
+                        fileBackups <- backups
+                        Ok()
+                    | Error errors -> Error errors)
+                |> Result.bind (fun () ->
+                    match plan.GenericVerifyPlan with
                 | None -> Ok()
                 | Some lifecycle ->
                     match Lifecycle.apply ctx probe lifecycle lifecycle.Digest with
@@ -755,9 +772,17 @@ module CurrentUpgrade =
 
                                             Ok
                                                 { ChangedComponents = plan.Transitions |> List.map _.Id
+                                                  UpdatedFiles =
+                                                    plan.FileChanges
+                                                    |> List.map (fun change ->
+                                                        Path.GetRelativePath(Path.GetFullPath target, change.Path).Replace('\\', '/'))
                                                   LockPath = lockPath
                                                   AuthorityPath = finalAuthorityPath
-                                                  NoRemainingVersionChanges = remaining }
+                                                  NoRemainingVersionChanges =
+                                                    remaining
+                                                    && (match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
+                                                        | Ok second -> second.FileChanges.IsEmpty
+                                                        | Error _ -> false) }
                                 with ex ->
                                     writeAtomically manifestPath oldManifest
 
@@ -769,3 +794,6 @@ module CurrentUpgrade =
 
                             if File.Exists pendingPath then File.Delete pendingPath
                             commitResult)
+                |> Result.mapError (fun errors ->
+                    restoreFileChanges fileBackups
+                    errors)
