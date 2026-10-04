@@ -104,6 +104,8 @@ conditor doctor --json --target . --manifest ./conditor.json
 conditor status --json --target . --manifest ./conditor.json
 conditor repair  --target . --manifest ./conditor.json
 conditor upgrade --target . --manifest ./conditor.json
+conditor upgrade --current --check --target .
+conditor upgrade --current --target . --authorize <plan-digest>
 conditor start   --check --target . --manifest ./conditor.json
 conditor resume  --launcher claude --target . --manifest ./conditor.json
 ```
@@ -173,7 +175,13 @@ Conditor lock schema v4 stores the complete governing declaration and preserves 
 
 Use an exact Registry resolved release set as the definition of "current". Conditor does not scrape product repositories for moving tags or infer that the highest GitHub release is compatible.
 
-First review the complete plan:
+First review the complete plan. By default Conditor resolves the moving `echelon-current` channel from Echelon Registry, then binds the plan to the exact selected resolved-set SHA-256:
+
+```bash
+conditor upgrade --current --check --target .
+```
+
+For offline operation, testing, or an intentionally pinned target, pass the exact resolved set explicitly:
 
 ```bash
 conditor upgrade --current --check --target . \
@@ -186,11 +194,10 @@ The plan compares the versions already declared in `conditor.json` with the exac
 To apply the exact reviewed plan:
 
 ```bash
-conditor upgrade --current --target . \
-  --resolved-set /path/to/current.resolved.json \
-  --resolved-set-sha256 <sha256> \
-  --authorize <plan-digest>
+conditor upgrade --current --target . --authorize <plan-digest>
 ```
+
+If the Registry channel advances between review and apply, the new resolved-set digest changes the plan digest and the old authorization is refused. Explicit `--resolved-set` operation remains bound to the supplied set instead.
 
 For each already-declared system, Conditor uses the strongest available generic contract:
 
@@ -198,9 +205,9 @@ For each already-declared system, Conditor uses the strongest available generic 
 - releases declaring `echelon.repository-lifecycle` use their standard `upgrade --root` and `verify --root` operations;
 - legacy native lifecycle systems are upgraded only when this Conditor build has explicitly qualified the exact target version and lifecycle command contract.
 
-Conditor never silently adds a new component to a repository during `--current`, never downgrades a declared component, and never guesses a project-binding migration. A changed Forma, Folio, Limen, Aegis, or other application binding is refused until its distribution exposes a safe generic migration contract.
+Conditor never silently adds a new component to a repository during `--current` and never downgrades a declared component. For Conditor-owned scaffold bindings, it can update only the already-proven target: npm dependencies in `src/kernel/package.json` and the Aegis `PackageReference` in `src/engine/App.Engine.fsproj`. Those exact file hashes are part of the authorization digest. An unknown or ambiguous project-binding target is still refused rather than guessed.
 
-After component upgrades, Conditor verifies the complete target repository against a staged copy of the new Registry authority. Only after that succeeds does it atomically replace the persisted authority and `conditor.json`, write a fresh lock, and calculate the same current plan again. A successful operation requires that second plan to contain zero remaining version transitions.
+Current upgrade requires a clean Git working tree before repository mutation. After component upgrades and project-binding edits, Conditor verifies the complete target repository against a staged copy of the new Registry authority. Only after that succeeds does it atomically replace the persisted authority and `conditor.json`, write a fresh lock, and calculate the same current plan again. A successful operation requires that second plan to contain zero remaining version transitions or planned binding changes.
 
 ### Explicit declaration upgrade
 
