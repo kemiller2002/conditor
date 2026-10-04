@@ -202,6 +202,145 @@ module CurrentUpgrade =
             | _ -> None
         | _ -> None
 
+
+    let private packageSpecifier (entry: TargetEntry) =
+        match entry.DistributionMechanism with
+        | Some "npm" -> Ok entry.Version
+        | Some "github-release" ->
+            match entry.PrimaryArtifactName with
+            | Some artifact when entry.DistributionClass = "web-package" ->
+                Ok $"https://github.com/{entry.Repository}/releases/download/{entry.Tag}/{artifact}"
+            | _ ->
+                Error
+                    $"Project binding '{entry.Id}' uses github-release but exposes no package artifact."
+        | Some mechanism ->
+            Error $"Project binding '{entry.Id}' uses unsupported package mechanism '{mechanism}'."
+        | None ->
+            Error $"Project binding '{entry.Id}' is missing a distribution mechanism."
+
+    let private npmBindingChange target (definition: ComponentDefinition) (entry: TargetEntry) =
+        let path = Path.Combine(Path.GetFullPath target, "src", "kernel", "package.json")
+
+        if not (File.Exists path) then
+            Error
+                $"Project binding '{definition.Id}' expects src/kernel/package.json; Conditor will not guess another npm target."
+        else
+            packageSpecifier entry
+            |> Result.bind (fun specifier ->
+                try
+                    match JsonNode.Parse(File.ReadAllText path) with
+                    | :? JsonObject as root ->
+                        match root["dependencies"] with
+                        | :? JsonObject as dependencies when dependencies.ContainsKey definition.Package ->
+                            dependencies[definition.Package] <- JsonValue.Create specifier
+                            let content = root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine
+                            Ok
+                                { Path = path
+                                  BeforeSha256 = sha256File path
+                                  AfterSha256 = sha256Text content
+                                  Content = content }
+                        | _ ->
+                            Error
+                                $"Project binding '{definition.Id}' expects dependency '{definition.Package}' in src/kernel/package.json; Conditor will not add an unproven binding."
+                    | _ -> Error "src/kernel/package.json must contain a JSON object."
+                with :? JsonException as ex ->
+                    Error $"Unable to parse src/kernel/package.json: {ex.Message}")
+
+    let private nugetBindingChange target (definition: ComponentDefinition) (entry: TargetEntry) =
+        let path = Path.Combine(Path.GetFullPath target, "src", "engine", "App.Engine.fsproj")
+
+        if not (File.Exists path) then
+            Error
+                $"Project binding '{definition.Id}' expects src/engine/App.Engine.fsproj; Conditor will not guess another NuGet target."
+        else
+            let before = File.ReadAllText path
+            let escaped = Regex.Escape definition.Package
+            let pattern =
+                $"(<PackageReference\\s+[^>]*Include=\\\"{escaped}\\\"[^>]*Version=\\\")[^\\\"]+(\\\")"
+            let matches = Regex.Matches(before, pattern, RegexOptions.CultureInvariant)
+
+            if matches.Count <> 1 then
+                Error
+                    $"Project binding '{definition.Id}' expected exactly one Version attribute for '{definition.Package}'; found {matches.Count}."
+            else
+                let content = Regex.Replace(before, pattern, $"$1{entry.Version}$2", RegexOptions.CultureInvariant)
+                Ok
+                    { Path = path
+                      BeforeSha256 = sha256File path
+                      AfterSha256 = sha256Text content
+                      Content = content }
+
+    let private foundationsChange target transitions =
+        let path = Path.Combine(Path.GetFullPath target, ".echelon", "foundations.json")
+
+        if not (File.Exists path) then
+            Ok None
+        else
+            try
+                match JsonNode.Parse(File.ReadAllText path) with
+                | :? JsonObject as root ->
+                    match root["capabilities"] with
+                    | :? JsonObject as capabilities ->
+                        for transition in transitions do
+                            match capabilities[transition.Id] with
+                            | :? JsonObject as capability ->
+                                capability["version"] <- JsonValue.Create transition.ToVersion
+                            | _ -> ()
+
+                        let content = root.ToJsonString(JsonSerializerOptions(WriteIndented = true)) + Environment.NewLine
+
+                        if sha256Text content = sha256File path then Ok None
+                        else
+                            Ok(
+                                Some
+                                    { Path = path
+                                      BeforeSha256 = sha256File path
+                                      AfterSha256 = sha256Text content
+                                      Content = content }
+                            )
+                    | _ -> Ok None
+                | _ -> Ok None
+            with :? JsonException as ex ->
+                Error $"Unable to parse .echelon/foundations.json: {ex.Message}"
+
+    let private writeTextAtomically path content =
+        let bytes = Encoding.UTF8.GetBytes content
+        let parent = Path.GetDirectoryName path |> Option.ofObj |> Option.defaultValue "."
+        Directory.CreateDirectory parent |> ignore
+        let temporary = $"{path}.conditor-current-{Guid.NewGuid():N}.tmp"
+
+        try
+            File.WriteAllBytes(temporary, bytes)
+            File.Move(temporary, path, true)
+        finally
+            if File.Exists temporary then File.Delete temporary
+
+    let private applyFileChanges changes =
+        let backups = ResizeArray<string * string>()
+
+        try
+            for change in changes do
+                if sha256File change.Path <> change.BeforeSha256 then
+                    raise (
+                        InvalidOperationException(
+                            $"Project binding '{change.Path}' changed after planning."
+                        )
+                    )
+
+                backups.Add(change.Path, File.ReadAllText change.Path)
+                writeTextAtomically change.Path change.Content
+
+            Ok(List.ofSeq backups)
+        with ex ->
+            for path, content in backups do
+                writeTextAtomically path content
+
+            Error [ $"Unable to apply planned project-binding changes: {ex.Message}" ]
+
+    let private restoreFileChanges backups =
+        for path, content in backups do
+            writeTextAtomically path content
+
     let private prepare
         target
         manifestPath
@@ -271,8 +410,12 @@ module CurrentUpgrade =
                             errors.Add
                                 $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is a native change, but the target release declares no {RepositoryLifecycleContract.Capability} contract and this Conditor build has not qualified that exact lifecycle version."
                     | None ->
-                        errors.Add
-                            $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is selected by Registry as {targetEntry.Role}/{targetEntry.DistributionClass}, but Conditor has no safe repository upgrade contract for that distribution."
+                        match Registry.tryFind request.Id with
+                        | Some definition when targetEntry.Role = "project-binding" && definition.ApplicationBinding.IsSome ->
+                            mode <- "project-binding"
+                        | _ ->
+                            errors.Add
+                                $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is selected by Registry as {targetEntry.Role}/{targetEntry.DistributionClass}, but Conditor has no safe repository upgrade contract for that distribution."
 
                     transitions.Add
                         { Id = request.Id
@@ -292,6 +435,30 @@ module CurrentUpgrade =
             transitions
             |> Seq.toList
             |> List.filter (fun transition -> transition.Mode <> "refused")
+
+        let fileChanges = ResizeArray<CurrentUpgradeFileChange>()
+
+        for transition in transitionList |> List.filter (fun item -> item.Mode = "project-binding") do
+            match Registry.tryFind transition.Id, entryMap |> Map.tryFind transition.Id with
+            | Some definition, Some entry ->
+                match definition.ApplicationBinding with
+                | Some NpmDependency ->
+                    match npmBindingChange target definition entry with
+                    | Ok change -> fileChanges.Add change
+                    | Error error -> errors.Add error
+                | Some NugetReference ->
+                    match nugetBindingChange target definition entry with
+                    | Ok change -> fileChanges.Add change
+                    | Error error -> errors.Add error
+                | None ->
+                    errors.Add $"Project binding '{transition.Id}' has no embedded target-binding declaration."
+            | _ ->
+                errors.Add $"Project binding '{transition.Id}' could not be resolved for a safe file edit."
+
+        match foundationsChange target transitionList with
+        | Ok(Some change) -> fileChanges.Add change
+        | Ok None -> ()
+        | Error error -> errors.Add error
 
         let manifestIds = manifest.Components |> List.map _.Id |> Set.ofList
 
@@ -369,6 +536,14 @@ module CurrentUpgrade =
                 $"{transition.Id}|{transition.FromVersion}|{transition.ToVersion}|{transition.Role}|{transition.Mode}")
             |> String.concat "\n"
 
+        let fileChangeText =
+            fileChanges
+            |> Seq.sortBy (fun change -> change.Path)
+            |> Seq.map (fun change ->
+                let relative = Path.GetRelativePath(Path.GetFullPath target, change.Path).Replace('\\', '/')
+                $"{relative}|{change.BeforeSha256}|{change.AfterSha256}")
+            |> String.concat "\n"
+
         let profileIdentity =
             targetProfile
             |> Option.map (fun profile ->
@@ -387,7 +562,8 @@ module CurrentUpgrade =
                   workstationPlan |> Option.map (fun plan -> $"workstation={plan.Digest}") |> Option.defaultValue "workstation=-"
                   genericUpgradePlan |> Option.map (fun plan -> $"lifecycleUpgrade={plan.Digest}") |> Option.defaultValue "lifecycleUpgrade=-"
                   genericVerifyPlan |> Option.map (fun plan -> $"lifecycleVerify={plan.Digest}") |> Option.defaultValue "lifecycleVerify=-"
-                  transitionText ]
+                  transitionText
+                  fileChangeText ]
 
         targetProfile
         |> Option.map (fun profile ->
@@ -403,6 +579,7 @@ module CurrentUpgrade =
               GenericUpgradePlan = genericUpgradePlan
               GenericVerifyPlan = genericVerifyPlan
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
+              FileChanges = fileChanges |> Seq.toList
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
 
