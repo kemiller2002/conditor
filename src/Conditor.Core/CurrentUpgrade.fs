@@ -513,34 +513,36 @@ module CurrentUpgrade =
                                 if File.Exists finalAuthorityPath then Some(File.ReadAllBytes finalAuthorityPath) else None
                             let oldManifest = File.ReadAllBytes manifestPath
 
-                            try
-                                writeAtomically finalAuthorityPath authorityBytes
-                                writeAtomically manifestPath (Encoding.UTF8.GetBytes plan.TargetManifestText)
+                            let commitResult =
+                                try
+                                    writeAtomically finalAuthorityPath authorityBytes
+                                    writeAtomically manifestPath (Encoding.UTF8.GetBytes plan.TargetManifestText)
 
-                                match Manifest.load manifestPath with
-                                | Error errors -> Error errors
-                                | Ok committedManifest ->
-                                    match Planner.create target Init committedManifest with
+                                    match Manifest.load manifestPath with
                                     | Error errors -> Error errors
-                                    | Ok lockPlan ->
-                                        let lockPath = LockFile.write target manifestPath lockPlan
-                                        let remaining =
-                                            match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
-                                            | Ok second -> second.Transitions.IsEmpty
-                                            | Error _ -> false
+                                    | Ok committedManifest ->
+                                        match Planner.create target Init committedManifest with
+                                        | Error errors -> Error errors
+                                        | Ok lockPlan ->
+                                            let lockPath = LockFile.write target manifestPath lockPlan
+                                            let remaining =
+                                                match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
+                                                | Ok second -> second.Transitions.IsEmpty
+                                                | Error _ -> false
 
-                                        Ok
-                                            { ChangedComponents = plan.Transitions |> List.map _.Id
-                                              LockPath = lockPath
-                                              AuthorityPath = finalAuthorityPath
-                                              NoRemainingVersionChanges = remaining }
-                            with ex ->
-                                writeAtomically manifestPath oldManifest
+                                            Ok
+                                                { ChangedComponents = plan.Transitions |> List.map _.Id
+                                                  LockPath = lockPath
+                                                  AuthorityPath = finalAuthorityPath
+                                                  NoRemainingVersionChanges = remaining }
+                                with ex ->
+                                    writeAtomically manifestPath oldManifest
 
-                                match oldAuthority with
-                                | Some bytes -> writeAtomically finalAuthorityPath bytes
-                                | None -> if File.Exists finalAuthorityPath then File.Delete finalAuthorityPath
+                                    match oldAuthority with
+                                    | Some bytes -> writeAtomically finalAuthorityPath bytes
+                                    | None -> if File.Exists finalAuthorityPath then File.Delete finalAuthorityPath
 
-                                Error [ $"Unable to commit current-upgrade governance atomically: {ex.Message}" ]
-                            finally
-                                if File.Exists pendingPath then File.Delete pendingPath)
+                                    Error [ $"Unable to commit current-upgrade governance atomically: {ex.Message}" ]
+
+                            if File.Exists pendingPath then File.Delete pendingPath
+                            commitResult)
