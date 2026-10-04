@@ -212,11 +212,13 @@ let run (check: string -> bool -> unit) =
                     let details = String.concat "; " errors
                     check $"current upgrade preview succeeds: {details}" false
                 | Ok plan ->
+                    let observedTransitions =
+                        plan.Transitions
+                        |> List.map (fun item -> item.Id, item.FromVersion, item.ToVersion)
+
                     check
                         "current upgrade selects exact Registry transition"
-                        ((plan.Transitions
-                          |> List.map (fun item -> item.Id, item.FromVersion, item.ToVersion))
-                         = [ "gamma", "1.0.0", "2.0.0" ])
+                        (observedTransitions = [ "gamma", "1.0.0", "2.0.0" ])
 
                     check "current upgrade uses generic repository lifecycle" (plan.Transitions.Head.Mode = "repository-lifecycle")
                     check
