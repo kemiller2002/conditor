@@ -326,6 +326,24 @@ let run (check: string -> bool -> unit) =
   "catalogSnapshot": { "sha256": "__CATALOG_SHA__" },
   "components": [
     {
+      "systemId": "gamma",
+      "role": "host-tool",
+      "required": false,
+      "version": "2.0.0",
+      "repository": "example/gamma",
+      "tag": "v2.0.0",
+      "commit": "__GAMMA_COMMIT__",
+      "releaseStage": "stable",
+      "lifecycleState": "active",
+      "distributionClass": "self-contained-native-cli",
+      "executable": "gamma",
+      "releaseManifest": { "schema": "echelon.release/v2", "sha256": "__RELEASE_SHA__" },
+      "distribution": { "mechanism": "github-release", "url": "https://github.com/example/gamma/releases/tag/v2.0.0" },
+      "artifacts": [
+        { "name": "__GAMMA_ASSET__", "purpose": "executable", "platform": "__RID__", "sha256": "__GAMMA_SHA__" }
+      ]
+    },
+    {
       "systemId": "forma",
       "role": "project-binding",
       "required": true,
@@ -353,6 +371,9 @@ let run (check: string -> bool -> unit) =
                 .Replace("__RID__", rid)
                 .Replace("__CATALOG_SHA__", catalogSha)
                 .Replace("__COMMIT__", commit2)
+                .Replace("__GAMMA_COMMIT__", commit)
+                .Replace("__GAMMA_ASSET__", assetName)
+                .Replace("__GAMMA_SHA__", assetSha)
                 .Replace("__RELEASE_SHA__", releaseSha)
                 .Replace("__PACKAGE_SHA__", packageSha)
 
