@@ -133,6 +133,7 @@ Private GitHub sources may use an existing Git credential helper or process-scop
 
 - Planning is read-only.
 - Unknown required components fail before target mutation.
+- When `registryAuthority` is declared, Registry is the single version authority: every requested component, embedded or not, is bound to the version the resolved set selects, and a conflicting or unselected component fails before target mutation. See [decision 0001](decisions/0001-registry-version-authority.md).
 - Invalid or escaping requirement paths fail before target mutation.
 - A fixed-source capability version without an immutable mapping fails closed.
 - Application dependency binding without an explicit scaffold fails closed.

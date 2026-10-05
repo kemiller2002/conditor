@@ -10,6 +10,7 @@
     <Compile Include="RepositoryLifecycleTests.fs" />
     <Compile Include="AdoptionTests.fs" />
     <Compile Include="CurrentUpgradeTests.fs" />
+    <Compile Include="RegistryAuthorityBindingTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>

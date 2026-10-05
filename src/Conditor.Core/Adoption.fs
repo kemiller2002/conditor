@@ -28,7 +28,10 @@ type AdoptionRegistryAuthority =
     { SourcePath: string
       Sha256: string
       TargetPath: string
-      Profile: WorkstationProfile }
+      Profile: WorkstationProfile
+      /// Every selection in the set (all roles), used to hold adopted
+      /// components to the Registry version authority.
+      Selections: RegistryAuthorityBinding.RegistryAuthoritySet }
 
 type AdoptionPlan =
     { Target: string
@@ -422,12 +425,20 @@ module Adoption =
         let fullSource = Path.GetFullPath sourcePath
         let normalized = normalizeSha256 expectedSha256
 
-        ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) fullSource normalized
-        |> Result.map (fun profile ->
-            { SourcePath = fullSource
-              Sha256 = normalized
-              TargetPath = AuthorityTargetPath
-              Profile = profile })
+        if not (File.Exists fullSource) then
+            Error $"resolved release set not found: {fullSource}"
+        else
+            let bytes = File.ReadAllBytes fullSource
+
+            ResolvedReleaseSets.parseVerified (Platform.runtimeIdentifier ()) normalized bytes
+            |> Result.bind (fun profile ->
+                RegistryAuthorityBinding.parseSelections AuthorityTargetPath normalized bytes
+                |> Result.map (fun selections ->
+                    { SourcePath = fullSource
+                      Sha256 = normalized
+                      TargetPath = AuthorityTargetPath
+                      Profile = profile
+                      Selections = selections }))
 
     let planWithAuthority
         (runner: Runner)
@@ -505,6 +516,14 @@ module Adoption =
 
         Compatibility.validateWithExternalIds externalIds manifest
         |> List.iter (fun error -> refusals.Add $"Compatibility refusal: {error}")
+
+        // An adopted manifest must replan: hold every observed component to the
+        // same Registry version authority the planner enforces (CON-F1).
+        (RegistryAuthorityBinding.bindAll
+            (registryAuthority |> Option.map _.Selections)
+            manifest.Components)
+            .Violations
+        |> List.iter (RegistryAuthorityBinding.describe >> refusals.Add)
 
         let refusalList = refusals |> Seq.distinct |> Seq.toList
         let authorityDigest =
