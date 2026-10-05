@@ -1135,6 +1135,7 @@ WorkstationTests.run check
 RepositoryLifecycleTests.run check
 AdoptionTests.run check
 CurrentUpgradeTests.run check
+RegistryAuthorityBindingTests.run check
 
 let exitCode =
     if failures = 0 then

@@ -101,7 +101,13 @@ module Planner =
             if full.StartsWith(rootPrefix, comparison) then Ok full
             else Error $"{label} '{relativePath}' escapes the target repository."
 
-    let private loadRegistryAuthority target (manifest: ProjectManifest) =
+    /// The declared Registry authority, read once so the installable profile
+    /// and the full selection set are derived from the same verified bytes.
+    type private LoadedAuthority =
+        { Profile: WorkstationProfile
+          Selections: RegistryAuthorityBinding.RegistryAuthoritySet }
+
+    let private loadRegistryAuthority target (manifest: ProjectManifest) : Result<LoadedAuthority option, string> =
         match manifest.RegistryAuthority with
         | None -> Ok None
         | Some authority when authority.Kind <> "resolved-release-set" ->
@@ -109,9 +115,17 @@ module Planner =
         | Some authority ->
             match resolveRepositoryRelativePath target "Registry authority path" authority.Path with
             | Error error -> Error error
+            | Ok path when not (File.Exists path) -> Error $"resolved release set not found: {path}"
             | Ok path ->
-                ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) path authority.Sha256
-                |> Result.map Some
+                let bytes = File.ReadAllBytes path
+
+                ResolvedReleaseSets.parseVerified (Platform.runtimeIdentifier ()) authority.Sha256 bytes
+                |> Result.bind (fun profile ->
+                    RegistryAuthorityBinding.parseSelections authority.Path authority.Sha256 bytes
+                    |> Result.map (fun selections ->
+                        Some
+                            { Profile = profile
+                              Selections = selections }))
 
     let private registryLifecycleComponents (profile: WorkstationProfile option) =
         profile
@@ -139,18 +153,34 @@ module Planner =
 
         List.ofSeq errors
 
-    let create target operation (manifest: ProjectManifest) : Result<InstallationPlan, string list> =
+    let create target operation (declaredManifest: ProjectManifest) : Result<InstallationPlan, string list> =
         let errors = ResizeArray<string>()
         let resolved = ResizeArray<ResolvedComponent>()
         let actions = ResizeArray<PlanAction>()
         let mutable sequence = 1
 
-        let authorityProfile =
-            match loadRegistryAuthority target manifest with
-            | Ok profile -> profile
+        let loadedAuthority =
+            match loadRegistryAuthority target declaredManifest with
+            | Ok authority -> authority
             | Error error ->
                 errors.Add $"Registry authority: {error}"
                 None
+
+        let authorityProfile = loadedAuthority |> Option.map _.Profile
+
+        // CON-F1: when an authority is declared it binds every requested
+        // component (embedded or Registry-only) before any catalog lookup, so
+        // the rest of planning only ever sees authority-selected versions.
+        let binding =
+            RegistryAuthorityBinding.bindAll
+                (loadedAuthority |> Option.map _.Selections)
+                declaredManifest.Components
+
+        binding.Violations |> List.iter (RegistryAuthorityBinding.describe >> errors.Add)
+
+        let manifest =
+            { declaredManifest with
+                Components = binding.Requests }
 
         let registryLifecycle = registryLifecycleComponents authorityProfile
         let externalIds = registryLifecycle |> Map.toSeq |> Seq.map fst |> Set.ofSeq
@@ -249,27 +279,22 @@ module Planner =
                             errors.Add
                                 $"Registry component '{request.Id}' has repository-lifecycle role but declares no supported {RepositoryLifecycleContract.Capability} contract."
                     | Some lifecycle ->
-                        let requestedVersion = request.Version |> Option.defaultValue release.Version
+                        // Version agreement with the authority was enforced by
+                        // RegistryAuthorityBinding before this lookup.
+                        resolved.Add
+                            { Id = release.Id
+                              Version = release.Version
+                              Distribution = HostTool
+                              Package = release.Executable
+                              SourceReference =
+                                Some(
+                                    RepositoryLifecycleContract.sourceReference
+                                        profile.SourceIdentity
+                                        release
+                                        lifecycle
+                                ) }
 
-                        if requestedVersion <> release.Version then
-                            if request.Required then
-                                errors.Add
-                                    $"Registry authority selects '{request.Id}' version '{release.Version}', but conditor.json requests '{requestedVersion}'. Replace the resolved-set authority instead of silently substituting a version."
-                        else
-                            resolved.Add
-                                { Id = release.Id
-                                  Version = release.Version
-                                  Distribution = HostTool
-                                  Package = release.Executable
-                                  SourceReference =
-                                    Some(
-                                        RepositoryLifecycleContract.sourceReference
-                                            profile.SourceIdentity
-                                            release
-                                            lifecycle
-                                    ) }
-
-                            addRegistryLifecycleActions request release
+                        addRegistryLifecycleActions request release
                 | _ ->
                     if request.Required then
                         errors.Add $"Unknown required component '{request.Id}'."

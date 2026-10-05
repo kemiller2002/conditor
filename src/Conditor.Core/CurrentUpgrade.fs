@@ -244,6 +244,26 @@ module CurrentUpgrade =
             | Some _, None when Registry.tryFind request.Id |> Option.isNone ->
                 errors.Add
                     $"Registry-only component '{request.Id}' is absent from the target current release set; Conditor will not discard its authority."
+            | requested, None ->
+                // The committed manifest will declare this set as its authority,
+                // and the planner refuses components the authority does not
+                // select (CON-F1). Refuse up front instead of after mutation.
+                let profile =
+                    targetProfile
+                    |> Option.map (fun value -> $"{value.Id}@{value.Version}")
+                    |> Option.defaultValue "<unverified>"
+
+                errors.Add(
+                    RegistryAuthorityBinding.describe (
+                        RegistryAuthorityBinding.AbsentFromAuthority(
+                            request.Id,
+                            requested,
+                            { Path = AuthorityPath
+                              Sha256 = normalizedDigest
+                              Profile = profile }
+                        )
+                    )
+                )
             | None, Some targetEntry ->
                 errors.Add
                     $"Component '{request.Id}' has no explicit installed version; current upgrade requires an exact old version before selecting {targetEntry.Version}."
