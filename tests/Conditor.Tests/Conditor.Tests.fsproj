@@ -12,6 +12,10 @@
     <Compile Include="CurrentUpgradeTests.fs" />
     <Compile Include="RegistryAuthorityBindingTests.fs" />
     <Compile Include="LimenPackageIdentityTests.fs" />
+    <Compile Include="ComponentSchemaTests.fs" />
     <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" Version="9.4.0" />
   </ItemGroup>
 </Project>

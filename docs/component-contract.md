@@ -67,6 +67,19 @@ Every package reference the plan produces comes from `ComponentDefinition.packag
 
 The v1 descriptor schema is published at `schemas/conditor-component.schema.json`. A descriptor carries component identity, qualified versions, distribution source, executable name, supported lifecycle arguments, and application binding. Built-in descriptors are embedded in the native binary through a wildcard resource rule and discovered dynamically, so adding a built-in descriptor does not require editing Registry code.
 
+The `distribution` decides which optional fields a descriptor must carry. The descriptor loader (`ComponentDescriptors.parse`) enforces these rules and the schema states the same rules:
+
+| `distribution` | Required in addition to the common fields | Refused |
+| --- | --- | --- |
+| `host-tool` | `command`, non-empty `versionArguments` | `lifecycleSource` |
+| `lifecycle-npm` | `lifecycleSource`, `command`, non-empty `versionArguments` | |
+| `npm` | `applicationBinding: "npm"` | |
+| `nuget` | `applicationBinding: "nuget"` | |
+
+`versionArguments` is an array of strings. A `host-tool` component is a native executable already installed on the host (for example Praxis, Ordo, Percepta); Conditor invokes its `command` directly and never resolves it through a package manager.
+
+The test suite validates every descriptor under `components/` against `schemas/conditor-component.schema.json`, and the `conditor components --json` inventory against `schemas/conditor-components.schema.json`, so the published schemas cannot drift from what the loader accepts and the CLI emits. CI repeats the check with an independent validator.
+
 The remaining evolution is to make descriptors release-bound and externally publishable, with signed integrity metadata and compatibility constraints that can be verified independently of a Conditor source release.
 
 ## Application dependency

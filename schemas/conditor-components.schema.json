@@ -104,7 +104,93 @@
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "distribution"
+              ],
+              "properties": {
+                "distribution": {
+                  "const": "host-tool"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "command"
+              ],
+              "not": {
+                "required": [
+                  "lifecycleSource"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "distribution"
+              ],
+              "properties": {
+                "distribution": {
+                  "const": "lifecycle-npm"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "lifecycleSource",
+                "command"
+              ]
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "distribution"
+              ],
+              "properties": {
+                "distribution": {
+                  "const": "npm"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "applicationBinding"
+              ],
+              "properties": {
+                "applicationBinding": {
+                  "const": "npm"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": [
+                "distribution"
+              ],
+              "properties": {
+                "distribution": {
+                  "const": "nuget"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "applicationBinding"
+              ],
+              "properties": {
+                "applicationBinding": {
+                  "const": "nuget"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

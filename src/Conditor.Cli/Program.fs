@@ -604,99 +604,19 @@ let private runStatus json target manifestPath =
 
         if Status.isHealthy report then 0 else 7
 
-let private distributionText =
-    function
-    | HostTool -> "host-tool"
-    | LifecycleNpm -> "lifecycle-npm"
-    | NpmPackage -> "npm"
-    | NugetPackage -> "nuget"
-
-let private bindingText =
-    function
-    | NpmDependency -> "npm"
-    | NugetReference -> "nuget"
-
-let private sourceText =
-    function
-    | RegistryPackage -> "registry"
-    | GitHubSource source ->
-        let entrypoint =
-            match source.Entrypoint with
-            | NodeScript path -> $"node-script:{path}"
-            | FileArtifact path -> $"file-artifact:{path}"
-
-        $"github:{source.Repository}#{source.Commit}:{entrypoint}"
-
 let private printComponents json =
-    let descriptors = Registry.descriptors |> List.sortBy (fun descriptor -> descriptor.Definition.Id)
-
     if json then
         use stream = Console.OpenStandardOutput()
-        let mutable options = JsonWriterOptions()
-        options.Indented <- true
-        use writer = new Utf8JsonWriter(stream, options)
-        writer.WriteStartObject()
-        writer.WriteNumber("schemaVersion", 1)
-        writer.WriteStartArray("components")
-
-        for descriptor in descriptors do
-            let definition = descriptor.Definition
-            writer.WriteStartObject()
-            writer.WriteString("id", definition.Id)
-            writer.WriteString("displayName", definition.DisplayName)
-            writer.WriteString("distribution", distributionText definition.Distribution)
-            writer.WriteString("package", definition.Package)
-            writer.WriteString("defaultVersion", definition.DefaultVersion)
-            writer.WriteString("descriptorSha256", descriptor.Sha256)
-            writer.WriteStartArray("qualifiedVersions")
-
-            for version in descriptor.QualifiedVersions |> Seq.sort do
-                writer.WriteStringValue version
-
-            writer.WriteEndArray()
-
-            if not definition.HistoricalPackages.IsEmpty then
-                writer.WriteStartArray("historicalPackages")
-
-                for historical in definition.HistoricalPackages do
-                    writer.WriteStartObject()
-                    writer.WriteString("package", historical.Package)
-                    writer.WriteStartArray("versions")
-
-                    for version in historical.Versions |> Seq.sort do
-                        writer.WriteStringValue version
-
-                    writer.WriteEndArray()
-                    writer.WriteEndObject()
-
-                writer.WriteEndArray()
-
-            match definition.LifecycleSource with
-            | Some source -> writer.WriteString("lifecycleSource", sourceText source)
-            | None -> ()
-
-            match definition.ApplicationBinding with
-            | Some binding -> writer.WriteString("applicationBinding", bindingText binding)
-            | None -> ()
-
-            match definition.Command with
-            | Some command -> writer.WriteString("command", command)
-            | None -> ()
-
-            writer.WriteEndObject()
-
-        writer.WriteEndArray()
-        writer.WriteEndObject()
-        writer.Flush()
+        ComponentInventory.writeJson stream Registry.descriptors
     else
         Console.WriteLine "Built-in Conditor components:"
 
-        for descriptor in descriptors do
+        for descriptor in Registry.descriptors |> List.sortBy _.Definition.Id do
             let definition = descriptor.Definition
             let versions = descriptor.QualifiedVersions |> Seq.sort |> String.concat ", "
             let source =
                 definition.LifecycleSource
-                |> Option.map sourceText
+                |> Option.map ComponentInventory.sourceText
                 |> Option.defaultValue "application-binding-only"
 
             let historical =
@@ -707,7 +627,7 @@ let private printComponents json =
                 |> String.concat String.Empty
 
             Console.WriteLine
-                $"  {definition.Id}@{definition.DefaultVersion} [{distributionText definition.Distribution}] package={definition.Package} qualified={versions}{historical} descriptor={descriptor.Sha256} source={source}"
+                $"  {definition.Id}@{definition.DefaultVersion} [{ComponentInventory.distributionText definition.Distribution}] package={definition.Package} qualified={versions}{historical} descriptor={descriptor.Sha256} source={source}"
 
     0
 
