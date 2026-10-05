@@ -76,6 +76,8 @@ The `distribution` decides which optional fields a descriptor must carry. The de
 | `npm` | `applicationBinding: "npm"` | |
 | `nuget` | `applicationBinding: "nuget"` | |
 
+The loader fails closed on the schema's structural rules as well. It refuses, with a typed `DescriptorViolation` and a specific message: properties the schema does not define (at the top level, in `lifecycleSource` and in `lifecycleSource.entrypoint`); an `id`, `lifecycleSource.repository` or `lifecycleSource.commit` that does not match its schema pattern; duplicate or empty `qualifiedVersions` entries; a `command` that is not a non-empty string; and an `applicationBinding` that is not a string.
+
 `versionArguments` is an array of strings. A `host-tool` component is a native executable already installed on the host (for example Praxis, Ordo, Percepta); Conditor invokes its `command` directly and never resolves it through a package manager.
 
 The test suite validates every descriptor under `components/` against `schemas/conditor-component.schema.json`, and the `conditor components --json` inventory against `schemas/conditor-components.schema.json`, so the published schemas cannot drift from what the loader accepts and the CLI emits. CI repeats the check with an independent validator.
