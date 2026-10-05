@@ -20,7 +20,7 @@ module Compatibility =
               "percepta", "Native Percepta repository lifecycle 0.1.0 is the frozen Indy Init repository-lifecycle baseline."
               "visual-engineering", "Qualified lifecycle release."
               "communication-engineering", "Pinned immutable-source lifecycle release."
-              "limen", "Qualified project-bound WASM/browser package used by the current web scaffold; Conditor does not run a package-manager lifecycle for it."
+              "limen", "Qualified project-bound WASM/browser package used by the current web scaffold; Conditor does not run a package-manager lifecycle for it. 0.7.0 is distributed as @echelon-foundry/limen; 0.6.1 and 0.6.2 stay qualified under their original @echelon-foundry/typescript-wasm-kernel name, and the Indy Init 0.1.0 freeze pins 0.6.2."
               "forma", "Qualified application binding."
               "folio", "Qualified application binding."
               "aegis", "Qualified NuGet application binding."

@@ -50,6 +50,21 @@ A branch name such as `main` is not an acceptable reproducible source. Conditor 
 
 The resolved source is written to the Conditor lock so the installation can be reconstructed later.
 
+### Package renames
+
+A component's package name can change between versions. The descriptor's `package` is the current identity. Earlier identities go in `historicalPackages`, and each entry lists the exact qualified versions that were published under that name:
+
+```json
+"package": "@echelon-foundry/limen",
+"historicalPackages": [
+  { "package": "@echelon-foundry/typescript-wasm-kernel", "versions": ["0.6.1", "0.6.2"] }
+],
+"defaultVersion": "0.7.0",
+"qualifiedVersions": ["0.6.1", "0.6.2", "0.7.0"]
+```
+
+Every package reference the plan produces comes from `ComponentDefinition.packageFor version`: the npm/NuGet binding, the lifecycle `npx --package` source, the lock's `package`, adoption sources, and the scaffold's Limen protocol import. A legacy pin therefore reproduces its original package, and a lock written for Limen 0.6.2 still records `@echelon-foundry/typescript-wasm-kernel`. Descriptor loading refuses an entry whose version is not qualified, an entry that repeats the current `package`, a version listed under more than one identity, the same identity declared twice, and a `defaultVersion` that is listed under a historical identity.
+
 The v1 descriptor schema is published at `schemas/conditor-component.schema.json`. A descriptor carries component identity, qualified versions, distribution source, executable name, supported lifecycle arguments, and application binding. Built-in descriptors are embedded in the native binary through a wildcard resource rule and discovered dynamically, so adding a built-in descriptor does not require editing Registry code.
 
 The remaining evolution is to make descriptors release-bound and externally publishable, with signed integrity metadata and compatibility constraints that can be verified independently of a Conditor source release.

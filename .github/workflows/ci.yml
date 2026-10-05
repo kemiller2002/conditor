@@ -31,6 +31,17 @@ jobs:
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- components --json > "$RUNNER_TEMP/conditor-components.json"
           grep -F '"id": "praxis"' "$RUNNER_TEMP/conditor-components.json"
           grep -F '"id": "tutela"' "$RUNNER_TEMP/conditor-components.json"
+          python3 - "$RUNNER_TEMP/conditor-components.json" <<'PY'
+          import json, sys
+          inventory = {item["id"]: item for item in json.load(open(sys.argv[1]))["components"]}
+          limen = inventory["limen"]
+          assert limen["package"] == "@echelon-foundry/limen", limen
+          assert limen["defaultVersion"] == "0.7.0", limen
+          assert limen["qualifiedVersions"] == ["0.6.1", "0.6.2", "0.7.0"], limen
+          assert limen["historicalPackages"] == [
+              {"package": "@echelon-foundry/typescript-wasm-kernel", "versions": ["0.6.1", "0.6.2"]}
+          ], limen
+          PY
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility --json > "$RUNNER_TEMP/conditor-compatibility.json"
           grep -F '"schemaVersion": 1' "$RUNNER_TEMP/conditor-compatibility.json"
@@ -144,7 +155,12 @@ jobs:
           test -f "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"
           grep -F "@echelon-foundry/design-system" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
           grep -F "@echelon-foundry/print-components" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
-          grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          grep -F '"@echelon-foundry/limen": "0.7.0"' "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          if grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json" "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"; then
+            echo "clean-room scaffold still names the deprecated Limen package" >&2
+            exit 1
+          fi
+          grep -F 'from "@echelon-foundry/limen/protocol"' "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"
           grep -F "EchelonFoundry.Aegis.Core" "$RUNNER_TEMP/conditor-empty/src/engine/App.Engine.fsproj"
           test -f "$RUNNER_TEMP/conditor-empty/requirements/contract.md"
           test -f "$RUNNER_TEMP/conditor-empty/SDE-MAP.md"
@@ -414,7 +430,12 @@ jobs:
             bundle verify --path "$RUNNER_TEMP/indy-init-bundle"
 
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/aegis/EchelonFoundry.Aegis.Core.1.0.0.nupkg"
+          # Indy Init 0.1.0 is a Registry release freeze (CON-INDY-090,
+          # freezes/indy-init-0.1.0.freeze.json): it pins Limen 0.6.2, which was
+          # published as @echelon-foundry/typescript-wasm-kernel. Limen 0.7.0
+          # (@echelon-foundry/limen) is not part of this frozen release set.
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/limen/echelon-foundry-typescript-wasm-kernel-0.6.2.tgz"
+          test -z "$(find "$RUNNER_TEMP/indy-init-bundle/packages/limen" -name 'echelon-foundry-limen-*')"
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/forma/echelon-foundry-design-system-0.3.0.tgz"
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/folio/echelon-foundry-print-components-0.3.0.tgz"
 

@@ -108,6 +108,88 @@ module ComponentDescriptors =
             | Ok other -> Error $"Unknown lifecycleSource kind '{other}'."
         | Some _ -> Error "'lifecycleSource' must be an object."
 
+    let private parseHistoricalPackages (element: JsonElement) =
+        match tryProperty "historicalPackages" element with
+        | None -> Ok []
+        | Some value when value.ValueKind = JsonValueKind.Array ->
+            let errors = ResizeArray<string>()
+            let entries = ResizeArray<HistoricalPackage>()
+
+            for entry in value.EnumerateArray() do
+                if entry.ValueKind <> JsonValueKind.Object then
+                    errors.Add "'historicalPackages' entries must be objects."
+                else
+                    let unknown =
+                        entry.EnumerateObject()
+                        |> Seq.map _.Name
+                        |> Seq.filter (fun name -> name <> "package" && name <> "versions")
+                        |> List.ofSeq
+
+                    for name in unknown do
+                        errors.Add $"'historicalPackages' entries do not support property '{name}'."
+
+                    let package = requiredString "package" entry
+
+                    let versions =
+                        match stringArray "versions" entry with
+                        | Ok [] -> Error [ "'historicalPackages.versions' must list at least one version." ]
+                        | Ok items when (items |> List.exists String.IsNullOrWhiteSpace) ->
+                            Error [ "'historicalPackages.versions' entries must be non-empty strings." ]
+                        | Ok items when (items |> List.distinct |> List.length) <> items.Length ->
+                            Error [ "'historicalPackages.versions' entries must be unique." ]
+                        | Ok items -> Ok items
+                        | Error versionErrors ->
+                            Error(versionErrors |> List.map (fun error -> error.Replace("'versions'", "'historicalPackages.versions'")))
+
+                    match package, versions with
+                    | Ok name, Ok items -> entries.Add { Package = name; Versions = Set.ofList items }
+                    | Error error, Ok _ -> errors.Add(error.Replace("'package'", "'historicalPackages.package'"))
+                    | Ok _, Error versionErrors -> versionErrors |> List.iter errors.Add
+                    | Error error, Error versionErrors ->
+                        errors.Add(error.Replace("'package'", "'historicalPackages.package'"))
+                        versionErrors |> List.iter errors.Add
+
+            if errors.Count = 0 then Ok(List.ofSeq entries) else Error(List.ofSeq errors)
+        | Some _ -> Error [ "'historicalPackages' must be an array." ]
+
+    /// Checks that historical package identities partition a subset of the
+    /// qualified versions, never repeat the current identity, and leave the
+    /// default version on the current identity.
+    let private validateHistoricalPackages
+        (id: string)
+        (currentPackage: string)
+        (defaultVersion: string)
+        (qualifiedVersions: Set<string>)
+        (historical: HistoricalPackage list)
+        =
+        [ for entry in historical do
+              if entry.Package = currentPackage then
+                  yield
+                      $"historicalPackages for '{id}' repeats the current package '{currentPackage}'; list only earlier package identities."
+
+              for version in entry.Versions |> Seq.sort do
+                  if not (qualifiedVersions.Contains version) then
+                      yield
+                          $"historicalPackages for '{id}' names version '{version}' under '{entry.Package}', but it is not present in qualifiedVersions."
+
+              if entry.Versions.Contains defaultVersion then
+                  yield
+                      $"defaultVersion '{defaultVersion}' for '{id}' is listed under historical package '{entry.Package}'; the default version must use the current package '{currentPackage}'."
+
+          for package, count in historical |> List.countBy _.Package do
+              if count > 1 then
+                  yield $"historicalPackages for '{id}' declares package '{package}' more than once."
+
+          let owners =
+              historical
+              |> List.collect (fun entry -> entry.Versions |> Set.toList |> List.map (fun version -> version, entry.Package))
+              |> List.groupBy fst
+
+          for version, claims in owners do
+              if claims.Length > 1 then
+                  let packages = claims |> List.map snd |> List.sort |> String.concat ", "
+                  yield $"historicalPackages for '{id}' assigns version '{version}' to more than one package: {packages}." ]
+
     let private readResource resourceName =
         match assembly.GetManifestResourceStream(resourceName) |> Option.ofObj with
         | None -> Error [ $"Embedded component descriptor is missing: {resourceName}" ]
@@ -116,7 +198,8 @@ module ComponentDescriptors =
             use reader = new StreamReader(value)
             Ok(reader.ReadToEnd())
 
-    let private parse (resourceName: string) (text: string) =
+    /// Parses and validates one component descriptor document.
+    let parse (resourceName: string) (text: string) =
         try
             use document = JsonDocument.Parse(text)
             let root = document.RootElement
@@ -162,6 +245,13 @@ module ComponentDescriptors =
                     errors.Add error
                     None
 
+            let historicalPackages =
+                match parseHistoricalPackages root with
+                | Ok value -> value
+                | Error historicalErrors ->
+                    historicalErrors |> List.iter errors.Add
+                    []
+
             let binding =
                 match parseBinding root with
                 | Ok value -> value
@@ -189,6 +279,9 @@ module ComponentDescriptors =
             if not (String.IsNullOrWhiteSpace defaultVersion)
                && not (qualifiedVersions.Contains defaultVersion) then
                 errors.Add $"defaultVersion '{defaultVersion}' is not present in qualifiedVersions for '{id}'."
+
+            validateHistoricalPackages id packageName defaultVersion qualifiedVersions historicalPackages
+            |> List.iter errors.Add
 
             match distribution with
             | HostTool ->
@@ -231,6 +324,7 @@ module ComponentDescriptors =
                           DisplayName = displayName
                           Distribution = distribution
                           Package = packageName
+                          HistoricalPackages = historicalPackages
                           LifecycleSource = lifecycleSource
                           ApplicationBinding = binding
                           Command = command

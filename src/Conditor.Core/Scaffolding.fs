@@ -48,7 +48,7 @@ module Scaffolding =
                     let version =
                         request.Version |> Option.defaultValue definition.DefaultVersion
 
-                    binding, definition.Package, version)))
+                    binding, ComponentDefinition.packageFor version definition, version)))
 
     [<Literal>]
     let private Folio030Release =
@@ -120,6 +120,21 @@ module Scaffolding =
         |> Option.bind (fun request ->
             Registry.tryFind id
             |> Option.map (fun definition -> request.Version |> Option.defaultValue definition.DefaultVersion))
+
+    /// The Limen package the scaffold's browser kernel imports: the identity
+    /// under which the requested Limen version is distributed.
+    let private limenPackage (manifest: ProjectManifest) =
+        Registry.tryFind "limen"
+        |> Option.map (fun definition ->
+            let version =
+                resolvedVersion "limen" manifest |> Option.defaultValue definition.DefaultVersion
+
+            ComponentDefinition.packageFor version definition)
+
+    let private kernelBootstrap (limen: string) =
+        let protocolModule = jsonString (limen + "/protocol")
+
+        $"import type {{ ViewState }} from {protocolModule};\n\nexport const scaffoldReady = true as const;\nexport type ScaffoldView = ViewState;\n"
 
     let private foundationManifest (projectName: string) (manifest: ProjectManifest) =
         let capabilities = JsonObject()
@@ -241,8 +256,10 @@ module Scaffolding =
 
         let ns = identifier projectName
 
-        match scaffold.Kind with
-        | "fsharp-limen-web" ->
+        match scaffold.Kind, limenPackage manifest with
+        | "fsharp-limen-web", None ->
+            Error [ "Scaffold 'fsharp-limen-web' requires an embedded Limen descriptor to name the kernel's protocol package." ]
+        | "fsharp-limen-web", Some limen ->
             let files =
                 [ "Directory.Build.props",
                   "<Project>\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <LangVersion>latest</LangVersion>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n"
@@ -257,8 +274,7 @@ module Scaffolding =
                   "src/kernel/package.json", packageJson projectName manifest
                   "src/kernel/tsconfig.json",
                   "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ES2022\",\n    \"moduleResolution\": \"Bundler\",\n    \"strict\": true,\n    \"noEmit\": true,\n    \"lib\": [\"ES2022\", \"DOM\"]\n  },\n  \"include\": [\"**/*.ts\"]\n}\n"
-                  "src/kernel/bootstrap.ts",
-                  "import type { ViewState } from \"@echelon-foundry/typescript-wasm-kernel/protocol\";\n\nexport const scaffoldReady = true as const;\nexport type ScaffoldView = ViewState;\n"
+                  "src/kernel/bootstrap.ts", kernelBootstrap limen
                   "src/kernel/index.html",
                   "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"./node_modules/@echelon-foundry/design-system/dist/all.css\">\n  <title>Application</title>\n</head>\n<body>\n  <main>\n    <ef-button><button type=\"button\">Ready</button></ef-button>\n  </main>\n</body>\n</html>\n"
                   "src/kernel/print.html",
@@ -269,7 +285,7 @@ module Scaffolding =
             match agentEntryFile manifest with
             | Some agentFile -> Ok(agentFile :: filesWithOrdoBaseline)
             | None -> Ok filesWithOrdoBaseline
-        | unknown ->
+        | unknown, _ ->
             Error [ $"Unsupported scaffold kind '{unknown}'." ]
 
     let private safeFullPath target relativePath =

@@ -99,7 +99,7 @@ module Adoption =
         | HostTool -> Ok(Some $"host:{definition.Id}@{version}")
         | LifecycleNpm ->
             match definition.LifecycleSource with
-            | Some RegistryPackage -> Ok(Some $"{definition.Package}@{version}")
+            | Some RegistryPackage -> Ok(Some $"{ComponentDefinition.packageFor version definition}@{version}")
             | Some(GitHubSource source) when version = definition.DefaultVersion ->
                 Ok(Some(SourceCache.sourceReference source))
             | Some(GitHubSource _) ->
@@ -304,7 +304,7 @@ module Adoption =
                                 { Id = definition.Id
                                   Version = version
                                   Distribution = definition.Distribution
-                                  Package = definition.Package
+                                  Package = ComponentDefinition.packageFor version definition
                                   SourceReference = source
                                   AuthorityIdentity = $"embedded-descriptor=sha256:{descriptor.Sha256}" }
 
