@@ -655,6 +655,22 @@ let private printComponents json =
 
             writer.WriteEndArray()
 
+            if not definition.HistoricalPackages.IsEmpty then
+                writer.WriteStartArray("historicalPackages")
+
+                for historical in definition.HistoricalPackages do
+                    writer.WriteStartObject()
+                    writer.WriteString("package", historical.Package)
+                    writer.WriteStartArray("versions")
+
+                    for version in historical.Versions |> Seq.sort do
+                        writer.WriteStringValue version
+
+                    writer.WriteEndArray()
+                    writer.WriteEndObject()
+
+                writer.WriteEndArray()
+
             match definition.LifecycleSource with
             | Some source -> writer.WriteString("lifecycleSource", sourceText source)
             | None -> ()
@@ -683,8 +699,15 @@ let private printComponents json =
                 |> Option.map sourceText
                 |> Option.defaultValue "application-binding-only"
 
+            let historical =
+                definition.HistoricalPackages
+                |> List.map (fun entry ->
+                    let historicalVersions = entry.Versions |> Seq.sort |> String.concat ","
+                    $" historical={entry.Package}@{historicalVersions}")
+                |> String.concat String.Empty
+
             Console.WriteLine
-                $"  {definition.Id}@{definition.DefaultVersion} [{distributionText definition.Distribution}] qualified={versions} descriptor={descriptor.Sha256} source={source}"
+                $"  {definition.Id}@{definition.DefaultVersion} [{distributionText definition.Distribution}] package={definition.Package} qualified={versions}{historical} descriptor={descriptor.Sha256} source={source}"
 
     0
 

@@ -11,6 +11,7 @@
     <Compile Include="AdoptionTests.fs" />
     <Compile Include="CurrentUpgradeTests.fs" />
     <Compile Include="RegistryAuthorityBindingTests.fs" />
+    <Compile Include="LimenPackageIdentityTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>

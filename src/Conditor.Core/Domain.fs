@@ -63,11 +63,21 @@ type ProjectManifest =
       Requirements: RequirementSource list
       Execution: ExecutionRequest option }
 
+/// A package identity a component was distributed under before its current
+/// `Package` name. Each listed version is published only under this name.
+type HistoricalPackage =
+    { Package: string
+      Versions: Set<string> }
+
 type ComponentDefinition =
     { Id: string
       DisplayName: string
       Distribution: Distribution
+      /// The component's current package identity.
       Package: string
+      /// Earlier package identities, each owning an explicit set of qualified
+      /// versions. Versions not listed here use `Package`.
+      HistoricalPackages: HistoricalPackage list
       LifecycleSource: LifecycleSource option
       ApplicationBinding: ApplicationBinding option
       Command: string option
@@ -77,6 +87,16 @@ type ComponentDefinition =
       VerifyArguments: string list
       DoctorArguments: string list
       UpgradeArguments: string list }
+
+module ComponentDefinition =
+    /// The package identity under which `version` of the component is
+    /// distributed: the historical identity that lists the version, otherwise
+    /// the current `Package`.
+    let packageFor (version: string) (definition: ComponentDefinition) =
+        definition.HistoricalPackages
+        |> List.tryFind (fun historical -> historical.Versions.Contains version)
+        |> Option.map _.Package
+        |> Option.defaultValue definition.Package
 
 type Operation =
     | Init

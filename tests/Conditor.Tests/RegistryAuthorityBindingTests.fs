@@ -183,6 +183,35 @@ let run (check: string -> bool -> unit) =
         (planAgainst [ "praxis", "3.6.0", NativeHost ] [ "praxis", Some "3.6.0"; "ordo", Some "1.4.0" ]
          |> refusedWith [ "'ordo'"; "not selected by the declared Registry authority"; AuthorityPath ])
 
+    // --- The bound version decides the package identity ------------------------
+    // Limen 0.7.0 is distributed as @echelon-foundry/limen; 0.6.2 and earlier as
+    // @echelon-foundry/typescript-wasm-kernel. The package follows the version
+    // the authority selects, not the embedded default.
+    let scaffoldedLimenAgainst (selected: string) =
+        withTarget (fun target ->
+            let digest = writeAuthority target [ "anchor", "1.0.0", NativeHost; "limen", selected, WebBinding ]
+
+            (manifestJson digest [ "limen", None ])
+                .Replace("\"execution\":{\"enabled\":false}", "\"execution\":{\"enabled\":false},\"scaffold\":{\"kind\":\"fsharp-limen-web\"}")
+            |> Manifest.parseText
+            |> Result.bind (Planner.create target Init))
+
+    let boundLimenPackage selected =
+        match scaffoldedLimenAgainst selected with
+        | Ok plan ->
+            plan.Components
+            |> List.tryFind (fun item -> item.Id = "limen" && item.Version = selected)
+            |> Option.map _.Package
+        | Error _ -> None
+
+    check
+        "unpinned Limen bound by the Registry authority to 0.7.0 uses the @echelon-foundry/limen package"
+        (boundLimenPackage "0.7.0" = Some "@echelon-foundry/limen")
+
+    check
+        "unpinned Limen bound by the Registry authority to 0.6.2 keeps the @echelon-foundry/typescript-wasm-kernel package"
+        (boundLimenPackage "0.6.2" = Some "@echelon-foundry/typescript-wasm-kernel")
+
     // --- Typed decision (pure) --------------------------------------------------
     let source: RegistryAuthorityBinding.AuthoritySource =
         { Path = AuthorityPath

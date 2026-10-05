@@ -13,7 +13,7 @@ module Planner =
         | HostTool -> Ok $"host:{definition.Id}@{version}"
         | _ ->
             match definition.LifecycleSource with
-            | Some RegistryPackage -> Ok $"{definition.Package}@{version}"
+            | Some RegistryPackage -> Ok $"{ComponentDefinition.packageFor version definition}@{version}"
             | Some(GitHubSource source) when version = definition.DefaultVersion ->
                 Ok(SourceCache.sourceReference source)
             | Some(GitHubSource _) ->
@@ -23,8 +23,8 @@ module Planner =
 
     let private bindingReference version (definition: ComponentDefinition) =
         match definition.ApplicationBinding with
-        | Some NpmDependency -> Some $"npm:{definition.Package}@{version}"
-        | Some NugetReference -> Some $"nuget:{definition.Package}@{version}"
+        | Some NpmDependency -> Some $"npm:{ComponentDefinition.packageFor version definition}@{version}"
+        | Some NugetReference -> Some $"nuget:{ComponentDefinition.packageFor version definition}@{version}"
         | None -> None
 
     let private replaceTarget target arguments =
@@ -47,7 +47,7 @@ module Planner =
                 ExternalProcess(
                     npxExecutable (),
                     [ "--yes"
-                      $"--package={definition.Package}@{version}"
+                      $"--package={ComponentDefinition.packageFor version definition}@{version}"
                       command ]
                     @ resolvedArguments
                 )
@@ -312,7 +312,7 @@ module Planner =
                             { Id = definition.Id
                               Version = version
                               Distribution = definition.Distribution
-                              Package = definition.Package
+                              Package = ComponentDefinition.packageFor version definition
                               SourceReference = Some resolvedSource }
 
                         match operation with
@@ -339,7 +339,7 @@ module Planner =
                             { Id = definition.Id
                               Version = version
                               Distribution = definition.Distribution
-                              Package = definition.Package
+                              Package = ComponentDefinition.packageFor version definition
                               SourceReference =
                                 match bindingReference version definition with
                                 | Some binding -> Some $"{resolvedSource};{binding}"
@@ -368,7 +368,7 @@ module Planner =
                         { Id = definition.Id
                           Version = version
                           Distribution = definition.Distribution
-                          Package = definition.Package
+                          Package = ComponentDefinition.packageFor version definition
                           SourceReference = bindingReference version definition }
 
                     if request.Required && manifest.Scaffold.IsNone then
