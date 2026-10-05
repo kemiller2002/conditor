@@ -106,6 +106,21 @@ let run (check: string -> bool -> unit) =
         $"components --json inventory conforms to conditor-components.schema.json: {describe inventoryResult}"
         (Result.isOk inventoryResult)
 
+    // The inventory is projected from loaded descriptors, so it can never carry
+    // a value the loader refuses; its schema says so too.
+    let blankInventoryCases =
+        [ "displayName"; "package"; "defaultVersion"; "id" ]
+        |> List.map (fun field ->
+            let document = (inventory |> JsonNode.Parse |> nonNull).AsObject()
+            let components = (nonNull document["components"]).AsArray()
+            (nonNull components[0]).AsObject()[field] <- JsonValue.Create " "
+            field, document.ToJsonString())
+
+    for field, text in blankInventoryCases do
+        check
+            $"inventory schema rejects a whitespace-only {field}"
+            (validate inventorySchema text |> Result.isError)
+
     // The schema and the loader must agree on the distribution-specific rules,
     // not merely on the descriptors that happen to exist today.
     let parityCases =
@@ -127,7 +142,21 @@ let run (check: string -> bool -> unit) =
           "descriptor with an unknown distribution",
           mutateDescriptor "praxis.component.json" (fun d -> d["distribution"] <- JsonValue.Create "brew")
           "versionArguments with a non-string entry",
-          mutateDescriptor "ordo.component.json" (fun d -> d["versionArguments"] <- JsonNode.Parse """["--version", 1]""") ]
+          mutateDescriptor "ordo.component.json" (fun d -> d["versionArguments"] <- JsonNode.Parse """["--version", 1]""")
+          "a whitespace-only displayName",
+          mutateDescriptor "praxis.component.json" (fun d -> d["displayName"] <- JsonValue.Create "   ")
+          "a whitespace-only package", mutateDescriptor "forma.component.json" (fun d -> d["package"] <- JsonValue.Create "\t")
+          "a whitespace-only defaultVersion",
+          mutateDescriptor "praxis.component.json" (fun d -> d["defaultVersion"] <- JsonValue.Create " ")
+          "a whitespace-only historical package",
+          mutateDescriptor "limen.component.json" (fun d ->
+              d["historicalPackages"] <- JsonNode.Parse """[{"package":"  ","versions":["0.6.1"]}]""")
+          "a whitespace-only historical version",
+          mutateDescriptor "limen.component.json" (fun d ->
+              d["historicalPackages"] <- JsonNode.Parse """[{"package":"@echelon-foundry/typescript-wasm-kernel","versions":[" "]}]""")
+          "a whitespace-only lifecycleSource entrypoint path",
+          mutateDescriptor "tutela.component.json" (fun d ->
+              (d |> child "lifecycleSource" |> child "entrypoint")["path"] <- JsonValue.Create " \n") ]
 
     for name, text in parityCases do
         check $"loader rejects {name}" (not (loaderAccepts text))

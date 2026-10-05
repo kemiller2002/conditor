@@ -29,11 +29,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "displayName": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "distribution": {
             "enum": [
@@ -45,11 +47,13 @@
           },
           "package": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "defaultVersion": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "qualifiedVersions": {
             "type": "array",
@@ -72,7 +76,8 @@
               "properties": {
                 "package": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "pattern": "\\S"
                 },
                 "versions": {
                   "type": "array",
@@ -80,7 +85,8 @@
                   "uniqueItems": true,
                   "items": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "pattern": "\\S"
                   }
                 }
               }
