@@ -6,11 +6,38 @@ open System.Reflection
 open System.Security.Cryptography
 open System.Text
 open System.Text.Json
+open System.Text.RegularExpressions
 
 type ComponentDescriptor =
     { Definition: ComponentDefinition
       QualifiedVersions: Set<string>
       Sha256: string }
+
+/// A structural rule of `schemas/conditor-component.schema.json` that a
+/// descriptor breaks. The loader refuses every violation rather than ignoring it.
+type DescriptorViolation =
+    /// `location` (the descriptor itself, `lifecycleSource` or
+    /// `lifecycleSource.entrypoint`) carries a property the contract does not define.
+    | UnknownProperty of location: string * property: string
+    /// A string field does not match the schema `pattern`.
+    | InvalidFormat of field: string * value: string * pattern: string
+    | DuplicateQualifiedVersion of version: string
+    | EmptyQualifiedVersion
+    /// `command` is present but is not a non-empty string.
+    | InvalidCommand
+    /// `applicationBinding` is present but is not a string.
+    | InvalidApplicationBinding
+
+module DescriptorViolation =
+    let describe =
+        function
+        | UnknownProperty("descriptor", property) -> $"Component descriptor does not support property '{property}'."
+        | UnknownProperty(location, property) -> $"'{location}' does not support property '{property}'."
+        | InvalidFormat(field, value, pattern) -> $"'{field}' value '{value}' does not match the required format {pattern}."
+        | DuplicateQualifiedVersion version -> $"'qualifiedVersions' lists '{version}' more than once."
+        | EmptyQualifiedVersion -> "'qualifiedVersions' entries must be non-empty strings."
+        | InvalidCommand -> "'command' must be a non-empty string."
+        | InvalidApplicationBinding -> "'applicationBinding' must be 'npm' or 'nuget'."
 
 module ComponentDescriptors =
     let private assembly = typeof<ComponentDefinition>.Assembly
@@ -57,6 +84,120 @@ module ComponentDescriptors =
 
             if errors.Count = 0 then Ok(List.ofSeq items) else Error(List.ofSeq errors)
         | _ -> Error [ $"'{name}' must be an array." ]
+
+    /// A schema `pattern` and its .NET equivalent. JSON Schema patterns use
+    /// ECMA-262 anchors, where `$` never matches before a trailing newline, so the
+    /// .NET form anchors with `\A` and `\z`.
+    let private schemaPattern (core: string) =
+        $"^{core}$", Regex($@"\A{core}\z", RegexOptions.CultureInvariant)
+
+    let private idPattern = schemaPattern "[a-z0-9-]+"
+    let private repositoryPattern = schemaPattern "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+    let private commitPattern = schemaPattern "[0-9a-fA-F]{40}"
+
+    let private descriptorProperties =
+        set
+            [ "schemaVersion"
+              "id"
+              "displayName"
+              "distribution"
+              "package"
+              "historicalPackages"
+              "defaultVersion"
+              "qualifiedVersions"
+              "lifecycleSource"
+              "applicationBinding"
+              "command"
+              "versionArguments"
+              "initArguments"
+              "verifyArguments"
+              "doctorArguments"
+              "upgradeArguments" ]
+
+    let private registrySourceProperties = set [ "kind" ]
+    let private githubSourceProperties = set [ "kind"; "repository"; "commit"; "entrypoint" ]
+    let private entrypointProperties = set [ "kind"; "path" ]
+
+    let private unknownProperties location (allowed: Set<string>) (element: JsonElement) =
+        element.EnumerateObject()
+        |> Seq.map _.Name
+        |> Seq.filter (allowed.Contains >> not)
+        |> Seq.map (fun property -> UnknownProperty(location, property))
+        |> List.ofSeq
+
+    /// Format violations of the string property `name`, when present. Missing or
+    /// non-string values are reported by the field's own parser.
+    let private formatViolations field name (pattern: string, regex: Regex) (element: JsonElement) =
+        match tryProperty name element with
+        | Some value when value.ValueKind = JsonValueKind.String ->
+            match value.GetString() |> Option.ofObj with
+            | Some text when text <> String.Empty && not (regex.IsMatch text) -> [ InvalidFormat(field, text, pattern) ]
+            | _ -> []
+        | _ -> []
+
+    let private objectProperty name (element: JsonElement) =
+        tryProperty name element |> Option.filter (fun value -> value.ValueKind = JsonValueKind.Object)
+
+    let private lifecycleSourceViolations (root: JsonElement) =
+        match objectProperty "lifecycleSource" root with
+        | None -> []
+        | Some source ->
+            match optionalString "kind" source with
+            | Some "registry" -> unknownProperties "lifecycleSource" registrySourceProperties source
+            | Some "github" ->
+                List.concat
+                    [ unknownProperties "lifecycleSource" githubSourceProperties source
+                      formatViolations "lifecycleSource.repository" "repository" repositoryPattern source
+                      formatViolations "lifecycleSource.commit" "commit" commitPattern source
+                      objectProperty "entrypoint" source
+                      |> Option.map (unknownProperties "lifecycleSource.entrypoint" entrypointProperties)
+                      |> Option.defaultValue [] ]
+            | _ -> []
+
+    let private qualifiedVersionViolations (root: JsonElement) =
+        match tryProperty "qualifiedVersions" root with
+        | Some value when value.ValueKind = JsonValueKind.Array ->
+            let versions =
+                value.EnumerateArray()
+                |> Seq.filter (fun item -> item.ValueKind = JsonValueKind.String)
+                |> Seq.choose (fun item -> item.GetString() |> Option.ofObj)
+                |> List.ofSeq
+
+            let empty = if versions |> List.contains String.Empty then [ EmptyQualifiedVersion ] else []
+
+            let duplicates =
+                versions
+                |> List.countBy id
+                |> List.filter (fun (version, count) -> count > 1 && version <> String.Empty)
+                |> List.map (fst >> DuplicateQualifiedVersion)
+
+            empty @ duplicates
+        | _ -> []
+
+    /// `violation` when the optional property `name` is present but `accepts` refuses it.
+    let private optionalPropertyViolations name (accepts: JsonElement -> bool) violation (root: JsonElement) =
+        match tryProperty name root with
+        | Some value when not (accepts value) -> [ violation ]
+        | _ -> []
+
+    let private isString (value: JsonElement) = value.ValueKind = JsonValueKind.String
+
+    let private isNonEmptyString (value: JsonElement) =
+        isString value && value.GetString() <> String.Empty
+
+    /// Every structural rule of the descriptor schema that `root` breaks, beyond
+    /// the required-field and distribution checks `parse` performs itself.
+    let structuralViolations (root: JsonElement) =
+        if root.ValueKind <> JsonValueKind.Object then
+            []
+        else
+            List.concat
+                [ unknownProperties "descriptor" descriptorProperties root
+                  formatViolations "id" "id" idPattern root
+                  lifecycleSourceViolations root
+                  qualifiedVersionViolations root
+                  optionalPropertyViolations "command" isNonEmptyString InvalidCommand root
+                  optionalPropertyViolations "applicationBinding" isString InvalidApplicationBinding root ]
 
     let private parseDistribution value =
         match value with
@@ -215,6 +356,8 @@ module ComponentDescriptors =
 
             if schemaVersion <> 1 then
                 errors.Add $"Unsupported component descriptor schemaVersion '{schemaVersion}' in {resourceName}."
+
+            structuralViolations root |> List.map DescriptorViolation.describe |> List.iter errors.Add
 
             let valueOrEmpty result =
                 match result with
