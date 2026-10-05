@@ -1137,6 +1137,7 @@ AdoptionTests.run check
 CurrentUpgradeTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
+ComponentSchemaTests.run check
 
 let exitCode =
     if failures = 0 then

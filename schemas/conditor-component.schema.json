@@ -21,7 +21,7 @@
     "schemaVersion": { "const": 1 },
     "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "displayName": { "type": "string", "minLength": 1 },
-    "distribution": { "enum": ["lifecycle-npm", "npm", "nuget"] },
+    "distribution": { "enum": ["host-tool", "lifecycle-npm", "npm", "nuget"] },
     "package": {
       "type": "string",
       "minLength": 1,
@@ -85,11 +85,40 @@
       "enum": ["npm", "nuget"]
     },
     "command": { "type": "string", "minLength": 1 },
+    "versionArguments": {
+      "$ref": "#/$defs/stringArray",
+      "description": "Read-only argument vector that makes `command` report the installed component version, used by existing-repository adoption. Required and non-empty for host-tool and lifecycle-npm components."
+    },
     "initArguments": { "$ref": "#/$defs/stringArray" },
     "verifyArguments": { "$ref": "#/$defs/stringArray" },
     "doctorArguments": { "$ref": "#/$defs/stringArray" },
     "upgradeArguments": { "$ref": "#/$defs/stringArray" }
   },
+  "allOf": [
+    {
+      "if": { "required": ["distribution"], "properties": { "distribution": { "const": "host-tool" } } },
+      "then": {
+        "required": ["command", "versionArguments"],
+        "properties": { "versionArguments": { "minItems": 1 } },
+        "not": { "required": ["lifecycleSource"] }
+      }
+    },
+    {
+      "if": { "required": ["distribution"], "properties": { "distribution": { "const": "lifecycle-npm" } } },
+      "then": {
+        "required": ["lifecycleSource", "command", "versionArguments"],
+        "properties": { "versionArguments": { "minItems": 1 } }
+      }
+    },
+    {
+      "if": { "required": ["distribution"], "properties": { "distribution": { "const": "npm" } } },
+      "then": { "required": ["applicationBinding"], "properties": { "applicationBinding": { "const": "npm" } } }
+    },
+    {
+      "if": { "required": ["distribution"], "properties": { "distribution": { "const": "nuget" } } },
+      "then": { "required": ["applicationBinding"], "properties": { "applicationBinding": { "const": "nuget" } } }
+    }
+  ],
   "$defs": {
     "stringArray": {
       "type": "array",

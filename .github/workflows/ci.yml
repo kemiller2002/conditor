@@ -49,6 +49,33 @@ jobs:
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --preset clean-room --target "$RUNNER_TEMP/conditor-plan"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/workstation-plan-home"
           test -z "$(ls -A "$RUNNER_TEMP/workstation-plan-home" 2>/dev/null)"
+      - name: Component schema conformance (independent validator)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/schema-venv"
+          "$RUNNER_TEMP/schema-venv/bin/pip" install --quiet --disable-pip-version-check 'jsonschema==4.26.0'
+          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- components --json > "$RUNNER_TEMP/conditor-components.json"
+          "$RUNNER_TEMP/schema-venv/bin/python" - "$RUNNER_TEMP/conditor-components.json" components/*.component.json <<'PY'
+          import json, sys
+          from jsonschema import Draft202012Validator
+
+          def validator(path):
+              schema = json.load(open(path))
+              Draft202012Validator.check_schema(schema)
+              return Draft202012Validator(schema)
+
+          component = validator("schemas/conditor-component.schema.json")
+          inventory = validator("schemas/conditor-components.schema.json")
+          failures = []
+          for path in sys.argv[2:]:
+              failures += [f"{path}: {error.message}" for error in component.iter_errors(json.load(open(path)))]
+          failures += [f"components --json: {error.message}" for error in inventory.iter_errors(json.load(open(sys.argv[1])))]
+          if len(sys.argv) < 3:
+              failures.append("no component descriptors found")
+          print("\n".join(failures) or f"{len(sys.argv) - 2} descriptors and the inventory conform to their schemas")
+          sys.exit(1 if failures else 0)
+          PY
       - name: Indy Init preset plan smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-indy-plan"
