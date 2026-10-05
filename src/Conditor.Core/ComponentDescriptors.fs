@@ -22,8 +22,9 @@ type DescriptorViolation =
     /// A string field does not match the schema `pattern`.
     | InvalidFormat of field: string * value: string * pattern: string
     | DuplicateQualifiedVersion of version: string
+    /// A `qualifiedVersions` entry is empty or whitespace-only.
     | EmptyQualifiedVersion
-    /// `command` is present but is not a non-empty string.
+    /// `command` is present but is not a string with a non-whitespace character.
     | InvalidCommand
     /// `applicationBinding` is present but is not a string.
     | InvalidApplicationBinding
@@ -35,8 +36,8 @@ module DescriptorViolation =
         | UnknownProperty(location, property) -> $"'{location}' does not support property '{property}'."
         | InvalidFormat(field, value, pattern) -> $"'{field}' value '{value}' does not match the required format {pattern}."
         | DuplicateQualifiedVersion version -> $"'qualifiedVersions' lists '{version}' more than once."
-        | EmptyQualifiedVersion -> "'qualifiedVersions' entries must be non-empty strings."
-        | InvalidCommand -> "'command' must be a non-empty string."
+        | EmptyQualifiedVersion -> "'qualifiedVersions' entries must be non-empty, non-whitespace strings."
+        | InvalidCommand -> "'command' must be a non-empty, non-whitespace string."
         | InvalidApplicationBinding -> "'applicationBinding' must be 'npm' or 'nuget'."
 
 module ComponentDescriptors =
@@ -163,12 +164,12 @@ module ComponentDescriptors =
                 |> Seq.choose (fun item -> item.GetString() |> Option.ofObj)
                 |> List.ofSeq
 
-            let empty = if versions |> List.contains String.Empty then [ EmptyQualifiedVersion ] else []
+            let empty = if versions |> List.exists String.IsNullOrWhiteSpace then [ EmptyQualifiedVersion ] else []
 
             let duplicates =
                 versions
                 |> List.countBy id
-                |> List.filter (fun (version, count) -> count > 1 && version <> String.Empty)
+                |> List.filter (fun (version, count) -> count > 1 && not (String.IsNullOrWhiteSpace version))
                 |> List.map (fst >> DuplicateQualifiedVersion)
 
             empty @ duplicates
@@ -182,8 +183,8 @@ module ComponentDescriptors =
 
     let private isString (value: JsonElement) = value.ValueKind = JsonValueKind.String
 
-    let private isNonEmptyString (value: JsonElement) =
-        isString value && value.GetString() <> String.Empty
+    let private isNonBlankString (value: JsonElement) =
+        isString value && not (String.IsNullOrWhiteSpace(value.GetString()))
 
     /// Every structural rule of the descriptor schema that `root` breaks, beyond
     /// the required-field and distribution checks `parse` performs itself.
@@ -196,7 +197,7 @@ module ComponentDescriptors =
                   formatViolations "id" "id" idPattern root
                   lifecycleSourceViolations root
                   qualifiedVersionViolations root
-                  optionalPropertyViolations "command" isNonEmptyString InvalidCommand root
+                  optionalPropertyViolations "command" isNonBlankString InvalidCommand root
                   optionalPropertyViolations "applicationBinding" isString InvalidApplicationBinding root ]
 
     let private parseDistribution value =
