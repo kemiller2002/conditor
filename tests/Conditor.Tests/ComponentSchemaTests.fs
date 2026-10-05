@@ -109,7 +109,7 @@ let run (check: string -> bool -> unit) =
     // The inventory is projected from loaded descriptors, so it can never carry
     // a value the loader refuses; its schema says so too.
     let blankInventoryCases =
-        [ "displayName"; "package"; "defaultVersion"; "id" ]
+        [ "displayName"; "package"; "defaultVersion"; "id"; "command" ]
         |> List.map (fun field ->
             let document = (inventory |> JsonNode.Parse |> nonNull).AsObject()
             let components = (nonNull document["components"]).AsArray()
@@ -203,6 +203,12 @@ let run (check: string -> bool -> unit) =
           "an empty command",
           mutateDescriptor "forma.component.json" (fun d -> d["command"] <- JsonValue.Create ""),
           InvalidCommand
+          "a whitespace-only command",
+          mutateDescriptor "praxis.component.json" (fun d -> d["command"] <- JsonValue.Create "  \t"),
+          InvalidCommand
+          "a whitespace-only qualifiedVersions entry",
+          mutateDescriptor "praxis.component.json" (fun d -> d["qualifiedVersions"] <- JsonNode.Parse """[" ","3.6.0"]"""),
+          EmptyQualifiedVersion
           "a non-string applicationBinding",
           mutateDescriptor "praxis.component.json" (fun d -> d["applicationBinding"] <- JsonValue.Create true),
           InvalidApplicationBinding ]
