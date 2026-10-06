@@ -4,9 +4,10 @@
   "displayName": "Visual Engineering",
   "distribution": "lifecycle-npm",
   "package": "@echelon-foundry/visual-engineering",
-  "defaultVersion": "1.0.0",
+  "defaultVersion": "1.0.1",
   "qualifiedVersions": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "lifecycleSource": {
     "kind": "registry"

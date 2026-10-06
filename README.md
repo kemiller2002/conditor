@@ -198,7 +198,8 @@ For each already-declared system, Conditor uses the strongest available generic 
 
 - exact native releases are installed or reused through the integrity-verified workstation engine;
 - releases declaring `echelon.repository-lifecycle` use their standard `upgrade --root` and `verify --root` operations;
-- legacy native lifecycle systems are upgraded only when this Conditor build has explicitly qualified the exact target version and lifecycle command contract.
+- legacy native lifecycle systems are upgraded only when this Conditor build has explicitly qualified the exact target version and lifecycle command contract;
+- package-distributed repository lifecycle tools (Registry distribution class `repository-lifecycle`, such as the Visual Engineering npm CLI) are upgraded only when this Conditor build qualifies the exact target version, the Registry release names the descriptor's package and exactly one package artifact digest, and the descriptor maps that version to an immutable distribution. Conditor runs the package's own `upgrade` at exactly the target version, then its verify contract (`verify --strict` for Visual Engineering); for example Visual Engineering 1.0.0 -> 1.0.1, whose upgrade rewrites its managed `.gitignore` region to `!.visual-engineering/`.
 
 Conditor never silently adds a new component to a repository during `--current`, never downgrades a declared component, and never guesses a project-binding migration. A changed Forma, Folio, Limen, Aegis, or other application binding is refused until its distribution exposes a safe generic migration contract.
 

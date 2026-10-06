@@ -375,6 +375,17 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
         for transition, _, release in plan.EmbeddedTransitions do
             Console.WriteLine $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} via {release.Executable}"
 
+    if not plan.PackageLifecycleTransitions.IsEmpty then
+        Console.WriteLine "  qualified package lifecycle upgrades:"
+
+        for item in plan.PackageLifecycleTransitions do
+            let transition = item.Transition
+            let upgrade = String.concat " " item.UpgradeArguments
+            let verify = String.concat " " item.VerifyArguments
+
+            Console.WriteLine
+                $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} via {item.Package}@{transition.ToVersion} (package sha256:{item.ArtifactSha256}): {upgrade}, then {verify}"
+
     if not plan.WebPackageTransitions.IsEmpty then
         Console.WriteLine "  web-package bindings:"
 

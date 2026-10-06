@@ -140,6 +140,154 @@ jobs:
           grep -F "managed-file-modified" "$RUNNER_TEMP/gate-damaged.json"
           test ! -e "$damaged/conditor.json"
 
+  echelon-current-sweep-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      # echelon-registry main at the echelon-current selection of Praxis 3.7.2,
+      # Ordo 1.4.2 and Visual Engineering 1.0.1 (profile 1.1.0).
+      REGISTRY_COMMIT: f0e45db563e57b0d69deafaf007a7702ca4bded4
+      CURRENT_SET_SHA256: cd8d8d0482c5c4750f4bb31d28bc79e9597d3be4f6264955691e3aebd86cb6d2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Fetch the exact echelon-current resolved set
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/kemiller2002/echelon-registry/$REGISTRY_COMMIT/channels/echelon-current"
+          curl -fsSL "$base/linux-x64.json" -o "$RUNNER_TEMP/current.json"
+          curl -fsSL "$base/channel.json" -o "$RUNNER_TEMP/channel.json"
+          echo "$CURRENT_SET_SHA256  $RUNNER_TEMP/current.json" | sha256sum -c -
+          python3 - "$RUNNER_TEMP/channel.json" "$RUNNER_TEMP/current.json" "$CURRENT_SET_SHA256" <<'PY'
+          import json, sys
+          channel = json.load(open(sys.argv[1]))
+          [entry] = [p for p in channel["platforms"] if p["platform"] == "linux-x64"]
+          assert entry["sha256"] == sys.argv[3], entry
+          selected = {c["systemId"]: c["version"] for c in json.load(open(sys.argv[2]))["components"]}
+          expected = {"praxis": "3.7.2", "ordo": "1.4.2", "visual-engineering": "1.0.1",
+                      "communication-engineering": "1.0.0", "tutela": "0.1.0"}
+          assert all(selected[k] == v for k, v in expected.items()), selected
+          PY
+      - name: Install exact native Praxis 3.7.2 and Ordo 1.4.2 and check them against the Registry digests
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/praxis/main/scripts/install-native.sh | sh -s -- --version 3.7.2
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version 1.4.2
+          echo "$HOME/.echelon/bin" >> "$GITHUB_PATH"
+          "$HOME/.echelon/bin/praxis" --version | grep -Fx "praxis 3.7.2"
+          "$HOME/.echelon/bin/ordo" --version | grep -Fx "1.4.2"
+          mkdir -p "$RUNNER_TEMP/artifacts" && cd "$RUNNER_TEMP/artifacts"
+          curl -fsSLO https://github.com/kemiller2002/praxis/releases/download/v3.7.2/praxis-linux-x64.tar.gz
+          curl -fsSLO https://github.com/kemiller2002/ordo/releases/download/v1.4.2/ordo-linux-x64.tar.gz
+          npm pack --silent @echelon-foundry/visual-engineering@1.0.1 > /dev/null
+          python3 - "$RUNNER_TEMP/current.json" <<'PY'
+          import hashlib, json, sys
+          wanted = {"praxis-linux-x64.tar.gz", "ordo-linux-x64.tar.gz", "echelon-foundry-visual-engineering-1.0.1.tgz"}
+          for component in json.load(open(sys.argv[1]))["components"]:
+              for artifact in component["artifacts"]:
+                  if artifact["name"] in wanted:
+                      actual = hashlib.sha256(open(artifact["name"], "rb").read()).hexdigest()
+                      assert actual == artifact["sha256"], (artifact["name"], actual)
+                      wanted.discard(artifact["name"])
+          assert not wanted, wanted
+          PY
+      - name: Install the exact Visual Engineering CLIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent --no-save --prefix "$RUNNER_TEMP/ve-1.0.0" @echelon-foundry/visual-engineering@1.0.0
+          npm install --silent --no-save --prefix "$RUNNER_TEMP/ve-1.0.1" @echelon-foundry/visual-engineering@1.0.1
+          "$RUNNER_TEMP/ve-1.0.0/node_modules/.bin/visual-engineering" --version | grep -Fx "1.0.0"
+          "$RUNNER_TEMP/ve-1.0.1/node_modules/.bin/visual-engineering" --version | grep -Fx "1.0.1"
+      - name: Sweep order - upgrade VE 1.0.0 to 1.0.1, then adopt against echelon-current
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          ve100="$RUNNER_TEMP/ve-1.0.0/node_modules/.bin/visual-engineering"
+          ve101="$RUNNER_TEMP/ve-1.0.1/node_modules/.bin/visual-engineering"
+          repo="$RUNNER_TEMP/sweep"
+          mkdir -p "$repo" && git -C "$repo" init -q
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q --allow-empty -m init
+          ( cd "$repo" && praxis init && ordo init && "$ve100" init )
+          grep -Fx ".visual-engineering/" "$repo/.gitignore"
+
+          # A 1.0.1 CLI reports the 1.0.0 installation stale under --strict.
+          set +e
+          ( cd "$repo" && "$ve101" verify --strict ) > "$RUNNER_TEMP/ve-stale.txt" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/ve-stale.txt"
+          test "$status" -ne 0
+          grep -F ".gitignore" "$RUNNER_TEMP/ve-stale.txt"
+
+          ( cd "$repo" && "$ve101" upgrade && "$ve101" verify --strict )
+          grep -Fx '!.visual-engineering/' "$repo/.gitignore"
+
+          export PATH="$RUNNER_TEMP/ve-1.0.1/node_modules/.bin:$PATH"
+          conditor adopt --target "$repo" --resolved-set "$RUNNER_TEMP/current.json" --resolved-set-sha256 "$CURRENT_SET_SHA256" --json > "$RUNNER_TEMP/sweep-adopt.json"
+          python3 - "$RUNNER_TEMP/sweep-adopt.json" <<'PY'
+          import json, sys
+          plan = json.load(open(sys.argv[1]))
+          assert plan["refusals"] == [], plan["refusals"]
+          assert sorted((c["id"], c["version"]) for c in plan["components"]) == [
+              ("ordo", "1.4.2"), ("praxis", "3.7.2"), ("visual-engineering", "1.0.1")], plan["components"]
+          PY
+          digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["digest"])' "$RUNNER_TEMP/sweep-adopt.json")
+          conditor adopt --target "$repo" --resolved-set "$RUNNER_TEMP/current.json" --resolved-set-sha256 "$CURRENT_SET_SHA256" --authorize "$digest"
+          conditor upgrade --current --check --home "$RUNNER_TEMP/sweep-home" --target "$repo" --resolved-set "$RUNNER_TEMP/current.json" --resolved-set-sha256 "$CURRENT_SET_SHA256" | tee "$RUNNER_TEMP/sweep-current.txt"
+          grep -F "version transitions: none" "$RUNNER_TEMP/sweep-current.txt"
+          conditor status --target "$repo"
+      - name: Qualified VE 1.0.0 -> 1.0.1 current-upgrade transition
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          ve100="$RUNNER_TEMP/ve-1.0.0/node_modules/.bin/visual-engineering"
+          repo="$RUNNER_TEMP/transition"
+          home="$RUNNER_TEMP/transition-home"
+          mkdir -p "$repo" "$home" && git -C "$repo" init -q
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q --allow-empty -m init
+          ( cd "$repo" && praxis init && ordo init && "$ve100" init )
+
+          PATH="$RUNNER_TEMP/ve-1.0.0/node_modules/.bin:$PATH" conditor adopt --target "$repo" --json > "$RUNNER_TEMP/transition-adopt.json"
+          python3 - "$RUNNER_TEMP/transition-adopt.json" <<'PY'
+          import json, sys
+          plan = json.load(open(sys.argv[1]))
+          assert plan["refusals"] == [], plan["refusals"]
+          assert {"id": "visual-engineering", "version": "1.0.0"} in plan["components"], plan["components"]
+          PY
+          digest=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["digest"])' "$RUNNER_TEMP/transition-adopt.json")
+          PATH="$RUNNER_TEMP/ve-1.0.0/node_modules/.bin:$PATH" conditor adopt --target "$repo" --authorize "$digest"
+
+          current=(--home "$home" --target "$repo" --resolved-set "$RUNNER_TEMP/current.json" --resolved-set-sha256 "$CURRENT_SET_SHA256")
+          conditor upgrade --current --check "${current[@]}" | tee "$RUNNER_TEMP/transition-plan.txt"
+          grep -F "visual-engineering: 1.0.0 -> 1.0.1 [embedded-qualified-package-lifecycle]" "$RUNNER_TEMP/transition-plan.txt"
+          grep -F "@echelon-foundry/visual-engineering@1.0.1 (package sha256:32347d5c134f724cb35f9c33d882c2ed51f860381f0d5802634da3da74fb3f2f)" "$RUNNER_TEMP/transition-plan.txt"
+          if grep -F "REFUSED" "$RUNNER_TEMP/transition-plan.txt"; then exit 1; fi
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/transition-plan.txt" | cut -d' ' -f2)
+
+          conditor upgrade --current "${current[@]}" --authorize "$authorization"
+          grep -Fx '!.visual-engineering/' "$repo/.gitignore"
+          python3 - "$repo/conditor.json" <<'PY'
+          import json, sys
+          manifest = json.load(open(sys.argv[1]))
+          versions = {c["id"]: c["version"] for c in manifest["components"]}
+          assert versions == {"ordo": "1.4.2", "praxis": "3.7.2", "visual-engineering": "1.0.1"}, versions
+          assert manifest["registryAuthority"]["sha256"] == "cd8d8d0482c5c4750f4bb31d28bc79e9597d3be4f6264955691e3aebd86cb6d2", manifest
+          PY
+          conditor upgrade --current --check "${current[@]}" | grep -F "version transitions: none"
+          conditor status --target "$repo"
+
   host-tool-upgrade-boundary:
     if: github.event_name == 'push'
     needs: build-test
