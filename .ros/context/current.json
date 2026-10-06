@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-06T16:32:24.000Z",
+  "updatedAt": "2026-10-06T16:34:03.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -284,13 +284,47 @@
     {
       "id": "WI-0007",
       "type": "mechanical",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-06T16:32:24.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".echelon/toolchain.json"
+        },
+        {
+          "type": "implementation",
+          "path": ".echelon/ros.json"
+        },
+        {
+          "type": "implementation",
+          "path": ".echelon/sde.json"
+        }
+      ],
+      "updatedAt": "2026-10-06T16:34:03.000Z",
       "telemetryExecutionIds": [
         "EXE-20261006T163224471Z-15416924"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "51999463fac1cf85ee8556e4",
+        "recordedAt": "2026-10-06T16:34:02.000Z",
+        "executionId": "EXE-20261006T163224471Z-15416924",
+        "repository": "conditor",
+        "branch": "chore/praxis-3.7.2-final",
+        "commit": "36eee58f56b01745bb59b8a63bff92a0cf3511b2",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/praxis-3.7.2-final",
+        "remoteCommit": "36eee58f56b01745bb59b8a63bff92a0cf3511b2",
+        "summary": "toolchain upgrade applied, verified, pushed",
+        "nextAction": "complete, PR",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-06T16:34:03.000Z"
     }
   ]
 }
