@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-06T15:46:38.000Z",
+  "updatedAt": "2026-10-06T16:18:56Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -238,6 +238,48 @@
       },
       "completedAt": "2026-10-06T15:46:38.000Z",
       "conclusion": "Machine-only lifecycle CLIs are not-found"
+    },
+    {
+      "id": "WI-0006",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/CurrentUpgrade.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-06T16:18:56Z",
+      "telemetryExecutionIds": [
+        "EXE-20261006T161127162Z-5a17dcf3"
+      ],
+      "latestCheckpoint": {
+        "id": "d57792e700e5ed100d1f0ebf",
+        "recordedAt": "2026-10-06T16:18:48Z",
+        "executionId": "EXE-20261006T161127162Z-5a17dcf3",
+        "repository": "conditor",
+        "branch": "chore/qualify-praxis-3.7.2-ve-1.0.1",
+        "commit": "71f28237dfa85711adcb776d1e8b1bfdd6b7d0ea",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/qualify-praxis-3.7.2-ve-1.0.1",
+        "remoteCommit": "71f28237dfa85711adcb776d1e8b1bfdd6b7d0ea",
+        "summary": "Praxis 3.7.2 and VE 1.0.1 qualified; VE 1.0.0->1.0.1 upgrade --current transition implemented and tested; CI rehearsal added; PR #46 open",
+        "nextAction": "Wait for CI on PR #46 and merge when green",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-06T16:18:56Z",
+      "conclusion": "Conditor qualifies every echelon-current selection"
     }
   ]
 }

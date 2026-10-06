@@ -56,6 +56,11 @@ module Planner =
             | None ->
                 invalidOp $"Lifecycle component '{definition.Id}' has no distribution source."
 
+    /// The process that runs `arguments` for exactly `version` of a lifecycle
+    /// component, as a plan action would run it.
+    let lifecycleProcess target version (definition: ComponentDefinition) arguments =
+        lifecycleExecution target version definition arguments
+
     let private actionKind operation phase =
         match operation, phase with
         | Init, ("install" | "init") -> InstallLifecycle

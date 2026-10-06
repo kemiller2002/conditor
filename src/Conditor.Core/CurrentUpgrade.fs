@@ -15,6 +15,18 @@ type CurrentUpgradeTransition =
       Role: string
       Mode: string }
 
+/// A qualified version change of a package-distributed repository lifecycle
+/// tool (for example the Visual Engineering npm CLI). The Registry selects the
+/// release; Conditor runs it only through its embedded descriptor, at exactly
+/// the selected version and under exactly the package that descriptor names.
+type PackageLifecycleTransition =
+    { Transition: CurrentUpgradeTransition
+      Definition: ComponentDefinition
+      Package: string
+      ArtifactSha256: string
+      UpgradeArguments: string list
+      VerifyArguments: string list }
+
 type CurrentUpgradePlan =
     { Target: string
       ManifestPath: string
@@ -28,6 +40,7 @@ type CurrentUpgradePlan =
       GenericUpgradePlan: LifecyclePlan option
       GenericVerifyPlan: LifecyclePlan option
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
+      PackageLifecycleTransitions: PackageLifecycleTransition list
       WebPackageTransitions: WebPackageTransition list
       Refusals: string list
       Digest: string }
@@ -47,7 +60,9 @@ module CurrentUpgrade =
           Version: string
           Role: string
           DistributionClass: string
-          HasLifecycle: bool }
+          HasLifecycle: bool
+          Package: string option
+          PackageArtifactSha256: string option }
 
     let private normalizeSha256 (value: string) =
         if value.StartsWith("sha256:", StringComparison.Ordinal) then
@@ -89,12 +104,26 @@ module CurrentUpgrade =
                 |> List.choose (fun item ->
                     match str "systemId" item, str "version" item, str "role" item, str "distributionClass" item with
                     | Some id, Some version, Some role, Some distributionClass ->
+                        let packageArtifacts =
+                            match tryProperty "artifacts" item with
+                            | Some artifacts when artifacts.ValueKind = JsonValueKind.Array ->
+                                artifacts.EnumerateArray()
+                                |> Seq.filter (fun artifact -> str "purpose" artifact = Some "package")
+                                |> Seq.choose (str "sha256")
+                                |> Seq.toList
+                            | _ -> []
+
                         Some
                             { Id = id
                               Version = version
                               Role = role
                               DistributionClass = distributionClass
-                              HasLifecycle = (tryProperty "repositoryLifecycle" item).IsSome }
+                              HasLifecycle = (tryProperty "repositoryLifecycle" item).IsSome
+                              Package = tryProperty "distribution" item |> Option.bind (str "package")
+                              PackageArtifactSha256 =
+                                match packageArtifacts with
+                                | [ digest ] -> Some(normalizeSha256 digest)
+                                | _ -> None }
                     | _ -> None)
             )
         with
@@ -164,6 +193,61 @@ module CurrentUpgrade =
             | _ -> None
         | _ -> None
 
+    /// The Registry's distribution class for a package-distributed repository
+    /// lifecycle tool.
+    [<Literal>]
+    let private PackageLifecycleClass = "repository-lifecycle"
+
+    [<Literal>]
+    let private PackageLifecycleMode = "embedded-qualified-package-lifecycle"
+
+    /// Proves that `fromVersion -> entry.Version` of a package-distributed
+    /// lifecycle tool is a transition this Conditor build qualifies: the target
+    /// version is qualified by the embedded descriptor and has an immutable
+    /// distribution mapping, and the Registry names the descriptor's package
+    /// and one package artifact digest. Anything else is refused.
+    let private packageLifecycleTransition (fromVersion: string) (entry: TargetEntry) =
+        let refuse reason =
+            Error $"'{entry.Id}' {fromVersion} -> {entry.Version} is a package-distributed lifecycle change, but {reason}"
+
+        let transition =
+            { Id = entry.Id
+              FromVersion = fromVersion
+              ToVersion = entry.Version
+              Role = entry.Role
+              Mode = PackageLifecycleMode }
+
+        match Registry.tryFind entry.Id, Registry.qualifiedVersions entry.Id with
+        | Some definition, Some qualified when definition.Distribution = LifecycleNpm ->
+            let expectedPackage = ComponentDefinition.packageFor entry.Version definition
+
+            let mapped =
+                match definition.LifecycleSource with
+                | Some RegistryPackage -> true
+                | Some(GitHubSource _) -> entry.Version = definition.DefaultVersion
+                | None -> false
+
+            if not (qualified.Contains entry.Version) then
+                let known = qualified |> Seq.sort |> String.concat ", "
+                refuse $"this Conditor build has not qualified that exact lifecycle version (qualified: {known})."
+            elif not mapped then
+                refuse $"Conditor's descriptor has no immutable distribution mapping for {entry.Version}."
+            elif entry.Package <> Some expectedPackage then
+                let named = entry.Package |> Option.defaultValue "<none>"
+                refuse $"the Registry release names package '{named}', not the qualified '{expectedPackage}'."
+            else
+                match entry.PackageArtifactSha256 with
+                | None -> refuse "the Registry release does not name exactly one package artifact digest."
+                | Some digest ->
+                    Ok
+                        { Transition = transition
+                          Definition = definition
+                          Package = expectedPackage
+                          ArtifactSha256 = digest
+                          UpgradeArguments = definition.UpgradeArguments
+                          VerifyArguments = VerificationGate.argumentsFor entry.Version definition }
+        | _ -> refuse "Conditor has no qualified package lifecycle descriptor for it."
+
     let private prepare
         target
         manifestPath
@@ -204,6 +288,7 @@ module CurrentUpgrade =
         let transitions = ResizeArray<CurrentUpgradeTransition>()
         let embeddedTransitions = ResizeArray<CurrentUpgradeTransition * ComponentDefinition * ProfileComponent>()
         let webTransitions = ResizeArray<WebPackageTransition>()
+        let packageTransitions = ResizeArray<PackageLifecycleTransition>()
 
         for request in manifest.Components do
             match request.Version, entryMap |> Map.tryFind request.Id with
@@ -233,6 +318,12 @@ module CurrentUpgrade =
                         | None ->
                             errors.Add
                                 $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is a native change, but the target release declares no {RepositoryLifecycleContract.Capability} contract and this Conditor build has not qualified that exact lifecycle version."
+                    | None when targetEntry.DistributionClass = PackageLifecycleClass && targetEntry.Role = "repository-lifecycle" ->
+                        match packageLifecycleTransition fromVersion targetEntry with
+                        | Ok packageTransition ->
+                            mode <- PackageLifecycleMode
+                            packageTransitions.Add packageTransition
+                        | Error refusal -> errors.Add refusal
                     | None when targetEntry.DistributionClass = WebPackageBinding.DistributionClass ->
                         match WebPackageBinding.plan target manifest request fromVersion targetSetPath with
                         | Ok webTransition ->
@@ -377,6 +468,13 @@ module CurrentUpgrade =
                   genericUpgradePlan |> Option.map (fun plan -> $"lifecycleUpgrade={plan.Digest}") |> Option.defaultValue "lifecycleUpgrade=-"
                   genericVerifyPlan |> Option.map (fun plan -> $"lifecycleVerify={plan.Digest}") |> Option.defaultValue "lifecycleVerify=-"
                   transitionText
+                  packageTransitions
+                  |> Seq.sortBy _.Transition.Id
+                  |> Seq.map (fun item ->
+                      let upgrade = String.concat " " item.UpgradeArguments
+                      let verify = String.concat " " item.VerifyArguments
+                      $"package-lifecycle|{item.Transition.Id}|{item.Package}@{item.Transition.ToVersion}|sha256:{item.ArtifactSha256}|upgrade={upgrade}|verify={verify}")
+                  |> String.concat "\n"
                   webTransitions
                   |> Seq.sortBy _.Id
                   |> Seq.map WebPackageTransition.digestMaterial
@@ -396,6 +494,7 @@ module CurrentUpgrade =
               GenericUpgradePlan = genericUpgradePlan
               GenericVerifyPlan = genericVerifyPlan
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
+              PackageLifecycleTransitions = packageTransitions |> Seq.toList |> List.sortBy _.Transition.Id
               WebPackageTransitions = webTransitions |> Seq.toList |> List.sortBy _.Id
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
@@ -451,6 +550,37 @@ module CurrentUpgrade =
                 $"Current upgrade installed {transition.Id}@{transition.ToVersion}, but its repository verification failed."
                 :: reasons)
 
+    /// Runs the qualified package's own upgrade at exactly the target version,
+    /// then its verify contract; either failing stops the current upgrade
+    /// before any governance changes.
+    let private executePackageLifecycle (target: string) (item: PackageLifecycleTransition) =
+        let transition = item.Transition
+
+        let run kind arguments =
+            ProcessRunner.run
+                target
+                { Sequence = 0
+                  ComponentId = transition.Id
+                  ComponentVersion = transition.ToVersion
+                  Kind = kind
+                  Execution = Planner.lifecycleProcess target transition.ToVersion item.Definition arguments }
+
+        let upgrade = run UpgradeLifecycle item.UpgradeArguments
+
+        if upgrade.ExitCode <> 0 then
+            [ $"Current upgrade stopped at {transition.Id}@{transition.ToVersion} upgrade ({item.Package}@{transition.ToVersion})."
+              upgrade.StandardOutput.Trim()
+              upgrade.StandardError.Trim() ]
+            |> List.filter (String.IsNullOrWhiteSpace >> not)
+            |> Error
+        else
+            run VerifyLifecycle item.VerifyArguments
+            |> VerificationGate.interpret transition.Id transition.ToVersion item.Definition
+            |> Result.map ignore
+            |> Result.mapError (fun reasons ->
+                $"Current upgrade ran {transition.Id}@{transition.ToVersion} upgrade, but its repository verification failed."
+                :: reasons)
+
     let apply
         target
         manifestPath
@@ -497,6 +627,12 @@ module CurrentUpgrade =
                 |> List.fold
                     (fun state transition ->
                         state |> Result.bind (fun () -> executeEmbedded target ctx transition))
+                    (Ok()))
+            |> Result.bind (fun () ->
+                plan.PackageLifecycleTransitions
+                |> List.fold
+                    (fun state transition ->
+                        state |> Result.bind (fun () -> executePackageLifecycle target transition))
                     (Ok()))
             |> Result.bind (fun () ->
                 WebPackageBinding.executeAll

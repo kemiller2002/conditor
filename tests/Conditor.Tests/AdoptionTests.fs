@@ -220,9 +220,60 @@ let private machineCliDoesNotImplyRepositoryInstallation check =
              |> Option.exists (fun observation -> observation.Status = "verified")
              && plan.Components |> List.exists (fun entry -> entry.Id = "communication-engineering")))
 
+/// The echelon-current sweep: Praxis 3.7.2, Ordo-free here, and the Visual
+/// Engineering 1.0.1 CLI. `installedVersion` is the VE release the repository
+/// was last brought to; 1.0.1's strict verify reports a 1.0.0 installation
+/// stale (the managed .gitignore region among others) until VE `upgrade` runs.
+let private echelonCurrentRunner (installedVersion: string) _ (executable: string) (arguments: string list) =
+    let name = Path.GetFileName executable |> Option.ofObj |> Option.defaultValue ""
+
+    match name, arguments with
+    | "praxis", [ "--version" ] -> result 0 "praxis 3.7.2" ""
+    | "praxis", [ "verify"; "--strict" ] -> result 0 "verification passed" ""
+    | "visual-engineering", [ "--version" ] -> result 0 "1.0.1" ""
+    | "visual-engineering", [ "verify"; "--strict" ] when installedVersion = "1.0.1" ->
+        result 0 "Verification passed (strict)." ""
+    | "visual-engineering", [ "verify"; "--strict" ] ->
+        result 3 "Verification failed.\n  FAIL up-to-date: stale: .gitignore\n  FAIL version-compatibility: installed version 1.0.0 is behind 1.0.1" ""
+    | _ -> result -1 "" $"Unable to execute '{executable}'."
+
+let private echelonCurrentSweepAdoption check =
+    let withVisualEngineering action =
+        withTarget (fun target ->
+            Directory.CreateDirectory(Path.Combine(target, ".visual-engineering")) |> ignore
+            action target)
+
+    withVisualEngineering (fun target ->
+        let plan = Adoption.planWith (echelonCurrentRunner "1.0.1") target None
+
+        check
+            "adoption of a repository upgraded to VE 1.0.1 under Praxis 3.7.2 passes"
+            plan.Refusals.IsEmpty
+
+        check
+            "the adopted declaration pins Praxis 3.7.2 and VE 1.0.1"
+            (plan.Components |> List.map (fun entry -> entry.Id, entry.Version) = [ ("praxis", "3.7.2"); ("visual-engineering", "1.0.1") ])
+
+        check
+            "adopted VE 1.0.1 is bound to its exact Registry package"
+            (plan.Components
+             |> List.exists (fun entry ->
+                 entry.Id = "visual-engineering"
+                 && entry.SourceReference = Some "@echelon-foundry/visual-engineering@1.0.1")))
+
+    withVisualEngineering (fun target ->
+        let plan = Adoption.planWith (echelonCurrentRunner "1.0.0") target None
+
+        check
+            "adoption refuses a VE 1.0.0 installation the 1.0.1 CLI reports stale (run VE upgrade first)"
+            (observationFor "visual-engineering" plan |> Option.exists (fun observation -> observation.Status = "refused")
+             && plan.Refusals |> List.exists (fun refusal -> refusal.Contains "visual-engineering")
+             && not (File.Exists(Path.Combine(target, "conditor.json")))))
+
 let run check =
     localLauncherDoesNotShadowHostTool check
     machineCliDoesNotImplyRepositoryInstallation check
+    echelonCurrentSweepAdoption check
 
     withTarget (fun target ->
         let plan = Adoption.planWith healthyPraxisRunner target None
