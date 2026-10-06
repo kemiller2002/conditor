@@ -59,8 +59,8 @@ A component's package name can change between versions. The descriptor's `packag
 "historicalPackages": [
   { "package": "@echelon-foundry/typescript-wasm-kernel", "versions": ["0.6.1", "0.6.2"] }
 ],
-"defaultVersion": "0.7.0",
-"qualifiedVersions": ["0.6.1", "0.6.2", "0.7.0"]
+"defaultVersion": "0.7.1",
+"qualifiedVersions": ["0.6.1", "0.6.2", "0.7.0", "0.7.1"]
 ```
 
 Every package reference the plan produces comes from `ComponentDefinition.packageFor version`: the npm/NuGet binding, the lifecycle `npx --package` source, the lock's `package`, adoption sources, and the scaffold's Limen protocol import. A legacy pin therefore reproduces its original package, and a lock written for Limen 0.6.2 still records `@echelon-foundry/typescript-wasm-kernel`. Descriptor loading refuses an entry whose version is not qualified, an entry that repeats the current `package`, a version listed under more than one identity, the same identity declared twice, and a `defaultVersion` that is listed under a historical identity.

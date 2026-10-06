@@ -184,7 +184,7 @@ let run (check: string -> bool -> unit) =
          |> refusedWith [ "'ordo'"; "not selected by the declared Registry authority"; AuthorityPath ])
 
     // --- The bound version decides the package identity ------------------------
-    // Limen 0.7.0 is distributed as @echelon-foundry/limen; 0.6.2 and earlier as
+    // Limen 0.7.0 and later are distributed as @echelon-foundry/limen; 0.6.2 and earlier as
     // @echelon-foundry/typescript-wasm-kernel. The package follows the version
     // the authority selects, not the embedded default.
     let scaffoldedLimenAgainst (selected: string) =
@@ -207,6 +207,10 @@ let run (check: string -> bool -> unit) =
     check
         "unpinned Limen bound by the Registry authority to 0.7.0 uses the @echelon-foundry/limen package"
         (boundLimenPackage "0.7.0" = Some "@echelon-foundry/limen")
+
+    check
+        "unpinned Limen bound by the Registry authority to 0.7.1 uses the @echelon-foundry/limen package"
+        (boundLimenPackage "0.7.1" = Some "@echelon-foundry/limen")
 
     check
         "unpinned Limen bound by the Registry authority to 0.6.2 keeps the @echelon-foundry/typescript-wasm-kernel package"

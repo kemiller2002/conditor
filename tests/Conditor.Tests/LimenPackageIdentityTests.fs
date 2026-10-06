@@ -1,6 +1,6 @@
 module LimenPackageIdentityTests
 
-// Limen 0.7.0 is distributed as @echelon-foundry/limen. Releases through 0.6.2
+// Limen 0.7.0 and later are distributed as @echelon-foundry/limen. Releases through 0.6.2
 // were distributed as @echelon-foundry/typescript-wasm-kernel, which is now
 // deprecated. A component descriptor records earlier package identities in
 // `historicalPackages`, so each qualified version resolves to the exact name it
@@ -57,10 +57,17 @@ let run (check: string -> bool -> unit) =
     // --- Embedded Limen descriptor ----------------------------------------------
     match Registry.tryFind "limen", Registry.qualifiedVersions "limen" with
     | Some limen, Some qualified ->
-        check "Limen 0.7.0 is qualified alongside the legacy 0.6.1 and 0.6.2 releases" (qualified = Set.ofList [ "0.6.1"; "0.6.2"; "0.7.0" ])
+        check
+            "Limen 0.7.0 and 0.7.1 are qualified alongside the legacy 0.6.1 and 0.6.2 releases"
+            (qualified = Set.ofList [ "0.6.1"; "0.6.2"; "0.7.0"; "0.7.1" ])
+
         check "Limen's current package identity is @echelon-foundry/limen" (limen.Package = CurrentLimen)
-        check "Limen's default version is 0.7.0" (limen.DefaultVersion = "0.7.0")
-        check "Limen 0.7.0 resolves to @echelon-foundry/limen" (ComponentDefinition.packageFor "0.7.0" limen = CurrentLimen)
+        check "Limen's default version is 0.7.1" (limen.DefaultVersion = "0.7.1")
+
+        check
+            "Limen 0.7.0 and 0.7.1 resolve to @echelon-foundry/limen"
+            (ComponentDefinition.packageFor "0.7.0" limen = CurrentLimen
+             && ComponentDefinition.packageFor "0.7.1" limen = CurrentLimen)
 
         check
             "Limen 0.6.1 and 0.6.2 keep their historical @echelon-foundry/typescript-wasm-kernel identity"
@@ -83,32 +90,33 @@ let run (check: string -> bool -> unit) =
                      || ComponentDefinition.packageFor version descriptor.Definition = owners.Head.Package))))
 
     // --- Planning and scaffolding use the version's own identity -------------------
-    match scaffoldPlan "0.7.0" with
-    | Error errors ->
-        let details = String.concat "; " errors
-        check $"Limen 0.7.0 scaffold plans: {details}" false
-    | Ok plan ->
-        check
-            "Limen 0.7.0 resolves to the @echelon-foundry/limen package and npm binding"
-            (limenComponent plan
-             |> Option.exists (fun item ->
-                 item.Version = "0.7.0"
-                 && item.Package = CurrentLimen
-                 && item.SourceReference = Some $"npm:{CurrentLimen}@0.7.0"))
+    for current in [ "0.7.0"; "0.7.1" ] do
+        match scaffoldPlan current with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"Limen {current} scaffold plans: {details}" false
+        | Ok plan ->
+            check
+                $"Limen {current} resolves to the @echelon-foundry/limen package and npm binding"
+                (limenComponent plan
+                 |> Option.exists (fun item ->
+                     item.Version = current
+                     && item.Package = CurrentLimen
+                     && item.SourceReference = Some $"npm:{CurrentLimen}@{current}"))
 
-        check
-            "Limen 0.7.0 scaffold binds @echelon-foundry/limen and never the deprecated package"
-            (scaffoldFile "src/kernel/package.json" plan
-             |> Option.exists (fun text ->
-                 text.Contains($"\"{CurrentLimen}\": \"0.7.0\"", StringComparison.Ordinal)
-                 && not (text.Contains(LegacyLimen, StringComparison.Ordinal))))
+            check
+                $"Limen {current} scaffold binds @echelon-foundry/limen and never the deprecated package"
+                (scaffoldFile "src/kernel/package.json" plan
+                 |> Option.exists (fun text ->
+                     text.Contains($"\"{CurrentLimen}\": \"{current}\"", StringComparison.Ordinal)
+                     && not (text.Contains(LegacyLimen, StringComparison.Ordinal))))
 
-        check
-            "Limen 0.7.0 scaffold kernel imports the protocol from @echelon-foundry/limen"
-            (scaffoldFile "src/kernel/bootstrap.ts" plan
-             |> Option.exists (fun text ->
-                 text.Contains($"from \"{CurrentLimen}/protocol\"", StringComparison.Ordinal)
-                 && not (text.Contains(LegacyLimen, StringComparison.Ordinal))))
+            check
+                $"Limen {current} scaffold kernel imports the protocol from @echelon-foundry/limen"
+                (scaffoldFile "src/kernel/bootstrap.ts" plan
+                 |> Option.exists (fun text ->
+                     text.Contains($"from \"{CurrentLimen}/protocol\"", StringComparison.Ordinal)
+                     && not (text.Contains(LegacyLimen, StringComparison.Ordinal))))
 
     for legacy in [ "0.6.1"; "0.6.2" ] do
         match scaffoldPlan legacy with
@@ -148,15 +156,24 @@ let run (check: string -> bool -> unit) =
                 check $"embedded clean-room preset plans: {details}" false
             | Ok plan ->
                 check
-                    "clean-room preset installs Limen 0.7.0 as @echelon-foundry/limen"
+                    "clean-room preset installs Limen 0.7.1 as @echelon-foundry/limen"
                     (limenComponent plan
-                     |> Option.exists (fun item -> item.Version = "0.7.0" && item.Package = CurrentLimen))
+                     |> Option.exists (fun item -> item.Version = "0.7.1" && item.Package = CurrentLimen))
 
                 check
-                    "clean-room scaffold names @echelon-foundry/limen and not the deprecated package"
+                    "clean-room preset installs Forma 0.4.1 as @echelon-foundry/design-system"
+                    (plan.Components
+                     |> List.exists (fun item ->
+                         item.Id = "forma"
+                         && item.Version = "0.4.1"
+                         && item.Package = "@echelon-foundry/design-system"))
+
+                check
+                    "clean-room scaffold binds Limen 0.7.1 and Forma 0.4.1 and never the deprecated Limen package"
                     (scaffoldFile "src/kernel/package.json" plan
                      |> Option.exists (fun text ->
-                         text.Contains($"\"{CurrentLimen}\": \"0.7.0\"", StringComparison.Ordinal)
+                         text.Contains($"\"{CurrentLimen}\": \"0.7.1\"", StringComparison.Ordinal)
+                         && text.Contains("\"@echelon-foundry/design-system\": \"0.4.1\"", StringComparison.Ordinal)
                          && not (text.Contains(LegacyLimen, StringComparison.Ordinal)))))
 
     // --- historicalPackages descriptor validation ----------------------------------

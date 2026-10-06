@@ -4,10 +4,11 @@
   "displayName": "Forma",
   "distribution": "npm",
   "package": "@echelon-foundry/design-system",
-  "defaultVersion": "0.3.0",
+  "defaultVersion": "0.4.1",
   "qualifiedVersions": [
     "0.2.0",
-    "0.3.0"
+    "0.3.0",
+    "0.4.1"
   ],
   "applicationBinding": "npm",
   "initArguments": [],
