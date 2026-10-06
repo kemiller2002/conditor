@@ -400,3 +400,82 @@ let run (check: string -> bool -> unit) =
                     "current upgrade refuses uncontracted project-binding version mutation"
                     (bindingPlan.Refusals
                      |> List.exists (fun error -> error.Contains("no safe repository upgrade contract")))
+
+        // A package-distributed repository lifecycle tool (Visual Engineering is
+        // an npm CLI) selected by the authority at the version conditor.json
+        // already pins is governed, not refused; a version change is still
+        // refused because Conditor has no upgrade contract for it.
+        let packageLifecycleCase (label: string) (selectedVersion: string) =
+            let packageTarget = temp $"package-lifecycle-{label}"
+            let packageManifestPath = Path.Combine(packageTarget, "conditor.json")
+            let packageResolved = Path.Combine(mirror, $"package-lifecycle-{label}.resolved.json")
+
+            let veComponent =
+                """,
+    {
+      "systemId": "visual-engineering",
+      "role": "repository-lifecycle",
+      "required": true,
+      "version": "__VE_VERSION__",
+      "repository": "kemiller2002/visual-engineering",
+      "tag": "visual-engineering-v__VE_VERSION__",
+      "commit": "__COMMIT__",
+      "releaseStage": "stable",
+      "lifecycleState": "active",
+      "distributionClass": "repository-lifecycle",
+      "executable": null,
+      "releaseManifest": { "schema": "echelon.release/v2", "sha256": "__RELEASE_SHA__" },
+      "distribution": { "mechanism": "npm", "package": "@echelon-foundry/visual-engineering", "url": "https://registry.npmjs.org/@echelon-foundry/visual-engineering/-/visual-engineering-__VE_VERSION__.tgz" },
+      "artifacts": [
+        { "name": "echelon-foundry-visual-engineering-__VE_VERSION__.tgz", "purpose": "package", "platform": null, "sha256": "__PACKAGE_SHA__" }
+      ]
+    }
+  ]
+}
+"""
+
+            let json =
+                bindingJson.Substring(0, bindingJson.LastIndexOf("\n  ]\n}"))
+                + veComponent
+                    .Replace("__VE_VERSION__", selectedVersion)
+                    .Replace("__COMMIT__", commit2)
+                    .Replace("__RELEASE_SHA__", releaseSha)
+                    .Replace("__PACKAGE_SHA__", packageSha)
+
+            File.WriteAllText(packageResolved, json)
+            let packageSha256 = sha256File packageResolved
+
+            File.WriteAllText(
+                packageManifestPath,
+                """{"schemaVersion":1,"name":"package-lifecycle","components":[{"id":"visual-engineering","version":"1.0.0","required":true}],"requirements":[],"execution":{"enabled":false}}"""
+            )
+
+            establishLock packageTarget packageManifestPath "visual-engineering" "1.0.0"
+
+            match Manifest.load packageManifestPath with
+            | Error _ -> Error [ "package lifecycle fixture does not parse" ]
+            | Ok packageManifest ->
+                let probe executable arguments = ProcessRunner.runProcess packageTarget executable arguments
+                CurrentUpgrade.preview packageTarget packageManifestPath packageManifest packageResolved packageSha256 ctx probe
+
+        match packageLifecycleCase "current" "1.0.0" with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"package lifecycle current plan is produced: {details}" false
+        | Ok packagePlan ->
+            let details = String.concat "; " packagePlan.Refusals
+            check
+                $"current upgrade governs a package-distributed lifecycle tool at its authority version without refusal: {details}"
+                packagePlan.Refusals.IsEmpty
+
+            check "current upgrade plans no transition for an already-current lifecycle package" packagePlan.Transitions.IsEmpty
+
+        match packageLifecycleCase "newer" "1.1.0" with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"package lifecycle version-change plan is produced: {details}" false
+        | Ok packagePlan ->
+            check
+                "current upgrade refuses an uncontracted lifecycle package version change"
+                (packagePlan.Refusals
+                 |> List.exists (fun error -> error.Contains("'visual-engineering' 1.0.0 -> 1.1.0")))

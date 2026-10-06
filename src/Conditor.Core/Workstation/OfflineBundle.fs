@@ -201,8 +201,15 @@ module OfflineBundle =
                                         let distribution = tryProperty "distribution" releaseComponent
                                         let mechanism = distribution |> Option.bind (str "mechanism") |> Option.defaultValue ""
                                         let distributionUrl = distribution |> Option.bind (str "url")
+                                        // A repository lifecycle tool distributed as a package
+                                        // (npm CLI or packed archive) is bundled like any package,
+                                        // not mirrored as a native executable.
+                                        let packagedLifecycle =
+                                            role = "repository-lifecycle"
+                                            && (distributionClass = "repository-lifecycle" || distributionClass = "web-package")
+
                                         let native =
-                                            role = "host-tool" || role = "repository-lifecycle"
+                                            role = "host-tool" || (role = "repository-lifecycle" && not packagedLifecycle)
 
                                         if native then
                                             if distributionClass <> "self-contained-native-cli" then

@@ -63,7 +63,7 @@ withManifest
             | Ok plan ->
                 let expectedSource =
                     Some
-                        "github:kemiller2002/communication-engineering#4590d2fe6f7e80b339117d3fbee5803f2dd39122|node:bin/communication-engineering.mjs"
+                        "github:kemiller2002/communication-engineering#707396de512065fe35aff6fcf82cd28118df14b3|node:bin/communication-engineering.mjs"
 
                 check "fixed source resolves to commit and entrypoint" (plan.Components[0].SourceReference = expectedSource)
 
@@ -321,7 +321,7 @@ withManifest
                 check
                     "tutela package source is immutable"
                     (plan.Components[0].SourceReference =
-                        Some "github:kemiller2002/tutela#1acf421e7d940665c134012f11b082a502e17537|node:bin/tutela.mjs"))
+                        Some "github:kemiller2002/tutela#94afcc91a84bd3b94a4ee639f169d0727eaac727|node:bin/tutela.mjs"))
 
 withManifest
     """{"schemaVersion":1,"name":"requirements-demo","components":[],"requirements":[{"id":"spec","source":{"repository":"kemiller2002/communication-engineering","commit":"4590d2fe6f7e80b339117d3fbee5803f2dd39122","path":"README.md"},"targetPath":"requirements/SPEC.md"}]}"""
@@ -1065,7 +1065,7 @@ match ComponentDescriptors.loadAll () with
              match descriptor.Definition.LifecycleSource with
              | Some(GitHubSource source) ->
                  source.Repository = "kemiller2002/communication-engineering"
-                 && source.Commit = "4590d2fe6f7e80b339117d3fbee5803f2dd39122"
+                 && source.Commit = "707396de512065fe35aff6fcf82cd28118df14b3"
                  && source.Entrypoint = NodeScript "bin/communication-engineering.mjs"
              | _ -> false))
 
@@ -1080,7 +1080,7 @@ match ComponentDescriptors.loadAll () with
              match descriptor.Definition.LifecycleSource with
              | Some(GitHubSource source) ->
                  source.Repository = "kemiller2002/tutela"
-                 && source.Commit = "1acf421e7d940665c134012f11b082a502e17537"
+                 && source.Commit = "94afcc91a84bd3b94a4ee639f169d0727eaac727"
                  && source.Entrypoint = NodeScript "bin/tutela.mjs"
              | _ -> false))
 

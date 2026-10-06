@@ -315,6 +315,84 @@ let run (check: string -> bool -> unit) =
         "Registry workstation adapter consumes native subset from full environment set"
         (mixedResult = Ok [ "gamma" ])
 
+    // A package-distributed repository lifecycle tool (an npm CLI such as
+    // Visual Engineering, or a packed archive on a GitHub release) is part of
+    // the governed environment set but never a native workstation install.
+    let packageLifecycleComponent (mechanism: string) (distributionClass: string) (lifecycleState: string) (extra: string) (artifacts: string) =
+        $$"""          ,
+            {
+              "systemId": "epsilon",
+              "role": "repository-lifecycle",
+              "required": true,
+              "version": "1.0.0",
+              "repository": "example/epsilon",
+              "tag": "v1.0.0",
+              "commit": "3333333333333333333333333333333333333333",
+              "releaseStage": "stable",
+              "lifecycleState": "{{lifecycleState}}",
+              "distributionClass": "{{distributionClass}}",
+              "executable": null,{{extra}}
+              "releaseManifest": {
+                "schema": "echelon.release/v2",
+                "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              },
+              "distribution": {
+                "mechanism": "{{mechanism}}",
+                "package": "@example/epsilon",
+                "url": "https://example.invalid/epsilon-1.0.0.tgz"
+              },
+              "artifacts": [{{artifacts}}]
+            }
+          ]
+        }"""
+
+    let packageArtifact =
+        """
+                {
+                  "name": "example-epsilon-1.0.0.tgz",
+                  "purpose": "package",
+                  "platform": null,
+                  "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                }"""
+
+    let loadWithPackageLifecycle (label: string) (fragment: string) =
+        let path = Path.Combine(registryMirror, $"{label}.resolved.json")
+        File.WriteAllText(path, File.ReadAllText(registrySet).Replace("          ]\n        }", fragment))
+        ResolvedReleaseSets.loadFile (Platform.runtimeIdentifier ()) path (fileSha256 path)
+        |> Result.map (fun profile -> profile.Components |> List.map (fun item -> item.Id))
+
+    for mechanism, distributionClass in [ "npm", "repository-lifecycle"; "github-release", "repository-lifecycle"; "npm", "web-package" ] do
+        check
+            $"Registry workstation adapter keeps a {distributionClass}/{mechanism} lifecycle package out of native installation"
+            (loadWithPackageLifecycle $"package-lifecycle-{mechanism}-{distributionClass}" (packageLifecycleComponent mechanism distributionClass "active" "" packageArtifact) = Ok [ "gamma" ])
+
+    check
+        "Registry workstation adapter refuses a lifecycle package that declares the native lifecycle contract"
+        (loadWithPackageLifecycle
+            "package-lifecycle-contract"
+            (packageLifecycleComponent "npm" "repository-lifecycle" "active" "\n              \"repositoryLifecycle\": { \"contract\": \"echelon.repository-lifecycle\", \"contractVersion\": 1 }," packageArtifact)
+         |> Result.isError)
+
+    check
+        "Registry workstation adapter refuses a lifecycle package without a package artifact"
+        (loadWithPackageLifecycle "package-lifecycle-no-artifact" (packageLifecycleComponent "npm" "repository-lifecycle" "active" "" "") |> Result.isError)
+
+    check
+        "Registry workstation adapter refuses a lifecycle package with an ambiguous package artifact"
+        (loadWithPackageLifecycle "package-lifecycle-two-artifacts" (packageLifecycleComponent "npm" "repository-lifecycle" "active" "" (packageArtifact + "," + packageArtifact.Replace("example-epsilon-1.0.0.tgz", "other.tgz"))) |> Result.isError)
+
+    check
+        "Registry workstation adapter refuses a security-revoked lifecycle package"
+        (loadWithPackageLifecycle "package-lifecycle-revoked" (packageLifecycleComponent "npm" "repository-lifecycle" "security-revoked" "" packageArtifact) |> Result.isError)
+
+    check
+        "Registry workstation adapter refuses a lifecycle package on an unsupported mechanism"
+        (loadWithPackageLifecycle "package-lifecycle-nuget" (packageLifecycleComponent "nuget" "repository-lifecycle" "active" "" packageArtifact) |> Result.isError)
+
+    check
+        "Registry workstation adapter still refuses a lifecycle tool of any other non-native class"
+        (loadWithPackageLifecycle "package-lifecycle-nuget-library" (packageLifecycleComponent "nuget" "nuget-library" "active" "" packageArtifact) |> Result.isError)
+
     let revokedText =
         File.ReadAllText(registrySet)
             .Replace("\"lifecycleState\": \"active\"", "\"lifecycleState\": \"security-revoked\"")
