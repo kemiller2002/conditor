@@ -141,7 +141,7 @@ module Upgrade =
             match Planner.create target Verify manifest with
             | Error errors -> Error errors
             | Ok plan ->
-                Installer.execute target manifestPath plan |> Result.map ignore
+                Installer.executeWithSignals target manifestPath plan |> Result.map snd
 
     let apply target manifestPath manifest =
         match preview target manifest with
@@ -152,11 +152,11 @@ module Upgrade =
             | Ok _ ->
                 match verifyAfterUpgrade target manifestPath manifest with
                 | Error errors -> Error errors
-                | Ok() ->
+                | Ok reviewSignals ->
                     match Planner.create target Init manifest with
                     | Error errors -> Error errors
                     | Ok lockPlan ->
-                        let lockPath = LockFile.write target manifestPath lockPlan
+                        let lockPath = LockFile.writeWith target manifestPath lockPlan reviewSignals
 
                         Ok
                             { ChangedComponents = preview.ChangedComponents

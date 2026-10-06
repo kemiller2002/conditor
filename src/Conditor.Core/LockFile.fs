@@ -166,7 +166,9 @@ module LockFile =
             | :? JsonException as ex -> Error [ $"Conditor lock is not valid JSON: {ex.Message}" ]
             | ex -> Error [ $"Unable to verify locked component identities: {ex.Message}" ]
 
-    let write target manifestPath (plan: InstallationPlan) =
+    /// Writes the lock, recording the structural review signals the integrity
+    /// gates reported (omitted when there are none).
+    let writeWith target manifestPath (plan: InstallationPlan) (reviewSignals: ReviewSignal list) =
         let directory = Path.Combine(target, ".conditor")
         Directory.CreateDirectory directory |> ignore
         let path = Path.Combine(directory, "lock.json")
@@ -223,6 +225,23 @@ module LockFile =
             | _ -> ()
 
         writer.WriteEndArray()
+
+        if not reviewSignals.IsEmpty then
+            writer.WriteStartArray("reviewSignals")
+
+            for signal in reviewSignals do
+                writer.WriteStartObject()
+                writer.WriteString("component", signal.ComponentId)
+                writer.WriteString("code", signal.Code)
+                writer.WriteString("band", signal.Band)
+                writer.WriteString("path", signal.Path)
+                writer.WriteNumber("lineCount", signal.LineCount)
+                writer.WriteEndObject()
+
+            writer.WriteEndArray()
+
         writer.WriteEndObject()
         writer.Flush()
         path
+
+    let write target manifestPath (plan: InstallationPlan) = writeWith target manifestPath plan []

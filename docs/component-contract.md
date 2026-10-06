@@ -113,10 +113,21 @@ A component is eligible for adoption only when:
 
 1. its command is already available on PATH or the target repository's `node_modules/.bin`;
 2. the version probe identifies exactly one embedded qualified version;
-3. the verification contract exits successfully; and
+3. the verification contract passes (the integrity gate, when the version declares one); and
 4. Conditor can preserve the immutable source identity required by its component descriptor.
 
 This probe is evidence for adoption, not authentication, and does not transfer ownership of component-managed files to Conditor.
+
+### Integrity gate: integrity fails closed, structural review is recorded
+
+A descriptor MAY declare an `integrityGate` (`report`, `versions`, `arguments`). For exactly the listed qualified versions, Conditor verifies with the gate's `arguments` instead of `verifyArguments` — in adoption, in the `init`, `verify` and `upgrade` lifecycle plans, and in `upgrade --current` — and interprets the JSON report rather than only the exit code. Ordo 1.4.2 declares `ordo verify --integrity-only --json` (report `ordo.verify-json/v1`).
+
+- Any failure whose `category` is not `structural-review` fails closed: a missing installation, missing, modified or undeclared managed artifacts, an unusable structural configuration, an older configuration version, an installed version other than the CLI's, or a toolchain pin that is absent or names another release. An unreadable report, a report that does not claim to pass, or a non-zero exit also fails closed.
+- Structural review findings (Ordo `SDE-STRUCT-001`, which Ordo documents as review signals) are returned as `reviewSignals`. Conditor prints them, includes them in the adoption plan (`reviewSignals` in `adopt --json`) and its authorization digest, and records them in `.conditor/lock.json` under `reviewSignals`. They never cause a refusal.
+
+Versions without a gate keep `verifyArguments` and their exit-code meaning; for Ordo before 1.4.2 that is `verify --strict`, which still refuses on structural findings. Conditor never excludes files, changes thresholds, or falls back to a non-strict verify to make adoption pass.
+
+A Registry `repository-lifecycle` release with no supported lifecycle contract is refused only when its executable is installed in the repository's environment; an absent one is reported as `not-found`, exactly like an absent contracted release.
 
 
 ## Registry-authorized adoption

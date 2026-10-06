@@ -113,7 +113,15 @@ module ComponentDescriptors =
               "initArguments"
               "verifyArguments"
               "doctorArguments"
-              "upgradeArguments" ]
+              "upgradeArguments"
+              "integrityGate" ]
+
+    let private integrityGateProperties = set [ "report"; "versions"; "arguments" ]
+
+    /// The one report format Conditor interprets: `ordo verify --json` with
+    /// typed `failures` and `reviewSignals` (Ordo 1.4.2 and later).
+    [<Literal>]
+    let IntegrityGateReport = "ordo.verify-json/v1"
 
     let private registrySourceProperties = set [ "kind" ]
     let private githubSourceProperties = set [ "kind"; "repository"; "commit"; "entrypoint" ]
@@ -411,6 +419,47 @@ module ComponentDescriptors =
                     []
 
             let qualifiedVersions = collectArray "qualifiedVersions" |> Set.ofList
+
+            let integrityGate =
+                match tryProperty "integrityGate" root with
+                | None -> None
+                | Some gate when gate.ValueKind <> JsonValueKind.Object ->
+                    errors.Add "'integrityGate' must be an object."
+                    None
+                | Some gate ->
+                    unknownProperties "integrityGate" integrityGateProperties gate
+                    |> List.iter (DescriptorViolation.describe >> errors.Add)
+
+                    match optionalString "report" gate with
+                    | Some IntegrityGateReport -> ()
+                    | other ->
+                        let shown = other |> Option.defaultValue "<absent>"
+                        errors.Add $"'integrityGate.report' must be '{IntegrityGateReport}', not '{shown}'."
+
+                    let versions =
+                        match stringArray "versions" gate with
+                        | Ok values when not values.IsEmpty -> Set.ofList values
+                        | Ok _ ->
+                            errors.Add "'integrityGate.versions' must list at least one version."
+                            Set.empty
+                        | Error arrayErrors ->
+                            arrayErrors |> List.iter (fun error -> errors.Add $"integrityGate: {error}")
+                            Set.empty
+
+                    for version in Set.difference versions qualifiedVersions do
+                        errors.Add $"'integrityGate.versions' names '{version}', which is not in qualifiedVersions for '{id}'."
+
+                    let arguments =
+                        match stringArray "arguments" gate with
+                        | Ok values when not values.IsEmpty -> values
+                        | Ok _ ->
+                            errors.Add "'integrityGate.arguments' must not be empty."
+                            []
+                        | Error arrayErrors ->
+                            arrayErrors |> List.iter (fun error -> errors.Add $"integrityGate: {error}")
+                            []
+
+                    Some { Versions = versions; Arguments = arguments }
             let versionArguments =
                 match tryProperty "versionArguments" root with
                 | None -> []
@@ -477,7 +526,8 @@ module ComponentDescriptors =
                           InitArguments = initArguments
                           VerifyArguments = verifyArguments
                           DoctorArguments = doctorArguments
-                          UpgradeArguments = upgradeArguments }
+                          UpgradeArguments = upgradeArguments
+                          IntegrityGate = integrityGate }
                       QualifiedVersions = qualifiedVersions
                       Sha256 = descriptorSha256 }
         with

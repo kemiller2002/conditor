@@ -126,12 +126,26 @@ let private run operation shouldExecute target selection =
             if not shouldExecute then
                 0
             else
-                match Installer.execute target selection.ManifestPath plan with
-                | Ok(Some lockPath) ->
+                match Installer.executeWithSignals target selection.ManifestPath plan with
+                | Ok(lockPath, signals) when not signals.IsEmpty ->
+                    Console.WriteLine
+                        $"Structural review signals ({signals.Length}; reported by integrity gates, not blocking):"
+
+                    for signal in signals do
+                        Console.WriteLine $"  {VerificationGate.describe signal}"
+
+                    match lockPath with
+                    | Some path ->
+                        Console.WriteLine $"Conditor completed successfully. Lock file: {path}"
+                        registerRepositoryComponents target plan
+                    | None -> Console.WriteLine "Conditor completed successfully."
+
+                    0
+                | Ok(Some lockPath, _) ->
                     Console.WriteLine $"Conditor completed successfully. Lock file: {lockPath}"
                     registerRepositoryComponents target plan
                     0
-                | Ok None ->
+                | Ok(None, _) ->
                     Console.WriteLine "Conditor completed successfully."
                     0
                 | Error errors ->
@@ -1097,6 +1111,19 @@ let private writeAdoptionJson (plan: AdoptionPlan) =
 
     root["components"] <- components
 
+    let signals = System.Text.Json.Nodes.JsonArray()
+
+    for signal in plan.ReviewSignals do
+        let item = System.Text.Json.Nodes.JsonObject()
+        item["component"] <- System.Text.Json.Nodes.JsonValue.Create signal.ComponentId
+        item["code"] <- System.Text.Json.Nodes.JsonValue.Create signal.Code
+        item["band"] <- System.Text.Json.Nodes.JsonValue.Create signal.Band
+        item["path"] <- System.Text.Json.Nodes.JsonValue.Create signal.Path
+        item["lineCount"] <- System.Text.Json.Nodes.JsonValue.Create signal.LineCount
+        signals.Add item
+
+    root["reviewSignals"] <- signals
+
     let refusals = System.Text.Json.Nodes.JsonArray()
     plan.Refusals
     |> List.iter (fun refusal -> refusals.Add(System.Text.Json.Nodes.JsonValue.Create refusal))
@@ -1147,6 +1174,14 @@ let private runAdopt (args: string array) =
             for observation in plan.Observations do
                 let version = observation.Version |> Option.map (fun value -> $" @{value}") |> Option.defaultValue ""
                 Console.WriteLine $"  {observation.Status,-10} {observation.ComponentId}{version}: {observation.Detail}"
+
+            if not plan.ReviewSignals.IsEmpty then
+                Console.WriteLine ""
+                Console.WriteLine
+                    $"Structural review signals ({plan.ReviewSignals.Length}; recorded in the lock, not blocking):"
+
+                for signal in plan.ReviewSignals do
+                    Console.WriteLine $"  {VerificationGate.describe signal}"
 
             Console.WriteLine ""
             Console.WriteLine "Proposed conditor.json:"

@@ -91,7 +91,30 @@
     "initArguments": { "$ref": "#/$defs/stringArray" },
     "verifyArguments": { "$ref": "#/$defs/stringArray" },
     "doctorArguments": { "$ref": "#/$defs/stringArray" },
-    "upgradeArguments": { "$ref": "#/$defs/stringArray" }
+    "upgradeArguments": { "$ref": "#/$defs/stringArray" },
+    "integrityGate": {
+      "type": "object",
+      "description": "A verification that fails closed on installation integrity and reports structural review signals without failing. Used instead of verifyArguments for exactly the listed qualified versions; every other version keeps verifyArguments.",
+      "additionalProperties": false,
+      "required": ["report", "versions", "arguments"],
+      "properties": {
+        "report": {
+          "const": "ordo.verify-json/v1",
+          "description": "The report format Conditor interprets: a JSON object with passed, typed failures (category, code, detail) and reviewSignals (code, band, path, lineCount). Any failure whose category is not structural-review fails closed."
+        },
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonBlankString" },
+          "description": "Qualified versions that carry this gate."
+        },
+        "arguments": {
+          "$ref": "#/$defs/stringArray",
+          "minItems": 1
+        }
+      }
+    }
   },
   "allOf": [
     {

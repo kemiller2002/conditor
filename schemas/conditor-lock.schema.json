@@ -95,6 +95,43 @@
           }
         }
       }
+    },
+    "reviewSignals": {
+      "type": "array",
+      "description": "Structural review findings (e.g. Ordo SDE-STRUCT-001) that integrity gates reported without failing. Present only when there are any. Review signals, not refusals.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "code",
+          "band",
+          "path",
+          "lineCount"
+        ],
+        "properties": {
+          "component": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "band": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lineCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
     }
   }
 }

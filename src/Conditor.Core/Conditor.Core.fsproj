@@ -8,6 +8,7 @@
     <Compile Include="Manifest.fs" />
     <Compile Include="ComponentDescriptors.fs" />
     <Compile Include="Registry.fs" />
+    <Compile Include="VerificationGate.fs" />
     <Compile Include="ComponentInventory.fs" />
     <Compile Include="Workstation/Model.fs" />
     <Compile Include="RegistryAuthorityBinding.fs" />

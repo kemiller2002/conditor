@@ -14,6 +14,7 @@
     <Compile Include="RegistryAuthorityBindingTests.fs" />
     <Compile Include="LimenPackageIdentityTests.fs" />
     <Compile Include="ComponentSchemaTests.fs" />
+    <Compile Include="VerificationGateTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
