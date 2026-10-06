@@ -2,12 +2,39 @@ namespace Conditor.Core
 
 open System
 open System.Diagnostics
+open System.IO
 
 module ProcessRunner =
-    let runProcess workingDirectory executable arguments =
+    let private hasDirectoryPart (executable: string) =
+        Path.IsPathRooted executable
+        || executable.IndexOfAny [| Path.DirectorySeparatorChar; Path.AltDirectorySeparatorChar |] >= 0
+
+    let private searchPath () =
+        Environment.GetEnvironmentVariable "PATH"
+        |> Option.ofObj
+        |> Option.map (fun value ->
+            value.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            |> Array.toList)
+        |> Option.defaultValue []
+
+    /// Resolves the program a process request names. On Unix, .NET looks for a
+    /// bare command name in the Conditor process's own working directory before
+    /// PATH, so a repository-local launcher (for example a governed
+    /// repository's ./praxis) would shadow the host tool being probed. A bare
+    /// name therefore resolves through PATH only; a name with a directory part
+    /// is used as given. Windows keeps the platform's own resolution.
+    let resolveExecutable (executable: string) =
+        if OperatingSystem.IsWindows() || hasDirectoryPart executable then
+            Some executable
+        else
+            searchPath ()
+            |> List.map (fun directory -> Path.Combine(directory, executable))
+            |> List.tryFind File.Exists
+
+    let private start workingDirectory (executable: string) (resolved: string) arguments =
         try
             let info = ProcessStartInfo()
-            info.FileName <- executable
+            info.FileName <- resolved
             info.WorkingDirectory <- workingDirectory
             info.UseShellExecute <- false
             info.RedirectStandardOutput <- true
@@ -35,6 +62,14 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = $"Unable to execute '{executable}': {ex.Message}" }
+
+    let runProcess workingDirectory (executable: string) arguments =
+        match resolveExecutable executable with
+        | Some resolved -> start workingDirectory executable resolved arguments
+        | None ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = $"Unable to execute '{executable}': not found on PATH." }
 
     let run workingDirectory (action: PlanAction) =
         match action.Execution with

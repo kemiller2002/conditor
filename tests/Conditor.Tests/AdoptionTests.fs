@@ -127,7 +127,38 @@ let private registryAuthorityFixture target =
     File.WriteAllText(source, root.ToJsonString())
     source, fileSha256 source, systemId, version, executable, log
 
+/// A governed repository carries its own ./praxis launcher. Probing the host
+/// tool from inside such a repository must not run that launcher instead.
+let private localLauncherDoesNotShadowHostTool check =
+    withTarget (fun target ->
+        if OperatingSystem.IsWindows() then
+            check "local launcher shadowing check is skipped on Windows" true
+        else
+            let name = $"conditor-shadow-probe-{Guid.NewGuid():N}"
+            let launcher = Path.Combine(target, name)
+            File.WriteAllText(launcher, "#!/bin/sh\necho shadowed\n")
+            File.SetUnixFileMode(launcher, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+            let previous = Directory.GetCurrentDirectory()
+
+            try
+                Directory.SetCurrentDirectory target
+                let probed = ProcessRunner.runProcess target name [ "--version" ]
+
+                check
+                    "a bare command name never resolves to a launcher in the working directory"
+                    (ProcessRunner.resolveExecutable name = None
+                     && probed.ExitCode = -1
+                     && not (probed.StandardOutput.Contains "shadowed"))
+
+                check
+                    "a command with a directory part is run as given"
+                    ((ProcessRunner.runProcess target launcher []).StandardOutput.Trim() = "shadowed")
+            finally
+                Directory.SetCurrentDirectory previous)
+
 let run check =
+    localLauncherDoesNotShadowHostTool check
+
     withTarget (fun target ->
         let plan = Adoption.planWith healthyPraxisRunner target None
 
