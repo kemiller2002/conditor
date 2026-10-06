@@ -33,5 +33,10 @@
   ],
   "upgradeArguments": [
     "upgrade"
+  ],
+  "installationMarkers": [
+    ".echelon/communication-engineering.json",
+    ".echelon/communication-engineering.config.json",
+    ".communication-engineering"
   ]
 }

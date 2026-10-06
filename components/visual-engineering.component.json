@@ -27,5 +27,10 @@
   ],
   "upgradeArguments": [
     "upgrade"
+  ],
+  "installationMarkers": [
+    ".echelon/visual-engineering.json",
+    ".echelon/visual-engineering.config.json",
+    ".visual-engineering"
   ]
 }

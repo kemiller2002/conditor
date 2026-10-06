@@ -242,6 +242,25 @@ let run (check: string -> bool -> unit) =
                  errors
                  |> List.exists (fun error -> error.Contains("does not match the required format ^[a-z0-9-]+$.", StringComparison.Ordinal)))
 
+    let withMarkers (markers: string) =
+        mutateDescriptor "visual-engineering.component.json" (fun d -> d["installationMarkers"] <- JsonNode.Parse markers)
+
+    for markers in [ "[]"; """["/etc/passwd"]"""; """["../outside"]"""; """["a/../b"]"""; """["./a"]"""; """["a//b"]"""; """["a\\b"]"""; """["dir/"]"""; """["a","a"]"""; "[42]" ] do
+        check $"loader rejects installationMarkers {markers}" (not (loaderAccepts (withMarkers markers)))
+        check $"component schema rejects installationMarkers {markers}" (not (schemaAccepts (withMarkers markers)))
+
+    let validMarkers = withMarkers """[".visual-engineering", ".echelon/visual-engineering.json", "a"]"""
+    check "loader accepts repository-relative installationMarkers" (loaderAccepts validMarkers)
+    check "component schema accepts repository-relative installationMarkers" (schemaAccepts validMarkers)
+
+    for id in [ "communication-engineering"; "visual-engineering" ] do
+        check
+            $"{id} declares where its repository installation lives"
+            (Registry.descriptors
+             |> List.exists (fun descriptor ->
+                 descriptor.Definition.Id = id
+                 && descriptor.Definition.InstallationMarkers |> List.contains $".echelon/{id}.json"))
+
     let acceptedCase =
         mutateDescriptor "forma.component.json" (fun d -> d["versionArguments"] <- JsonArray())
 

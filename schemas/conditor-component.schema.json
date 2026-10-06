@@ -92,6 +92,16 @@
     "verifyArguments": { "$ref": "#/$defs/stringArray" },
     "doctorArguments": { "$ref": "#/$defs/stringArray" },
     "upgradeArguments": { "$ref": "#/$defs/stringArray" },
+    "installationMarkers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!(?:.*/)?\\.{1,2}(?:/|$))(?!.*//)[^/].*[^/]$|^[^/\\\\.]$"
+      },
+      "description": "Repository-relative, forward-slashed paths whose presence shows the component is installed in a repository. When declared and none exists, adoption reports the component not-found without consulting its command, because a CLI installed on the machine says nothing about the repository."
+    },
     "integrityGate": {
       "type": "object",
       "description": "A verification that fails closed on installation integrity and reports structural review signals without failing. Used instead of verifyArguments for exactly the listed qualified versions; every other version keeps verifyArguments.",
