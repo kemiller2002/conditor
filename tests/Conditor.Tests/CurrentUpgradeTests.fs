@@ -397,9 +397,9 @@ let run (check: string -> bool -> unit) =
                 check $"project binding current plan is produced: {details}" false
             | Ok bindingPlan ->
                 check
-                    "current upgrade refuses uncontracted project-binding version mutation"
+                    "current upgrade refuses an unproven project-binding version mutation (no package identity, unqualified target)"
                     (bindingPlan.Refusals
-                     |> List.exists (fun error -> error.Contains("no safe repository upgrade contract")))
+                     |> List.exists (fun error -> error.Contains("'forma'@9.0.0 names no distribution package")))
 
         // A package-distributed repository lifecycle tool (Visual Engineering is
         // an npm CLI) selected by the authority at the version conditor.json

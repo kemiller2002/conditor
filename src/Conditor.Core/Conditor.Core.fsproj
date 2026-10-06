@@ -31,6 +31,7 @@
     <Compile Include="Workstation/OfflineBundle.fs" />
     <Compile Include="Workstation/Engine.fs" />
     <Compile Include="Workstation/Lifecycle.fs" />
+    <Compile Include="WebPackageBinding.fs" />
     <Compile Include="CurrentUpgrade.fs" />
   </ItemGroup>
   <ItemGroup>

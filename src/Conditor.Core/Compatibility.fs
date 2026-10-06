@@ -15,8 +15,8 @@ module Compatibility =
 
     let private notes =
         Map.ofList
-            [ "praxis", "Native Praxis 3.6.0 is the frozen Indy Init host-tool baseline; 3.1.x remains qualified only for existing compatibility fixtures."
-              "ordo", "Native Ordo 1.4.0 is the frozen Indy Init host-tool baseline."
+            [ "praxis", "Native Praxis 3.6.0 is the frozen Indy Init host-tool baseline; 3.7.1 is qualified as the Registry echelon-current selection; 3.1.x remains qualified only for existing compatibility fixtures."
+              "ordo", "Native Ordo 1.4.0 is the frozen Indy Init host-tool baseline; 1.4.1 is qualified as the Registry echelon-current selection."
               "percepta", "Native Percepta repository lifecycle 0.1.0 is the frozen Indy Init repository-lifecycle baseline."
               "visual-engineering", "Qualified lifecycle release."
               "communication-engineering", "Pinned immutable-source lifecycle release."

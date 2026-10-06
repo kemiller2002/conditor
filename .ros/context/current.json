@@ -71,6 +71,47 @@
       "completedAt": "2026-10-06T12:26:36.000Z"
     },
     {
+      "id": "WI-0002",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/WebPackageBinding.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebPackageUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-06T14:02:45Z",
+      "telemetryExecutionIds": [
+        "EXE-20261006T135344412Z-0f608236"
+      ],
+      "latestCheckpoint": {
+        "id": "96f80e412d5b6ea3d65044b9",
+        "recordedAt": "2026-10-06T14:02:33Z",
+        "executionId": "EXE-20261006T135344412Z-0f608236",
+        "repository": "conditor",
+        "branch": "feat/web-package-upgrade-contract",
+        "commit": "4c477a36dd188a62f83bfc6b556dbb5a006c4cd1",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/web-package-upgrade-contract",
+        "remoteCommit": "4c477a36dd188a62f83bfc6b556dbb5a006c4cd1",
+        "summary": "Web-package current-upgrade contract implemented with tests; Praxis 3.7.1 and Ordo 1.4.1 qualified",
+        "nextAction": "Complete work item, open PR, wait for CI",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-06T14:02:45Z"
+    },
+    {
       "id": "WI-0003",
       "type": "mechanical",
       "state": "complete",

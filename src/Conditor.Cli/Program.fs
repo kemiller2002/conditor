@@ -361,6 +361,19 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
         for transition, _, release in plan.EmbeddedTransitions do
             Console.WriteLine $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} via {release.Executable}"
 
+    if not plan.WebPackageTransitions.IsEmpty then
+        Console.WriteLine "  web-package bindings:"
+
+        for transition in plan.WebPackageTransitions do
+            let target = transition.Target
+
+            Console.WriteLine
+                $"    {transition.Id}: {transition.FromVersion} -> {target.Version} [{WebPackageTransition.mode transition}] {target.Package}@{target.Specifier} (package sha256:{target.ArtifactSha256})"
+
+            for directory, arguments in WebPackageTransition.steps transition do
+                let rendered = String.concat " " arguments
+                Console.WriteLine $"      {directory}: npm {rendered}"
+
     Console.WriteLine "  final verification: complete repository verify, then authority + lock commit"
 
     for refusal in plan.Refusals do
