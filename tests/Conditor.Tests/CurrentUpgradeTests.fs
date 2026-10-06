@@ -403,9 +403,10 @@ let run (check: string -> bool -> unit) =
 
         // A package-distributed repository lifecycle tool (Visual Engineering is
         // an npm CLI) selected by the authority at the version conditor.json
-        // already pins is governed, not refused; a version change is still
-        // refused because Conditor has no upgrade contract for it.
-        let packageLifecycleCase (label: string) (selectedVersion: string) =
+        // already pins is governed, not refused. A version change is planned
+        // only to a version this Conditor build qualifies, distributed under
+        // the package its descriptor names; anything else is refused.
+        let packageLifecycleCaseWith (label: string) (selectedVersion: string) (selectedPackage: string) =
             let packageTarget = temp $"package-lifecycle-{label}"
             let packageManifestPath = Path.Combine(packageTarget, "conditor.json")
             let packageResolved = Path.Combine(mirror, $"package-lifecycle-{label}.resolved.json")
@@ -425,7 +426,7 @@ let run (check: string -> bool -> unit) =
       "distributionClass": "repository-lifecycle",
       "executable": null,
       "releaseManifest": { "schema": "echelon.release/v2", "sha256": "__RELEASE_SHA__" },
-      "distribution": { "mechanism": "npm", "package": "@echelon-foundry/visual-engineering", "url": "https://registry.npmjs.org/@echelon-foundry/visual-engineering/-/visual-engineering-__VE_VERSION__.tgz" },
+      "distribution": { "mechanism": "npm", "package": "__VE_PACKAGE__", "url": "https://registry.npmjs.org/@echelon-foundry/visual-engineering/-/visual-engineering-__VE_VERSION__.tgz" },
       "artifacts": [
         { "name": "echelon-foundry-visual-engineering-__VE_VERSION__.tgz", "purpose": "package", "platform": null, "sha256": "__PACKAGE_SHA__" }
       ]
@@ -438,6 +439,7 @@ let run (check: string -> bool -> unit) =
                 bindingJson.Substring(0, bindingJson.LastIndexOf("\n  ]\n}"))
                 + veComponent
                     .Replace("__VE_VERSION__", selectedVersion)
+                    .Replace("__VE_PACKAGE__", selectedPackage)
                     .Replace("__COMMIT__", commit2)
                     .Replace("__RELEASE_SHA__", releaseSha)
                     .Replace("__PACKAGE_SHA__", packageSha)
@@ -452,11 +454,18 @@ let run (check: string -> bool -> unit) =
 
             establishLock packageTarget packageManifestPath "visual-engineering" "1.0.0"
 
+            packageTarget, packageManifestPath, packageResolved, packageSha256
+
+        let previewPackageCase (packageTarget, packageManifestPath, packageResolved, packageSha256) =
             match Manifest.load packageManifestPath with
             | Error _ -> Error [ "package lifecycle fixture does not parse" ]
             | Ok packageManifest ->
                 let probe executable arguments = ProcessRunner.runProcess packageTarget executable arguments
                 CurrentUpgrade.preview packageTarget packageManifestPath packageManifest packageResolved packageSha256 ctx probe
+
+        let packageLifecycleCase label selectedVersion =
+            packageLifecycleCaseWith label selectedVersion "@echelon-foundry/visual-engineering"
+            |> previewPackageCase
 
         match packageLifecycleCase "current" "1.0.0" with
         | Error errors ->
@@ -479,3 +488,193 @@ let run (check: string -> bool -> unit) =
                 "current upgrade refuses an uncontracted lifecycle package version change"
                 (packagePlan.Refusals
                  |> List.exists (fun error -> error.Contains("'visual-engineering' 1.0.0 -> 1.1.0")))
+
+        // Visual Engineering 1.0.0 -> 1.0.1 is the qualified echelon-current
+        // transition: VE's own `upgrade` rewrites its managed .gitignore region
+        // (to `!.visual-engineering/`) that a 1.0.1 `verify --strict` reports
+        // stale on a 1.0.0 install.
+        match packageLifecycleCase "qualified" "1.0.1" with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"qualified lifecycle package transition plan is produced: {details}" false
+        | Ok packagePlan ->
+            let details = String.concat "; " packagePlan.Refusals
+            check $"current upgrade plans the qualified VE 1.0.0 -> 1.0.1 transition without refusal: {details}" packagePlan.Refusals.IsEmpty
+
+            check
+                "current upgrade selects the exact VE package lifecycle transition"
+                (packagePlan.Transitions
+                 |> List.map (fun item -> item.Id, item.FromVersion, item.ToVersion, item.Mode) =
+                    [ ("visual-engineering", "1.0.0", "1.0.1", "embedded-qualified-package-lifecycle") ])
+
+            check
+                "the VE transition runs the qualified package's own upgrade, then its verify contract"
+                (packagePlan.PackageLifecycleTransitions
+                 |> List.map (fun (transition: PackageLifecycleTransition) ->
+                     transition.Package, transition.UpgradeArguments, transition.VerifyArguments) =
+                    [ ("@echelon-foundry/visual-engineering", [ "upgrade" ], [ "verify"; "--strict" ]) ])
+
+            check
+                "the VE transition binds the Registry package artifact digest into the plan"
+                (packagePlan.PackageLifecycleTransitions
+                 |> List.forall (fun (transition: PackageLifecycleTransition) -> transition.ArtifactSha256 = packageSha))
+
+        match packageLifecycleCaseWith "renamed" "1.0.1" "@example/not-visual-engineering" |> previewPackageCase with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"renamed lifecycle package plan is produced: {details}" false
+        | Ok packagePlan ->
+            check
+                "current upgrade refuses a lifecycle package whose Registry package differs from the qualified descriptor"
+                (packagePlan.Transitions.IsEmpty
+                 && packagePlan.Refusals
+                    |> List.exists (fun error ->
+                        error.Contains("'visual-engineering' 1.0.0 -> 1.0.1")
+                        && error.Contains("@example/not-visual-engineering")))
+
+        // Execution: a fake npx stands in for the npm registry so the exact
+        // commands Conditor runs, their order and the governance commit are
+        // observable without network access.
+        let fakeBin = temp "fake-npx"
+        let npxLog = Path.Combine(fakeBin, "npx.log")
+
+        let npxScript =
+            String.concat
+                "\n"
+                [ "#!/bin/sh"
+                  "set -eu"
+                  $"echo \"$*\" >> '{npxLog}'"
+                  "[ \"$1\" = --yes ] || exit 64"
+                  "version=\"${2##*@}\""
+                  "shift 3"
+                  "case \"$1\" in"
+                  "  --version) echo \"$version\" ;;"
+                  "  upgrade)"
+                  "    if [ -e .ve/refuse-upgrade ]; then echo 'upgrade refused' >&2; exit 1; fi"
+                  "    mkdir -p .ve && echo \"$version\" > .ve/version ;;"
+                  "  verify) test \"$(cat .ve/version 2>/dev/null || true)\" = \"$version\" ;;"
+                  "  *) exit 2 ;;"
+                  "esac"
+                  "" ]
+
+        File.WriteAllText(Path.Combine(fakeBin, "npx"), npxScript)
+        File.SetUnixFileMode(
+            Path.Combine(fakeBin, "npx"),
+            UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute
+        )
+
+        let applyPackageCase label (prepare: string -> unit) =
+            let ((packageTarget, packageManifestPath, packageResolved, packageSha256) as fixture) =
+                packageLifecycleCaseWith label "1.0.1" "@echelon-foundry/visual-engineering"
+
+            Directory.CreateDirectory(Path.Combine(packageTarget, ".ve")) |> ignore
+            File.WriteAllText(Path.Combine(packageTarget, ".ve", "version"), "1.0.0\n")
+            prepare packageTarget
+            let priorPath = Environment.GetEnvironmentVariable "PATH"
+            Environment.SetEnvironmentVariable("PATH", fakeBin + string Path.PathSeparator + priorPath)
+
+            try
+                let outcome =
+                    match previewPackageCase fixture, Manifest.load packageManifestPath with
+                    | Ok plan, Ok packageManifest ->
+                        let probe executable arguments = ProcessRunner.runProcess packageTarget executable arguments
+
+                        CurrentUpgrade.apply
+                            packageTarget
+                            packageManifestPath
+                            packageManifest
+                            packageResolved
+                            packageSha256
+                            ctx
+                            probe
+                            plan.Digest
+                    | Error errors, _
+                    | _, Error errors -> Error errors
+
+                packageTarget, packageManifestPath, outcome
+            finally
+                Environment.SetEnvironmentVariable("PATH", priorPath)
+
+        let _, packageManifestPath, applied = applyPackageCase "apply" ignore
+
+        match applied with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"authorized VE 1.0.0 -> 1.0.1 current upgrade succeeds: {details}" false
+        | Ok result ->
+            let commands = File.ReadAllLines npxLog |> Array.toList
+
+            check
+                "VE current upgrade runs the exact 1.0.1 package upgrade before any verification"
+                (commands
+                 |> List.tryHead = Some "--yes --package=@echelon-foundry/visual-engineering@1.0.1 visual-engineering upgrade")
+
+            check
+                "VE current upgrade verifies the upgraded repository with the qualified strict contract"
+                (commands
+                 |> List.contains "--yes --package=@echelon-foundry/visual-engineering@1.0.1 visual-engineering verify --strict")
+
+            check
+                "VE current upgrade never runs an unqualified or source package version"
+                (commands |> List.forall (fun line -> line.Contains "@echelon-foundry/visual-engineering@1.0.1 "))
+
+            check "VE current upgrade proves zero remaining version drift" result.NoRemainingVersionChanges
+            check "VE current upgrade reports the changed component" (result.ChangedComponents = [ "visual-engineering" ])
+
+            check
+                "VE current upgrade commits the 1.0.1 declaration and the Registry authority"
+                (match Manifest.load packageManifestPath with
+                 | Ok upgraded ->
+                     upgraded.Components
+                     |> List.exists (fun entry -> entry.Id = "visual-engineering" && entry.Version = Some "1.0.1")
+                     && upgraded.RegistryAuthority.IsSome
+                 | Error _ -> false)
+
+            check "VE current upgrade writes a fresh lock" (File.Exists result.LockPath)
+
+        File.Delete npxLog
+
+        let refusedTarget, refusedManifestPath, refused =
+            applyPackageCase "refused" (fun target -> File.WriteAllText(Path.Combine(target, ".ve", "refuse-upgrade"), ""))
+
+        check "a failing VE upgrade stops the current upgrade" (Result.isError refused)
+
+        check
+            "a failing VE upgrade leaves conditor.json at 1.0.0 without Registry authority"
+            (match Manifest.load refusedManifestPath with
+             | Ok unchanged ->
+                 unchanged.Components
+                 |> List.exists (fun entry -> entry.Id = "visual-engineering" && entry.Version = Some "1.0.0")
+                 && unchanged.RegistryAuthority.IsNone
+             | Error _ -> false)
+
+        check
+            "a failing VE upgrade does not run verification or commit authority"
+            (File.ReadAllLines npxLog |> Array.forall (fun line -> not (line.Contains " verify"))
+             && not (File.Exists(Path.Combine(refusedTarget, ".conditor", "authority", "resolved-release-set.json"))))
+
+
+    // Every echelon-current selection Conditor carries a descriptor for is
+    // qualified at exactly the selected version (registry main f0e45db).
+    let echelonCurrent =
+        [ "praxis", "3.7.2"
+          "ordo", "1.4.2"
+          "percepta", "0.1.0"
+          "visual-engineering", "1.0.1"
+          "communication-engineering", "1.0.0"
+          "tutela", "0.1.0"
+          "aegis", "1.0.0"
+          "limen", "0.7.1"
+          "forma", "0.4.1"
+          "folio", "0.3.0" ]
+
+    for id, version in echelonCurrent do
+        check
+            $"Conditor qualifies the echelon-current selection {id} {version}"
+            (Registry.qualifiedVersions id |> Option.exists (Set.contains version))
+
+    check
+        "Visual Engineering 1.0.1 is the default lifecycle version and 1.0.0 stays qualified as its upgrade source"
+        (Registry.tryFind "visual-engineering"
+         |> Option.exists (fun definition -> definition.DefaultVersion = "1.0.1")
+         && Registry.qualifiedVersions "visual-engineering" = Some(Set.ofList [ "1.0.0"; "1.0.1" ]))
