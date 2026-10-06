@@ -28,6 +28,7 @@ type CurrentUpgradePlan =
       GenericUpgradePlan: LifecyclePlan option
       GenericVerifyPlan: LifecyclePlan option
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
+      WebPackageTransitions: WebPackageTransition list
       Refusals: string list
       Digest: string }
 
@@ -202,6 +203,7 @@ module CurrentUpgrade =
 
         let transitions = ResizeArray<CurrentUpgradeTransition>()
         let embeddedTransitions = ResizeArray<CurrentUpgradeTransition * ComponentDefinition * ProfileComponent>()
+        let webTransitions = ResizeArray<WebPackageTransition>()
 
         for request in manifest.Components do
             match request.Version, entryMap |> Map.tryFind request.Id with
@@ -231,6 +233,12 @@ module CurrentUpgrade =
                         | None ->
                             errors.Add
                                 $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is a native change, but the target release declares no {RepositoryLifecycleContract.Capability} contract and this Conditor build has not qualified that exact lifecycle version."
+                    | None when targetEntry.DistributionClass = WebPackageBinding.DistributionClass ->
+                        match WebPackageBinding.plan target manifest request fromVersion targetSetPath with
+                        | Ok webTransition ->
+                            mode <- WebPackageTransition.mode webTransition
+                            webTransitions.Add webTransition
+                        | Error refusals -> refusals |> List.iter errors.Add
                     | None ->
                         errors.Add
                             $"'{request.Id}' {fromVersion} -> {targetEntry.Version} is selected by Registry as {targetEntry.Role}/{targetEntry.DistributionClass}, but Conditor has no safe repository upgrade contract for that distribution."
@@ -368,7 +376,11 @@ module CurrentUpgrade =
                   workstationPlan |> Option.map (fun plan -> $"workstation={plan.Digest}") |> Option.defaultValue "workstation=-"
                   genericUpgradePlan |> Option.map (fun plan -> $"lifecycleUpgrade={plan.Digest}") |> Option.defaultValue "lifecycleUpgrade=-"
                   genericVerifyPlan |> Option.map (fun plan -> $"lifecycleVerify={plan.Digest}") |> Option.defaultValue "lifecycleVerify=-"
-                  transitionText ]
+                  transitionText
+                  webTransitions
+                  |> Seq.sortBy _.Id
+                  |> Seq.map WebPackageTransition.digestMaterial
+                  |> String.concat "\n" ]
 
         targetProfile
         |> Option.map (fun profile ->
@@ -384,6 +396,7 @@ module CurrentUpgrade =
               GenericUpgradePlan = genericUpgradePlan
               GenericVerifyPlan = genericVerifyPlan
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
+              WebPackageTransitions = webTransitions |> Seq.toList |> List.sortBy _.Id
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
 
@@ -482,6 +495,11 @@ module CurrentUpgrade =
                     (fun state transition ->
                         state |> Result.bind (fun () -> executeEmbedded target ctx transition))
                     (Ok()))
+            |> Result.bind (fun () ->
+                WebPackageBinding.executeAll
+                    (WebPackageBinding.fetchArtifact ctx)
+                    ProcessRunner.runProcess
+                    plan.WebPackageTransitions)
             |> Result.bind (fun () ->
                 match plan.GenericVerifyPlan with
                 | None -> Ok()

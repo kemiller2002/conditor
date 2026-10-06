@@ -63,6 +63,8 @@ Conditor refuses unknown or ambiguous versions, mismatched Registry identities, 
 
 Application-package bindings such as Forma, Folio, Limen, and Aegis are reported but not inferred automatically because Conditor will not guess their project/scaffold target.
 
+Once declared, the npm-distributed web packages (Limen, Forma, Folio) follow the Registry current selection through `conditor upgrade --current`: Conditor proves the exact source and target releases and their digests, changes exact pins only through npm, and refuses unpinned, drifted or unlocked bindings. See `docs/web-package-upgrade-contract.md`.
+
 ## Empty-repository quick start
 
 Built-in presets are embedded in the native Conditor executable, so a target repository does not need a Conditor source checkout or a manually copied manifest.
