@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-06T12:18:39.000Z",
+  "updatedAt": "2026-10-06T12:26:36.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -24,13 +24,51 @@
     {
       "id": "WI-0001",
       "type": "mechanical",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-06T12:18:39.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".echelon/ros.json"
+        },
+        {
+          "type": "implementation",
+          "path": ".echelon/sde.json"
+        },
+        {
+          "type": "documentation",
+          "path": "AGENTS.md"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/AdoptionTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-06T12:26:36.000Z",
       "telemetryExecutionIds": [
         "EXE-20261006T121839615Z-a831f51e"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "2bdf42d61c8c088892b60d1c",
+        "recordedAt": "2026-10-06T12:26:34.000Z",
+        "executionId": "EXE-20261006T121839615Z-a831f51e",
+        "repository": "conditor",
+        "branch": "chore/praxis-3.7.1",
+        "commit": "687006195fe5db71df5be6ce41cbe1e09893ea7e",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/praxis-3.7.1",
+        "remoteCommit": "687006195fe5db71df5be6ce41cbe1e09893ea7e",
+        "summary": "Praxis 3.7.1 and Ordo 1.4.0 installed, verified, pushed",
+        "nextAction": "complete, PR",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-06T12:26:36.000Z"
     }
   ]
 }
