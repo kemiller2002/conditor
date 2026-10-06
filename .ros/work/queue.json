@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 3,
+  "nextSeq": 4,
   "items": [
     {
       "id": "WI-0001",
@@ -39,6 +39,30 @@
       "createdAt": "2026-10-06T13:53:27.749Z",
       "updatedAt": "2026-10-06T14:02:45Z",
       "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0003",
+      "title": "Move conditor to Ordo 1.4.1",
+      "description": null,
+      "tags": [
+        "ordo",
+        "toolchain"
+      ],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-06T14:05:37.000Z",
+      "updatedAt": "2026-10-06T14:06:03.000Z",
+      "createdBy": "anthropic/claude-code",
       "createdByActor": {
         "kind": "agent",
         "id": "anthropic/claude-code",
