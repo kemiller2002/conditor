@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "tool": "ros",
   "package": "@echelon-foundry/repository-operating-system",
-  "installedVersion": "3.7.1",
+  "installedVersion": "3.7.2",
   "configurationVersion": 1,
   "profile": "greenfield",
   "managedArtifacts": [
     {
       "path": ".echelon/toolchain.json",
       "ownership": "shared",
-      "sha256": "139a49930a071facf704068180051078b8d65b6c84be3235a11fcd96bc3a63e6"
+      "sha256": "6a9d9b563cf1dd797869fdc772e7538ea089ecbf808c9444e07434fc0991f870"
     },
     {
       "path": ".editorconfig",
@@ -19,7 +19,7 @@
     {
       "path": ".gitattributes",
       "ownership": "user-owned",
-      "sha256": "489fb811f97deb0befb181e8eda6330bd155b6e1a3d7cc4b717391c31cf870f0"
+      "sha256": "faf43061bbb2a4f74fbaf596edfc350f44a09c205a801bda943ee20c09d6bc89"
     },
     {
       "path": ".github/copilot-instructions.md",
@@ -34,12 +34,12 @@
     {
       "path": ".gitignore",
       "ownership": "user-owned",
-      "sha256": "f8d315b49c13dc101485b04c6bea8ca84e5d0fc4e24f85d924d078c80e2fe775"
+      "sha256": "6d2c38694f68228e69f9f79bd39e17a174e7af7555603c159ff4379068799f02"
     },
     {
       "path": "AGENTS.md",
       "ownership": "shared",
-      "sha256": "c9a59ea58475ace449947647cf56cbf959b5ad8a6bd285f872bab28635b64178"
+      "sha256": "5c7071c8facd31e2e5891f0402575831dcc9fda372c1762c38d813129f212677"
     },
     {
       "path": "BOOTSTRAP.md",
@@ -69,7 +69,7 @@
     {
       "path": "README.md",
       "ownership": "user-owned",
-      "sha256": "3d77565e105894815655cd9f44e83f630abca8d3fc0799c5fc6ecba5f0344327"
+      "sha256": "a501227a311174014023fddcaba8223f70672089a1df45c1c8209cda04504c40"
     },
     {
       "path": "context/ARCHITECTURE.md",
@@ -154,7 +154,7 @@
     {
       "path": "docs/fallback-reconciliation.md",
       "ownership": "tool-owned",
-      "sha256": "43c7b4f11c733f14c1db9d3135d53928e2c08224e36d34dd7ebfcec05834f47d"
+      "sha256": "d10d1a749ba2b868b382981ff3d90c349bbc45911d9c0698ab25db71dda45f31"
     },
     {
       "path": "docs/ordo-observation.md",
@@ -169,7 +169,7 @@
     {
       "path": "docs/remote-protocol.md",
       "ownership": "tool-owned",
-      "sha256": "115bcdcadf466b53812883f4a0a5276ac47a9d66daada9943d07a4299aae42f4"
+      "sha256": "91835e62fe1496e907308758bebae320aca5ad5f65471c305189d7ec8b09de89"
     },
     {
       "path": "docs/work-adapter-contract.md",
