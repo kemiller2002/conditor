@@ -27,6 +27,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0003",
+      "title": "Move conditor to Ordo 1.4.1",
+      "description": null,
+      "tags": [
+        "ordo",
+        "toolchain"
+      ],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-06T14:05:37.000Z",
+      "updatedAt": "2026-10-06T14:05:37.000Z",
+      "createdBy": "anthropic/claude-code",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }
