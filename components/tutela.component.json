@@ -11,7 +11,7 @@
   "lifecycleSource": {
     "kind": "github",
     "repository": "kemiller2002/tutela",
-    "commit": "1acf421e7d940665c134012f11b082a502e17537",
+    "commit": "94afcc91a84bd3b94a4ee639f169d0727eaac727",
     "entrypoint": {
       "kind": "node-script",
       "path": "bin/tutela.mjs"

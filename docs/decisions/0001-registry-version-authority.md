@@ -57,6 +57,21 @@ version is installed.
   select a version that Conditor has not qualified, and that plan is still
   refused by the compatibility graph.
 
+## Package-distributed repository lifecycle tools
+
+The Registry resolver accepts `repository-lifecycle` releases whose
+distribution class is `repository-lifecycle` or `web-package`. These are
+npm CLIs or packed archives on a GitHub release, such as Visual Engineering,
+Communication Engineering and Tutela. The workstation adapter
+(`ResolvedReleaseSets`) keeps them in the integrity-bound environment set and
+does not install them as native tools. It still requires one active,
+platform-neutral package artifact with a SHA-256, served over `npm` or
+`github-release`, and it refuses such a release if it declares the native
+`echelon.repository-lifecycle` contract. Their versions are bound by this
+decision like every other component, and Conditor runs them through its
+qualified embedded descriptors. A current upgrade that would change their
+version is still refused, because Conditor has no upgrade contract for them.
+
 ## Open debt (not addressed here)
 
 - **CON-F2: parallel embedded catalog.** `components/*.component.json` still

@@ -265,9 +265,12 @@ module Profiles =
                 | Some parent -> resolve parent |> Result.map (fun b -> compose b profile))
 
 /// A Registry-resolved release set adapted to the existing workstation
-/// installation engine. This is deliberately strict: the first integration
-/// supports native host tools only. Other distribution classes require their
-/// own explicit binding/install semantics and are refused here.
+/// installation engine. This is deliberately strict: only native host tools and
+/// native repository lifecycle tools are installed. Project bindings and
+/// package-distributed repository lifecycle tools (npm, or a packed archive on a
+/// GitHub release) stay integrity-bound in the set but are never workstation
+/// installs; their versions are governed through registry authority and run by
+/// Conditor's qualified embedded descriptors. Everything else is refused.
 module ResolvedReleaseSets =
     let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>
@@ -365,6 +368,31 @@ module ResolvedReleaseSets =
                 Error $"resolved project binding '{id}' uses unsupported distribution mechanism '{mechanism}'"
             | _ ->
                 Error $"resolved project binding '{id}' is missing required release facts"
+        | Some "repository-lifecycle" when (match distributionClass with Some("repository-lifecycle" | "web-package") -> true | _ -> false) ->
+            // A package-distributed lifecycle tool (for example an npm CLI such
+            // as Visual Engineering). It stays integrity-bound in the full
+            // environment set and its version is governed by registry
+            // authority, but it is not a native workstation install: Conditor
+            // runs it through its qualified embedded descriptor.
+            let packageArtifacts =
+                objects "artifacts" element
+                |> List.filter (fun artifact -> str "purpose" artifact = Some "package")
+
+            match lifecycleState, distributionMechanism, tryProperty "repositoryLifecycle" element with
+            | Some state, _, _ when state <> "active" ->
+                Error $"resolved repository lifecycle package '{id}' is {state}; normal installation accepts only active releases"
+            | _, _, Some _ ->
+                Error $"resolved repository lifecycle package '{id}' declares {RepositoryLifecycleContract.Capability}, which only a self-contained-native-cli release may declare"
+            | Some "active", Some("npm" | "github-release"), None ->
+                match packageArtifacts with
+                | [ artifact ] when (str "platform" artifact).IsNone && (str "sha256" artifact |> Option.exists isSha256) -> Ok None
+                | [ _ ] -> Error $"resolved repository lifecycle package '{id}' has no platform-neutral package artifact with a valid SHA-256"
+                | [] -> Error $"resolved repository lifecycle package '{id}' has no package artifact"
+                | _ -> Error $"resolved repository lifecycle package '{id}' has more than one package artifact; selection is ambiguous"
+            | _, Some mechanism, _ ->
+                Error $"resolved repository lifecycle package '{id}' uses unsupported distribution mechanism '{mechanism}'"
+            | _ ->
+                Error $"resolved repository lifecycle package '{id}' is missing required release facts"
         | Some(("host-tool" | "repository-lifecycle") as environmentRole) ->
             match distributionClass, lifecycleState, distributionMechanism, executable, str "version" element, str "repository" element, str "tag" element with
             | Some "self-contained-native-cli", Some "active", Some "github-release", Some exe, Some version, Some repository, Some tag ->

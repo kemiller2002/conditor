@@ -11,7 +11,7 @@
   "lifecycleSource": {
     "kind": "github",
     "repository": "kemiller2002/communication-engineering",
-    "commit": "4590d2fe6f7e80b339117d3fbee5803f2dd39122",
+    "commit": "707396de512065fe35aff6fcf82cd28118df14b3",
     "entrypoint": {
       "kind": "node-script",
       "path": "bin/communication-engineering.mjs"
