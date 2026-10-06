@@ -69,6 +69,23 @@ type HistoricalPackage =
     { Package: string
       Versions: Set<string> }
 
+/// A verification that fails closed on installation integrity and reports
+/// structural review signals instead of failing on them. Only the exact
+/// qualified versions listed carry it; every other version keeps
+/// `VerifyArguments`.
+type IntegrityGate =
+    { Versions: Set<string>
+      Arguments: string list }
+
+/// A structural review finding a component reported without failing its
+/// integrity gate (for Ordo, SDE-STRUCT-001). Recorded, never a refusal.
+type ReviewSignal =
+    { ComponentId: string
+      Code: string
+      Band: string
+      Path: string
+      LineCount: int }
+
 type ComponentDefinition =
     { Id: string
       DisplayName: string
@@ -86,7 +103,8 @@ type ComponentDefinition =
       InitArguments: string list
       VerifyArguments: string list
       DoctorArguments: string list
-      UpgradeArguments: string list }
+      UpgradeArguments: string list
+      IntegrityGate: IntegrityGate option }
 
 module ComponentDefinition =
     /// The package identity under which `version` of the component is
@@ -107,6 +125,8 @@ type Operation =
 type PlanActionKind =
     | InstallLifecycle
     | VerifyLifecycle
+    /// A verify that gates the lock through the component's integrity gate.
+    | IntegrityVerifyLifecycle
     | DiagnoseLifecycle
     | UpgradeLifecycle
     | ScaffoldFile

@@ -223,64 +223,65 @@ module Installer =
         plan.Actions
         |> List.map (fun action -> $"{action.Sequence,2}. {action.ComponentId}@{action.ComponentVersion}: {commandText action}")
 
-    let execute target manifestPath (plan: InstallationPlan) =
+    /// Executes the plan. Returns the lock path (Init only) and the review
+    /// signals every integrity gate reported; any gate failure stops the plan.
+    let executeWithSignals target manifestPath (plan: InstallationPlan) =
         Directory.CreateDirectory target |> ignore
 
-        let rec loop actions =
+        let stopped (action: PlanAction) details =
+            Error(
+                [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
+                  $"Command: {commandText action}" ]
+                @ details
+            )
+
+        let rec loop signals actions =
             match actions with
             | [] ->
+                let collected = List.rev signals |> List.concat
+
                 if plan.Operation = Init then
-                    let lockPath = LockFile.write target manifestPath plan
-                    Ok(Some lockPath)
+                    let lockPath = LockFile.writeWith target manifestPath plan collected
+                    Ok(Some lockPath, collected)
                 else
-                    Ok None
+                    Ok(None, collected)
             | action :: remaining ->
                 match action.Execution with
                 | EnsureFile(relativePath, content) ->
                     match ensureFile target relativePath content with
-                    | Ok() -> loop remaining
-                    | Error error ->
-                        Error
-                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
-                              $"Command: {commandText action}"
-                              error ]
+                    | Ok() -> loop signals remaining
+                    | Error error -> stopped action [ error ]
                 | EnsureManagedRegion(relativePath, regionId, content) ->
                     match ensureManagedRegion target relativePath regionId content with
-                    | Ok() -> loop remaining
-                    | Error error ->
-                        Error
-                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
-                              $"Command: {commandText action}"
-                              error ]
+                    | Ok() -> loop signals remaining
+                    | Error error -> stopped action [ error ]
                 | MaterializeSourceFile(source, relativePath) ->
                     match materializeSourceFile target action.ComponentId source relativePath with
-                    | Ok() -> loop remaining
-                    | Error error ->
-                        Error
-                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
-                              $"Command: {commandText action}"
-                              error ]
+                    | Ok() -> loop signals remaining
+                    | Error error -> stopped action [ error ]
                 | EnsurePraxisMission mission ->
                     match Mission.ensure target mission with
-                    | Ok() -> loop remaining
-                    | Error errors ->
-                        Error
-                            ([ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
-                               $"Command: {commandText action}" ]
-                             @ errors)
+                    | Ok() -> loop signals remaining
+                    | Error errors -> stopped action errors
                 | ExternalProcess _
                 | GitHubSourceProcess _ ->
                     let result = ProcessRunner.run target action
 
-                    if result.ExitCode = 0 then
-                        loop remaining
-                    else
-                        Error
-                            [ $"Conditor stopped at action {action.Sequence} ({action.ComponentId})."
-                              $"Command: {commandText action}"
-                              $"Exit code: {result.ExitCode}"
-                              result.StandardOutput.Trim()
-                              result.StandardError.Trim() ]
-                        |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
+                    match action.Kind with
+                    | IntegrityVerifyLifecycle ->
+                        match VerificationGate.interpretReport action.ComponentId action.ComponentVersion result with
+                        | Ok reported -> loop (reported :: signals) remaining
+                        | Error reasons -> stopped action reasons
+                    | _ when result.ExitCode = 0 -> loop signals remaining
+                    | _ ->
+                        stopped
+                            action
+                            ([ $"Exit code: {result.ExitCode}"
+                               result.StandardOutput.Trim()
+                               result.StandardError.Trim() ]
+                             |> List.filter (String.IsNullOrWhiteSpace >> not))
 
-        loop plan.Actions
+        loop [] plan.Actions
+
+    let execute target manifestPath (plan: InstallationPlan) =
+        executeWithSignals target manifestPath plan |> Result.map fst

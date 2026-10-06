@@ -40,6 +40,9 @@ type AdoptionPlan =
       Observations: AdoptionObservation list
       Refusals: string list
       RegistryAuthority: AdoptionRegistryAuthority option
+      /// Structural review findings reported by integrity gates. Recorded in
+      /// the lock; never a refusal.
+      ReviewSignals: ReviewSignal list
       ManifestText: string
       Digest: string }
 
@@ -227,6 +230,7 @@ module Adoption =
               Detail = "Component has no lifecycle command and cannot be adopted automatically."
               Version = None
               Command = None },
+            [],
             []
         | Some command ->
             let executable = localExecutable target command
@@ -239,6 +243,7 @@ module Adoption =
                   Detail = "Lifecycle command is not available on PATH or in node_modules/.bin."
                   Version = None
                   Command = Some executable },
+                [],
                 []
             elif versionResult.ExitCode <> 0 then
                 let detail =
@@ -254,7 +259,8 @@ module Adoption =
                   Detail = detail
                   Version = None
                   Command = Some executable },
-                [ $"Component '{definition.Id}' appears present but its read-only version probe failed; adoption will not guess." ]
+                [ $"Component '{definition.Id}' appears present but its read-only version probe failed; adoption will not guess." ],
+                []
             else
                 let output = versionResult.StandardOutput + Environment.NewLine + versionResult.StandardError
                 let qualified = Registry.qualifiedVersions definition.Id |> Option.defaultValue Set.empty
@@ -268,28 +274,23 @@ module Adoption =
                       Detail = $"Version output did not identify one of Conditor's qualified versions: {output.Trim()}"
                       Version = None
                       Command = Some executable },
-                    [ $"Component '{definition.Id}' is present but its version is not unambiguously qualified by this Conditor build." ]
+                    [ $"Component '{definition.Id}' is present but its version is not unambiguously qualified by this Conditor build." ],
+                    []
                 | [ version ] ->
-                    let verifyResult = runner target executable definition.VerifyArguments
+                    let verifyResult =
+                        runner target executable (VerificationGate.argumentsFor version definition)
 
-                    if verifyResult.ExitCode <> 0 then
-                        let diagnostic =
-                            [ verifyResult.StandardOutput.Trim(); verifyResult.StandardError.Trim() ]
-                            |> List.filter (String.IsNullOrWhiteSpace >> not)
-                            |> String.concat " | "
-
+                    match VerificationGate.interpret definition.Id version definition verifyResult with
+                    | Error reasons ->
                         None,
                         { ComponentId = definition.Id
                           Status = "refused"
-                          Detail =
-                            if String.IsNullOrWhiteSpace diagnostic then
-                                $"Verification exited {verifyResult.ExitCode}."
-                            else
-                                $"Verification exited {verifyResult.ExitCode}: {diagnostic}"
+                          Detail = String.concat " | " reasons
                           Version = Some version
                           Command = Some executable },
-                        [ $"Component '{definition.Id}' version '{version}' was detected but did not verify successfully; adoption will not record unhealthy state." ]
-                    else
+                        [ $"Component '{definition.Id}' version '{version}' was detected but did not verify successfully; adoption will not record unhealthy state." ],
+                        []
+                    | Ok signals ->
                         match embeddedSourceReference version definition with
                         | Error error ->
                             None,
@@ -298,7 +299,8 @@ module Adoption =
                               Detail = error
                               Version = Some version
                               Command = Some executable },
-                            [ error ]
+                            [ error ],
+                            []
                         | Ok source ->
                             let adoptedEntry =
                                 { Id = definition.Id
@@ -308,13 +310,21 @@ module Adoption =
                                   SourceReference = source
                                   AuthorityIdentity = $"embedded-descriptor=sha256:{descriptor.Sha256}" }
 
+                            let detail =
+                                match VerificationGate.gateFor version definition, signals with
+                                | None, _ -> "Qualified version detected and the component's read-only verify contract passed."
+                                | Some _, [] -> "Qualified version detected and the component's integrity gate passed with no structural review signals."
+                                | Some _, reported ->
+                                    $"Qualified version detected and the component's integrity gate passed; {reported.Length} structural review signal(s) recorded, not blocking."
+
                             Some adoptedEntry,
                             { ComponentId = definition.Id
                               Status = "verified"
-                              Detail = "Qualified version detected and the component's read-only verify contract passed."
+                              Detail = detail
                               Version = Some version
                               Command = Some executable },
-                            []
+                            [],
+                            signals
                 | versions ->
                     let rendered = String.Join(", ", versions)
 
@@ -324,7 +334,8 @@ module Adoption =
                       Detail = $"Version output ambiguously matched multiple qualified versions: {rendered}."
                       Version = None
                       Command = Some executable },
-                    [ $"Component '{definition.Id}' version identity is ambiguous; adoption will not choose one." ]
+                    [ $"Component '{definition.Id}' version identity is ambiguous; adoption will not choose one." ],
+                    []
 
     let private observeRegistryLifecycle
         (runner: Runner)
@@ -334,14 +345,30 @@ module Adoption =
         =
         match release.Lifecycle with
         | None ->
-            None,
-            { ComponentId = release.Id
-              Status = "refused"
-              Detail =
-                $"Registry release has repository-lifecycle role but no supported {RepositoryLifecycleContract.Capability} contract."
-              Version = Some release.Version
-              Command = Some release.Executable },
-            [ $"Registry component '{release.Id}' cannot be adopted because its lifecycle contract is unsupported or missing." ]
+            // Without a contract Conditor has no lifecycle semantics for the
+            // release, so it can never adopt it. That blocks adoption only when
+            // the release is actually installed here: an absent component is
+            // reported exactly as an absent contracted one is.
+            let executable = localExecutable target release.Executable
+
+            if (runner target executable release.VersionProbe).ExitCode = -1 then
+                None,
+                { ComponentId = release.Id
+                  Status = "not-found"
+                  Detail =
+                    $"Registry-selected executable is not installed; its release declares no supported {RepositoryLifecycleContract.Capability} contract, so it could not be adopted if it were."
+                  Version = None
+                  Command = Some executable },
+                []
+            else
+                None,
+                { ComponentId = release.Id
+                  Status = "refused"
+                  Detail =
+                    $"Registry release has repository-lifecycle role but no supported {RepositoryLifecycleContract.Capability} contract."
+                  Version = Some release.Version
+                  Command = Some executable },
+                [ $"Registry component '{release.Id}' cannot be adopted because its lifecycle contract is unsupported or missing." ]
         | Some lifecycle ->
             let executable = localExecutable target release.Executable
             let identityResult = runner target executable release.VersionProbe
@@ -450,6 +477,7 @@ module Adoption =
         let observations = ResizeArray<AdoptionObservation>()
         let components = ResizeArray<AdoptionComponent>()
         let refusals = ResizeArray<string>()
+        let reviewSignals = ResizeArray<ReviewSignal>()
 
         if not (Directory.Exists fullTarget) then
             refusals.Add $"Target repository does not exist: {fullTarget}"
@@ -484,12 +512,13 @@ module Adoption =
                     match descriptor.Definition.Distribution with
                     | HostTool
                     | LifecycleNpm ->
-                        let adoptedEntry, observation, entryRefusals =
+                        let adoptedEntry, observation, entryRefusals, entrySignals =
                             observeEmbeddedLifecycle runner fullTarget descriptor
 
                         observations.Add observation
                         adoptedEntry |> Option.iter components.Add
                         entryRefusals |> List.iter refusals.Add
+                        entrySignals |> List.iter reviewSignals.Add
                     | NpmPackage
                     | NugetPackage ->
                         observations.Add
@@ -533,6 +562,10 @@ module Adoption =
                 $"{authority.TargetPath}|sha256:{authority.Sha256}|{sourceIdentity}")
             |> Option.defaultValue "-"
 
+        let signalList = reviewSignals |> Seq.toList
+
+        // Review signals are recorded in the lock, so the authorization binds
+        // them too: a changed finding needs a fresh review of the proposal.
         let digestMaterial =
             String.concat
                 "\n"
@@ -543,7 +576,10 @@ module Adoption =
                  @ (componentList
                     |> List.map (fun adoptedEntry ->
                         let source = adoptedEntry.SourceReference |> Option.defaultValue "-"
-                        $"{adoptedEntry.Id}|{adoptedEntry.Version}|{distributionText adoptedEntry.Distribution}|{adoptedEntry.AuthorityIdentity}|{source}")))
+                        $"{adoptedEntry.Id}|{adoptedEntry.Version}|{distributionText adoptedEntry.Distribution}|{adoptedEntry.AuthorityIdentity}|{source}"))
+                 @ (signalList
+                    |> List.map (fun signal ->
+                        $"review|{signal.ComponentId}|{signal.Code}|{signal.Band}|{signal.Path}|{signal.LineCount}")))
 
         { Target = fullTarget
           ProjectName = name
@@ -551,6 +587,7 @@ module Adoption =
           Observations = observations |> Seq.toList
           Refusals = refusalList
           RegistryAuthority = registryAuthority
+          ReviewSignals = signalList
           ManifestText = manifestText
           Digest = sha256Text digestMaterial }
 
@@ -629,7 +666,7 @@ module Adoption =
                       Components = plan.Components |> List.map resolved
                       Actions = [] }
 
-                let writtenLock = LockFile.write plan.Target manifestPath installationPlan
+                let writtenLock = LockFile.writeWith plan.Target manifestPath installationPlan plan.ReviewSignals
 
                 Ok
                     { ManifestPath = manifestPath

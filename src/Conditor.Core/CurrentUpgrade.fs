@@ -437,16 +437,19 @@ module CurrentUpgrade =
                   upgrade.StandardError.Trim() ]
             |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
         else
-            let verify = ProcessRunner.runProcess target executable definition.VerifyArguments
+            let verify =
+                ProcessRunner.runProcess
+                    target
+                    executable
+                    (VerificationGate.argumentsFor transition.ToVersion definition)
 
-            if verify.ExitCode <> 0 then
-                Error
-                    [ $"Current upgrade installed {transition.Id}@{transition.ToVersion}, but its repository verification failed."
-                      verify.StandardOutput.Trim()
-                      verify.StandardError.Trim() ]
-                |> Result.mapError (List.filter (String.IsNullOrWhiteSpace >> not))
-            else
-                Ok()
+            // Review signals are collected by the full verification that
+            // follows every transition; this step only has to pass the gate.
+            VerificationGate.interpret transition.Id transition.ToVersion definition verify
+            |> Result.map ignore
+            |> Result.mapError (fun reasons ->
+                $"Current upgrade installed {transition.Id}@{transition.ToVersion}, but its repository verification failed."
+                :: reasons)
 
     let apply
         target
@@ -543,7 +546,7 @@ module CurrentUpgrade =
                             |> Result.bind (fun () ->
                                 Planner.create target Verify verificationManifest
                                 |> Result.bind (fun verifyPlan ->
-                                    Installer.execute target String.Empty verifyPlan |> Result.map ignore))
+                                    Installer.executeWithSignals target String.Empty verifyPlan |> Result.map snd))
 
                         match verification with
                         | Error errors ->
@@ -552,7 +555,7 @@ module CurrentUpgrade =
                                 "Full repository verification failed after component upgrades; existing Conditor governance was left unchanged."
                                 :: errors
                             )
-                        | Ok() ->
+                        | Ok reviewSignals ->
                             let finalAuthorityPath = Path.Combine(Path.GetFullPath target, AuthorityPath)
                             let oldAuthority =
                                 if File.Exists finalAuthorityPath then Some(File.ReadAllBytes finalAuthorityPath) else None
@@ -569,7 +572,7 @@ module CurrentUpgrade =
                                         match Planner.create target Init committedManifest with
                                         | Error errors -> Error errors
                                         | Ok lockPlan ->
-                                            let lockPath = LockFile.write target manifestPath lockPlan
+                                            let lockPath = LockFile.writeWith target manifestPath lockPlan reviewSignals
                                             let remaining =
                                                 match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
                                                 | Ok second -> second.Transitions.IsEmpty

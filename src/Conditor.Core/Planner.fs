@@ -240,6 +240,21 @@ module Planner =
 
             sequence <- sequence + 1
 
+        /// The verify phase: through the integrity gate for a version that
+        /// declares one, otherwise the component's plain verify arguments.
+        let addVerifyAction (request: ComponentRequest) (version: string) (definition: ComponentDefinition) =
+            match VerificationGate.gateFor version definition with
+            | None -> addLifecycleAction request version definition "verify" definition.VerifyArguments
+            | Some gate ->
+                actions.Add
+                    { Sequence = sequence
+                      ComponentId = request.Id
+                      ComponentVersion = version
+                      Kind = IntegrityVerifyLifecycle
+                      Execution = lifecycleExecution target version definition gate.Arguments }
+
+                sequence <- sequence + 1
+
         let addRegistryLifecycleActions
             (request: ComponentRequest)
             (release: ProfileComponent)
@@ -318,14 +333,14 @@ module Planner =
                         match operation with
                         | Init ->
                             addLifecycleAction request version definition "install" definition.InitArguments
-                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                            addVerifyAction request version definition
                         | Verify ->
-                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                            addVerifyAction request version definition
                         | Doctor ->
                             addLifecycleAction request version definition "doctor" definition.DoctorArguments
                         | Upgrade ->
                             addLifecycleAction request version definition "upgrade" definition.UpgradeArguments
-                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                            addVerifyAction request version definition
 
                         if definition.Id = "praxis" && manifest.Scaffold.IsSome then
                             praxisReconciliation <- Some(request, version, definition)
@@ -348,14 +363,14 @@ module Planner =
                         match operation with
                         | Init ->
                             addLifecycleAction request version definition "install" definition.InitArguments
-                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                            addVerifyAction request version definition
                         | Verify ->
-                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                            addVerifyAction request version definition
                         | Doctor ->
                             addLifecycleAction request version definition "doctor" definition.DoctorArguments
                         | Upgrade ->
                             addLifecycleAction request version definition "upgrade" definition.UpgradeArguments
-                            addLifecycleAction request version definition "verify" definition.VerifyArguments
+                            addVerifyAction request version definition
 
                         if definition.Id = "limen" && manifest.Scaffold.IsSome then
                             limenReadiness <- Some(version, definition)
@@ -419,7 +434,7 @@ module Planner =
             match praxisReconciliation with
             | Some(request, version, definition) ->
                 addLifecycleAction request version definition "install" definition.InitArguments
-                addLifecycleAction request version definition "verify" definition.VerifyArguments
+                addVerifyAction request version definition
             | None -> ()
 
         if errors.Count = 0 then

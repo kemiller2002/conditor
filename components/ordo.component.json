@@ -8,7 +8,8 @@
   "qualifiedVersions": [
     "1.3.0",
     "1.4.0",
-    "1.4.1"
+    "1.4.1",
+    "1.4.2"
   ],
   "versionArguments": [
     "--version"
@@ -21,6 +22,17 @@
     "verify",
     "--strict"
   ],
+  "integrityGate": {
+    "report": "ordo.verify-json/v1",
+    "versions": [
+      "1.4.2"
+    ],
+    "arguments": [
+      "verify",
+      "--integrity-only",
+      "--json"
+    ]
+  },
   "doctorArguments": [
     "doctor"
   ],
