@@ -8,3 +8,4 @@
 | WI-0003 | Move conditor to Ordo 1.4.1 | complete | ordo, toolchain | medium |
 | WI-0004 | WI-0004 | complete |  |  |
 | WI-0005 | conditor adopt: report not-found when a lifecycle component is not installed in the repository even if its CLI is on the machine (installation markers) | complete |  | medium |
+| WI-0006 | Qualify the echelon-current releases: Praxis 3.7.2 and Visual Engineering 1.0.1, with a planned VE 1.0.0 -> 1.0.1 current-upgrade transition | complete |  | medium |
