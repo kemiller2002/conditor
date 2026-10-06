@@ -114,7 +114,8 @@ module ComponentDescriptors =
               "verifyArguments"
               "doctorArguments"
               "upgradeArguments"
-              "integrityGate" ]
+              "integrityGate"
+              "installationMarkers" ]
 
     let private integrityGateProperties = set [ "report"; "versions"; "arguments" ]
 
@@ -348,6 +349,38 @@ module ComponentDescriptors =
             use reader = new StreamReader(value)
             Ok(reader.ReadToEnd())
 
+    /// A marker must name a path inside the repository: relative, forward
+    /// slashed, and free of empty, `.` and `..` segments.
+    let private isRepositoryRelative (marker: string) =
+        not (String.IsNullOrWhiteSpace marker)
+        && not (Path.IsPathRooted marker)
+        && not (marker.Contains '\\')
+        && marker.Split('/') |> Array.forall (fun segment -> segment <> "" && segment <> "." && segment <> "..")
+
+    let private parseInstallationMarkers (root: JsonElement) =
+        match tryProperty "installationMarkers" root with
+        | None -> Ok []
+        | Some _ ->
+            match stringArray "installationMarkers" root with
+            | Error arrayErrors -> Error arrayErrors
+            | Ok [] -> Error [ "'installationMarkers' must list at least one path when declared." ]
+            | Ok markers ->
+                let invalid =
+                    markers
+                    |> List.filter (isRepositoryRelative >> not)
+                    |> List.map (fun marker ->
+                        $"'installationMarkers' entry '{marker}' must be a forward-slashed path inside the repository.")
+
+                let repeated =
+                    if List.distinct markers = markers then
+                        []
+                    else
+                        [ "'installationMarkers' must not repeat a path." ]
+
+                match invalid @ repeated with
+                | [] -> Ok markers
+                | markerErrors -> Error markerErrors
+
     /// Parses and validates one component descriptor document.
     let parse (resourceName: string) (text: string) =
         try
@@ -469,6 +502,13 @@ module ComponentDescriptors =
             let doctorArguments = collectArray "doctorArguments"
             let upgradeArguments = collectArray "upgradeArguments"
 
+            let installationMarkers =
+                match parseInstallationMarkers root with
+                | Ok markers -> markers
+                | Error markerErrors ->
+                    markerErrors |> List.iter errors.Add
+                    []
+
             if not (String.IsNullOrWhiteSpace defaultVersion)
                && not (qualifiedVersions.Contains defaultVersion) then
                 errors.Add $"defaultVersion '{defaultVersion}' is not present in qualifiedVersions for '{id}'."
@@ -527,7 +567,8 @@ module ComponentDescriptors =
                           VerifyArguments = verifyArguments
                           DoctorArguments = doctorArguments
                           UpgradeArguments = upgradeArguments
-                          IntegrityGate = integrityGate }
+                          IntegrityGate = integrityGate
+                          InstallationMarkers = installationMarkers }
                       QualifiedVersions = qualifiedVersions
                       Sha256 = descriptorSha256 }
         with

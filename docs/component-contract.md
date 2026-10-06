@@ -109,9 +109,11 @@ Lifecycle component descriptors used for existing-repository adoption declare `v
 
 Conditor adoption executes the already-installed command directly, first with `versionArguments` and then with the component's existing `verifyArguments`. It does not invoke package-manager resolution, `init`, `upgrade`, or a remote source during discovery.
 
+A descriptor MAY declare `installationMarkers`: repository-relative, forward-slashed paths whose presence shows the component is installed in a repository (Communication Engineering and Visual Engineering declare their `.echelon/<id>.json` manifest, `.echelon/<id>.config.json` configuration and context directory). When it does and none of them exists in the target, the component is reported `not-found` and its command is not run at all: a lifecycle CLI installed on the machine for other repositories says nothing about this one, so it must neither block adoption nor be adopted. When any marker exists, discovery continues as below, so a damaged installation is still verified and refused.
+
 A component is eligible for adoption only when:
 
-1. its command is already available on PATH or the target repository's `node_modules/.bin`;
+1. it is installed in the target repository, when its descriptor declares `installationMarkers`, and its command is already available on PATH or the target repository's `node_modules/.bin`;
 2. the version probe identifies exactly one embedded qualified version;
 3. the verification contract passes (the integrity gate, when the version declares one); and
 4. Conditor can preserve the immutable source identity required by its component descriptor.

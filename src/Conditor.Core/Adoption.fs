@@ -215,6 +215,15 @@ module Adoption =
                   Mission = None
                   ContractPath = None } }
 
+    /// Whether the repository shows any trace of the component's installation.
+    /// A component that declares no markers can only be judged by its command.
+    let private installedInRepository target (definition: ComponentDefinition) =
+        definition.InstallationMarkers.IsEmpty
+        || definition.InstallationMarkers
+           |> List.exists (fun marker ->
+               let path = Path.Combine(target, marker)
+               File.Exists path || Directory.Exists path)
+
     let private observeEmbeddedLifecycle
         (runner: Runner)
         target
@@ -223,6 +232,20 @@ module Adoption =
         let definition = descriptor.Definition
 
         match definition.Command with
+        // A lifecycle CLI installed on the machine says nothing about this
+        // repository. Without any installation marker here the component is
+        // absent, whatever the CLI would report, so it is not probed at all.
+        | Some command when not (installedInRepository target definition) ->
+            let markers = String.Join(", ", definition.InstallationMarkers)
+
+            None,
+            { ComponentId = definition.Id
+              Status = "not-found"
+              Detail = $"Not installed in this repository: none of its installation markers ({markers}) exists."
+              Version = None
+              Command = Some(localExecutable target command) },
+            [],
+            []
         | None ->
             None,
             { ComponentId = definition.Id

@@ -156,8 +156,73 @@ let private localLauncherDoesNotShadowHostTool check =
             finally
                 Directory.SetCurrentDirectory previous)
 
+
+/// Communication and Visual Engineering CLIs installed on the machine, as on a
+/// workstation that has used them in another repository. Their verify fails
+/// exactly as the real ones do in a repository where they were never installed.
+let private machineWideEngineeringRunner (installedInRepository: string list) target (executable: string) (arguments: string list) =
+    let name = Path.GetFileName executable |> Option.ofObj |> Option.defaultValue ""
+
+    match name, arguments with
+    | "praxis", _ -> healthyPraxisRunner target executable arguments
+    | ("communication-engineering" | "visual-engineering"), [ "--version" ] -> result 0 "1.0.0" ""
+    | ("communication-engineering" | "visual-engineering"), [ "verify"; "--strict" ] ->
+        if installedInRepository |> List.contains name then
+            result 0 "verification passed" ""
+        else
+            result 3 "Verification failed.\n  FAIL installation: not installed in this repository" ""
+    | _ -> result -1 "" $"Unable to execute '{executable}'."
+
+let private observationFor componentId (plan: AdoptionPlan) =
+    plan.Observations |> List.tryFind (fun observation -> observation.ComponentId = componentId)
+
+/// A lifecycle CLI on the machine says nothing about the repository: a
+/// component Conditor cannot find installed here is not-found, not refused.
+let private machineCliDoesNotImplyRepositoryInstallation check =
+    withTarget (fun target ->
+        let plan = Adoption.planWith (machineWideEngineeringRunner []) target None
+
+        for id in [ "communication-engineering"; "visual-engineering" ] do
+            check
+                $"{id} with a machine CLI but no repository installation is not-found"
+                (observationFor id plan |> Option.exists (fun observation -> observation.Status = "not-found"))
+
+        check
+            "machine-only engineering CLIs do not block adoption"
+            (plan.Refusals
+             |> List.forall (fun refusal ->
+                 not (refusal.Contains "communication-engineering" || refusal.Contains "visual-engineering")))
+
+        check "adoption still proceeds with the installed Praxis" (plan.Components |> List.map _.Id = [ "praxis" ]))
+
+    withTarget (fun target ->
+        Directory.CreateDirectory(Path.Combine(target, ".echelon")) |> ignore
+        File.WriteAllText(Path.Combine(target, ".echelon", "visual-engineering.json"), "{}")
+        let plan = Adoption.planWith (machineWideEngineeringRunner []) target None
+
+        check
+            "a component installed in the repository that fails verify is still refused"
+            (observationFor "visual-engineering" plan |> Option.exists (fun observation -> observation.Status = "refused")
+             && plan.Refusals |> List.exists (fun refusal -> refusal.Contains "visual-engineering"))
+
+        check
+            "the other machine-only component stays not-found"
+            (observationFor "communication-engineering" plan
+             |> Option.exists (fun observation -> observation.Status = "not-found")))
+
+    withTarget (fun target ->
+        Directory.CreateDirectory(Path.Combine(target, ".communication-engineering")) |> ignore
+        let plan = Adoption.planWith (machineWideEngineeringRunner [ "communication-engineering" ]) target None
+
+        check
+            "a component installed in the repository that verifies is adopted"
+            (observationFor "communication-engineering" plan
+             |> Option.exists (fun observation -> observation.Status = "verified")
+             && plan.Components |> List.exists (fun entry -> entry.Id = "communication-engineering")))
+
 let run check =
     localLauncherDoesNotShadowHostTool check
+    machineCliDoesNotImplyRepositoryInstallation check
 
     withTarget (fun target ->
         let plan = Adoption.planWith healthyPraxisRunner target None

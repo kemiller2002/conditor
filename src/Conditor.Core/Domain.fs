@@ -104,7 +104,11 @@ type ComponentDefinition =
       VerifyArguments: string list
       DoctorArguments: string list
       UpgradeArguments: string list
-      IntegrityGate: IntegrityGate option }
+      IntegrityGate: IntegrityGate option
+      /// Repository-relative paths whose presence shows the component is
+      /// installed in a repository. Empty when the descriptor declares none,
+      /// in which case only the lifecycle command can be consulted.
+      InstallationMarkers: string list }
 
 module ComponentDefinition =
     /// The package identity under which `version` of the component is
