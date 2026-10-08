@@ -213,7 +213,8 @@ module Adoption =
                 { Enabled = false
                   Launcher = None
                   Mission = None
-                  ContractPath = None } }
+                  ContractPath = None
+                  PermissionMode = None } }
 
     /// Whether the repository shows any trace of the component's installation.
     /// A component that declares no markers can only be judged by its command.

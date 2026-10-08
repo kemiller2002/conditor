@@ -86,6 +86,33 @@ module ProcessRunner =
               StandardOutput = String.Empty
               StandardError = $"Unable to execute '{executable}': {ex.Message}" }
 
+    /// Runs a command attached to this console: its output streams to the
+    /// terminal as it happens instead of being captured. For long-running
+    /// interactive work (a headless agent); returns the exit code.
+    let runAttached workingDirectory (executable: string) (arguments: string list) =
+        match resolveExecutable executable with
+        | None -> Error $"Unable to execute '{executable}': not found on PATH."
+        | Some resolved ->
+            try
+                let info = ProcessStartInfo()
+                info.FileName <- resolved
+                info.WorkingDirectory <- workingDirectory
+                info.UseShellExecute <- false
+
+                for argument in arguments do
+                    info.ArgumentList.Add argument
+
+                use childProcess = new Process()
+                childProcess.StartInfo <- info
+
+                if childProcess.Start() then
+                    childProcess.WaitForExit()
+                    Ok childProcess.ExitCode
+                else
+                    Error $"Unable to start '{executable}'."
+            with ex ->
+                Error $"Unable to execute '{executable}': {ex.Message}"
+
     /// Runs a command, resolving a bare name through `preferred` before PATH.
     let runProcessIn (preferred: string list) workingDirectory (executable: string) arguments =
         match resolveExecutableIn preferred executable with

@@ -68,7 +68,10 @@ type ExecutionRequest =
     { Enabled: bool
       Launcher: string option
       Mission: string option
-      ContractPath: string option }
+      ContractPath: string option
+      /// Claude Code permission mode for a headless run; Readiness resolves
+      /// an undeclared mode to Launcher.DefaultPermissionMode.
+      PermissionMode: string option }
 
 type PraxisMission =
     { Id: string

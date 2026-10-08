@@ -1148,6 +1148,48 @@ To choose another target, replace the workflow and update this file in the
 same change.
 """
 
+    /// Claude Code project settings for an unattended agent. In the `auto`
+    /// permission mode the classifier still refuses destructive actions;
+    /// these rules pre-approve the repository's own toolchain and pull-request
+    /// flow, and let the agent merge its own pull requests once the required
+    /// checks are green (the pattern the Praxis repository uses). Force pushes
+    /// and repository deletion stay denied.
+    let private webClaudeSettings =
+        """{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "Bash(gh api *)",
+      "Bash(dotnet *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(./praxis *)",
+      "Bash(praxis *)",
+      "Bash(ordo *)",
+      "Bash(percepta-repo *)",
+      "Bash(conditor *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh api --method DELETE *)",
+      "Bash(gh api -X DELETE *)"
+    ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Opening pull requests in this repository, pushing their branches, merging the base branch into them, and merging them without separate human review once every required check is green and the branch is conflict-free."
+    ]
+  }
+}
+"""
+
     let private webIgnores =
         "# Build, test, package and browser outputs (Conditor fsharp-limen-web scaffold)\nbin/\nobj/\ndist/\nTestResults/\nnode_modules/\ntest-results/\nplaywright-report/\n"
 
@@ -1185,6 +1227,7 @@ same change.
           ".github/workflows/deploy-pages.yml", render webDeployWorkflow
           BranchProtection.RelativePath, BranchProtection.render webBranchProtection
           "DEPLOYMENT.md", webDeploymentGuide
+          ".claude/settings.json", webClaudeSettings
           ".gitignore", webIgnores ]
         @ ordoBaselineFiles webBaselineLocations manifest
 

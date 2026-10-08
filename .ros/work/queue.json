@@ -506,6 +506,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "INDY-0003",
+      "title": "conditor supervise: sustainable headless Claude launch with explicit permission mode, resume on exit and a deadline",
+      "description": "The Claude launcher ran claude -p with no permission mode, the preset defaulted to Codex (not installed), and nothing relaunched an agent that exited (readiness G1-9). Add execution.permissionMode, an explicit --permission-mode on every Claude launch, conditor supervise with a pure decision core (start once, resume fresh sessions, backoff on fast exits, stop on completion, block, drained queue, deadline, stop file or budget), queue and deadline aware instructions, Claude settings in the web scaffold, and switch the Indy preset to Claude in auto mode.",
+      "tags": [
+        "launcher",
+        "indy-init"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T11:42:09.000Z",
+      "updatedAt": "2026-10-08T11:42:09.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

@@ -169,7 +169,15 @@ module Manifest =
             let launcher = optionalString "launcher" value
             let mission = optionalString "mission" value
             let contractPath = optionalString "contractPath" value
+            let permissionMode = optionalString "permissionMode" value
             let errors = ResizeArray<string>()
+
+            // Modes that can block a headless run on a prompt nobody answers
+            // (plan, manual) are not launch modes.
+            match permissionMode with
+            | Some mode when not (List.contains mode [ "acceptEdits"; "auto"; "bypassPermissions"; "dontAsk" ]) ->
+                errors.Add $"Unsupported execution permissionMode '{mode}'. Supported: acceptEdits, auto, bypassPermissions, dontAsk."
+            | _ -> ()
 
             match launcher with
             | Some provider when provider <> "codex" && provider <> "claude" ->
@@ -190,7 +198,8 @@ module Manifest =
                         { Enabled = enabled
                           Launcher = launcher
                           Mission = mission
-                          ContractPath = contractPath }
+                          ContractPath = contractPath
+                          PermissionMode = permissionMode }
                 )
         | Some _ -> Error "'execution' must be an object."
 

@@ -65,6 +65,15 @@
         "contractPath": {
           "type": "string",
           "minLength": 1
+        },
+        "permissionMode": {
+          "description": "Claude Code permission mode for headless runs. Modes that wait for a person (plan, manual) are not allowed.",
+          "enum": [
+            "acceptEdits",
+            "auto",
+            "bypassPermissions",
+            "dontAsk"
+          ]
         }
       }
     },

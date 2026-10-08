@@ -4,11 +4,18 @@ open System
 open System.IO
 
 module Readiness =
+    /// The Claude Code permission mode for a headless run when the manifest
+    /// declares none (see Launcher).
+    [<Literal>]
+    let DefaultPermissionMode = "auto"
+
     type ReadyExecution =
         { Mission: PraxisMission
           Launcher: string
           ContractPath: string
-          MissionState: string }
+          MissionState: string
+          /// Claude Code permission mode for headless runs.
+          PermissionMode: string }
 
     let private missionFor (manifest: ProjectManifest) contractPath =
         let description =
@@ -118,4 +125,8 @@ module Readiness =
                     { Mission = mission
                       Launcher = launcher |> Option.get
                       ContractPath = resolvedContract
-                      MissionState = missionState }
+                      MissionState = missionState
+                      PermissionMode =
+                        execution
+                        |> Option.bind _.PermissionMode
+                        |> Option.defaultValue DefaultPermissionMode }
