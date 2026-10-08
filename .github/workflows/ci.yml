@@ -88,6 +88,14 @@ jobs:
   ordo-integrity-gate-qualification:
     needs: build-test
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.4.2 is the echelon-current 1.1.0 selection and the upgrade source;
+        # 1.5.0 is the echelon-current 1.2.0 selection.
+        ordo: ["1.4.2", "1.5.0"]
+    env:
+      ORDO_VERSION: ${{ matrix.ordo }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v5
@@ -95,13 +103,13 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
-      - name: Install exact native Ordo 1.4.2
+      - name: Install exact native Ordo ${{ matrix.ordo }}
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version 1.4.2
+          curl -fsSL https://raw.githubusercontent.com/kemiller2002/ordo/main/scripts/install-native.sh | sh -s -- --version "$ORDO_VERSION"
           echo "$HOME/.echelon/bin" >> "$GITHUB_PATH"
-          "$HOME/.echelon/bin/ordo" --version | grep -Fx "1.4.2"
+          "$HOME/.echelon/bin/ordo" --version | grep -Fx "$ORDO_VERSION"
       - name: Adoption records structural review signals and fails closed on integrity
         shell: bash
         run: |
@@ -116,11 +124,11 @@ jobs:
           echo "edited" >> "$damaged/.sde/reference/GLOSSARY.md"
 
           conditor adopt --target "$healthy" --json > "$RUNNER_TEMP/gate-healthy.json"
-          python3 - "$RUNNER_TEMP/gate-healthy.json" <<'PY'
+          python3 - "$RUNNER_TEMP/gate-healthy.json" "$ORDO_VERSION" <<'PY'
           import json, sys
           plan = json.load(open(sys.argv[1]))
           assert plan["refusals"] == [], plan["refusals"]
-          assert {"id": "ordo", "version": "1.4.2"} in plan["components"], plan["components"]
+          assert {"id": "ordo", "version": sys.argv[2]} in plan["components"], plan["components"]
           paths = [signal["path"] for signal in plan["reviewSignals"] if signal["code"] == "SDE-STRUCT-001"]
           assert paths == ["src/Big.fs"], plan["reviewSignals"]
           PY
@@ -247,6 +255,45 @@ jobs:
           conditor upgrade --current --check --home "$RUNNER_TEMP/sweep-home" --target "$repo" --resolved-set "$RUNNER_TEMP/current.json" --resolved-set-sha256 "$CURRENT_SET_SHA256" | tee "$RUNNER_TEMP/sweep-current.txt"
           grep -F "version transitions: none" "$RUNNER_TEMP/sweep-current.txt"
           conditor status --target "$repo"
+      - name: Sweep to echelon-current 1.2.0 - upgrade --current moves only Ordo 1.4.2 -> 1.5.0
+        shell: bash
+        env:
+          # echelon-registry main at the echelon-current 1.2.0 selection of Ordo 1.5.0
+          # (merge 7f7a688). Strata 0.1.0 is optional in 1.2.0 and is not declared here,
+          # so --current must not add it.
+          NEXT_REGISTRY_COMMIT: 7f7a68844196dda17bfd5a07b30610206c1c8035
+          NEXT_SET_SHA256: ea1b39a003d3f2f41c4fb6e979694ec82fd03964854e5dd268e38df51cd22931
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          export PATH="$RUNNER_TEMP/ve-1.0.1/node_modules/.bin:$PATH"
+          repo="$RUNNER_TEMP/sweep"
+          curl -fsSL "https://raw.githubusercontent.com/kemiller2002/echelon-registry/$NEXT_REGISTRY_COMMIT/channels/echelon-current/linux-x64.json" -o "$RUNNER_TEMP/next.json"
+          echo "$NEXT_SET_SHA256  $RUNNER_TEMP/next.json" | sha256sum -c -
+          next=(--home "$RUNNER_TEMP/sweep-next-home" --target "$repo" --resolved-set "$RUNNER_TEMP/next.json" --resolved-set-sha256 "$NEXT_SET_SHA256")
+          conditor upgrade --current --check "${next[@]}" | tee "$RUNNER_TEMP/sweep-next.txt"
+          grep -F "Current upgrade plan: echelon-current@1.2.0" "$RUNNER_TEMP/sweep-next.txt"
+          grep -F "ordo: 1.4.2 -> 1.5.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/sweep-next.txt"
+          test "$(grep -c -- ' -> ' "$RUNNER_TEMP/sweep-next.txt")" -eq 2   # the transition and its lifecycle line
+          if grep -E "REFUSED|strata" "$RUNNER_TEMP/sweep-next.txt"; then exit 1; fi
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/sweep-next.txt" | cut -d' ' -f2)
+          conditor upgrade --current "${next[@]}" --authorize "$authorization"
+          python3 - "$repo" "$NEXT_SET_SHA256" <<'PY'
+          import json, sys, pathlib
+          repo, sha = pathlib.Path(sys.argv[1]), sys.argv[2]
+          manifest = json.loads((repo / "conditor.json").read_text())
+          versions = {c["id"]: c["version"] for c in manifest["components"]}
+          assert versions == {"ordo": "1.5.0", "praxis": "3.7.2", "visual-engineering": "1.0.1"}, versions
+          assert manifest["registryAuthority"]["sha256"] == sha, manifest
+          assert json.loads((repo / ".echelon/toolchain.json").read_text())["ordo"] == "1.5.0"
+          assert (repo / ".sde/VERSION").read_text().strip() == "1.5.0"
+          PY
+          conditor upgrade --current --check "${next[@]}" | grep -F "version transitions: none"
+          # The upgrade installed Ordo 1.5.0 into the workstation home and adds its bin
+          # directory to future shells through ~/.profile. Status must run with that
+          # copy: the Ordo 1.4.2 an earlier step put on PATH correctly refuses a 1.5.0
+          # installation with version-mismatch.
+          PATH="$RUNNER_TEMP/sweep-next-home/.local/bin:$PATH" conditor status --target "$repo"
       - name: Qualified VE 1.0.0 -> 1.0.1 current-upgrade transition
         shell: bash
         run: |

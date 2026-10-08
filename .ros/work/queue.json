@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 10,
+  "nextSeq": 12,
   "items": [
     {
       "id": "WI-0001",
@@ -185,6 +185,49 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0010",
+      "title": "Qualify Ordo 1.5.0 (echelon-current 1.2.0) and make conditor's own Ordo pins consistent at 1.5.0",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T07:01:44.527Z",
+      "updatedAt": "2026-10-08T07:06:34.639Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0011",
+      "title": "x",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "abandoned",
+      "attachments": [],
+      "createdAt": "2026-10-08T07:01:46.849Z",
+      "updatedAt": "2026-10-08T07:01:53.200Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null,
+      "abandonedReason": "Captured by accident: a mistyped 'add x --help' probe, not a real obligation."
     }
   ]
 }

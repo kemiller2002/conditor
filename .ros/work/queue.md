@@ -12,3 +12,5 @@
 | WI-0007 | Move conditor to Praxis 3.7.2 and Ordo 1.4.2 | complete | praxis, ordo, toolchain | medium |
 | WI-0008 | Current upgrade verifies with the tools it installed | complete | lifecycle | high |
 | WI-0009 | Current upgrade opts a project in to an optional native lifecycle tool | complete | lifecycle | high |
+| WI-0010 | Qualify Ordo 1.5.0 (echelon-current 1.2.0) and make conditor's own Ordo pins consistent at 1.5.0 | complete |  | medium |
+| WI-0011 | x | abandoned |  | medium |

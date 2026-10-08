@@ -682,10 +682,12 @@ let run (check: string -> bool -> unit) =
 
 
     // Every echelon-current selection Conditor carries a descriptor for is
-    // qualified at exactly the selected version (registry main f0e45db).
+    // qualified at exactly the selected version (registry main 7f7a688,
+    // echelon-current 1.2.0). Ordo 1.4.2, the 1.1.0 selection, stays
+    // qualified as the upgrade source (VerificationGateTests).
     let echelonCurrent =
         [ "praxis", "3.7.2"
-          "ordo", "1.4.2"
+          "ordo", "1.5.0"
           "percepta", "0.1.0"
           "visual-engineering", "1.0.1"
           "communication-engineering", "1.0.0"
