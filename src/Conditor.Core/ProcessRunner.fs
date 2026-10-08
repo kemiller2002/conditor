@@ -17,21 +17,38 @@ module ProcessRunner =
             |> Array.toList)
         |> Option.defaultValue []
 
-    /// Resolves the program a process request names. On Unix, .NET looks for a
-    /// bare command name in the Conditor process's own working directory before
-    /// PATH, so a repository-local launcher (for example a governed
-    /// repository's ./praxis) would shadow the host tool being probed. A bare
-    /// name therefore resolves through PATH only; a name with a directory part
-    /// is used as given. Windows keeps the platform's own resolution.
-    let resolveExecutable (executable: string) =
-        if OperatingSystem.IsWindows() || hasDirectoryPart executable then
+    /// The executable names a bare command can be on this platform.
+    let private candidates (executable: string) =
+        if OperatingSystem.IsWindows() then [ executable; executable + ".exe"; executable + ".cmd" ] else [ executable ]
+
+    /// Resolves the program a process request names, trying the `preferred`
+    /// directories before PATH. On Unix, .NET looks for a bare command name in
+    /// the Conditor process's own working directory before PATH, so a
+    /// repository-local launcher (for example a governed repository's
+    /// ./praxis) would shadow the host tool being probed. A bare name therefore
+    /// resolves through the preferred directories and PATH only; a name with a
+    /// directory part is used as given. Windows keeps the platform's own
+    /// resolution for anything the preferred directories do not hold.
+    let resolveExecutableIn (preferred: string list) (executable: string) =
+        if hasDirectoryPart executable then
             Some executable
         else
-            searchPath ()
-            |> List.map (fun directory -> Path.Combine(directory, executable))
-            |> List.tryFind File.Exists
+            let inPreferred =
+                preferred
+                |> List.collect (fun directory -> candidates executable |> List.map (fun name -> Path.Combine(directory, name)))
+                |> List.tryFind File.Exists
 
-    let private start workingDirectory (executable: string) (resolved: string) arguments =
+            match inPreferred with
+            | Some found -> Some found
+            | None when OperatingSystem.IsWindows() -> Some executable
+            | None ->
+                searchPath ()
+                |> List.map (fun directory -> Path.Combine(directory, executable))
+                |> List.tryFind File.Exists
+
+    let resolveExecutable (executable: string) = resolveExecutableIn [] executable
+
+    let private start (preferred: string list) workingDirectory (executable: string) (resolved: string) arguments =
         try
             let info = ProcessStartInfo()
             info.FileName <- resolved
@@ -39,6 +56,12 @@ module ProcessRunner =
             info.UseShellExecute <- false
             info.RedirectStandardOutput <- true
             info.RedirectStandardError <- true
+
+            // A tool that runs another tool (praxis running ordo) must find the
+            // same copies Conditor resolved, so the child sees the preferred
+            // directories first on its PATH as well.
+            if not preferred.IsEmpty then
+                info.Environment["PATH"] <- String.Join(string Path.PathSeparator, preferred @ searchPath ())
 
             for argument in arguments do
                 info.ArgumentList.Add argument
@@ -63,15 +86,24 @@ module ProcessRunner =
               StandardOutput = String.Empty
               StandardError = $"Unable to execute '{executable}': {ex.Message}" }
 
-    let runProcess workingDirectory (executable: string) arguments =
-        match resolveExecutable executable with
-        | Some resolved -> start workingDirectory executable resolved arguments
+    /// Runs a command, resolving a bare name through `preferred` before PATH.
+    let runProcessIn (preferred: string list) workingDirectory (executable: string) arguments =
+        match resolveExecutableIn preferred executable with
+        | Some resolved -> start preferred workingDirectory executable resolved arguments
         | None ->
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = $"Unable to execute '{executable}': not found on PATH." }
 
-    let run workingDirectory (action: PlanAction) =
+    let runProcess workingDirectory (executable: string) arguments =
+        runProcessIn [] workingDirectory executable arguments
+
+    /// Runs one plan action, resolving its executables through `preferred`
+    /// before PATH -- for example the workstation bin directory a current
+    /// upgrade has just installed into.
+    let runIn (preferred: string list) workingDirectory (action: PlanAction) =
+        let runProcess = runProcessIn preferred
+
         match action.Execution with
         | ExternalProcess(executable, arguments) ->
             runProcess workingDirectory executable arguments
@@ -111,3 +143,5 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = "EnsurePraxisMission must be executed by the Conditor installer, not the process runner." }
+
+    let run workingDirectory (action: PlanAction) = runIn [] workingDirectory action

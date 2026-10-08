@@ -677,12 +677,25 @@ module CurrentUpgrade =
                                           Path = pendingRelative.Replace('\\', '/')
                                           Sha256 = plan.TargetSetSha256 } }
 
+                        // Verify with the tools this upgrade installed. The
+                        // workstation step puts them in its bin directory and
+                        // adds that to future shells' PATH, not this
+                        // process's, so resolving bare names through PATH
+                        // here found nothing newly installed (an optional
+                        // native CLI such as strata) or a different copy
+                        // that happened to be on PATH.
+                        let installed =
+                            match plan.WorkstationPlan with
+                            | Some _ -> [ WorkstationPaths.binDir ctx ]
+                            | None -> []
+
                         let verification =
                             Requirements.verify target verificationManifest
                             |> Result.bind (fun () ->
                                 Planner.create target Verify verificationManifest
                                 |> Result.bind (fun verifyPlan ->
-                                    Installer.executeWithSignals target String.Empty verifyPlan |> Result.map snd))
+                                    Installer.executeWithSignalsUsing (ProcessRunner.runIn installed) target String.Empty verifyPlan
+                                    |> Result.map snd))
 
                         match verification with
                         | Error errors ->

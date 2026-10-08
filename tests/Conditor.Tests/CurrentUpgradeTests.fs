@@ -197,7 +197,16 @@ let run (check: string -> bool -> unit) =
 
         let ctx = context home mirror
         let priorPath = Environment.GetEnvironmentVariable "PATH"
-        Environment.SetEnvironmentVariable("PATH", Path.Combine(home, ".local", "bin") + string Path.PathSeparator + priorPath)
+
+        // The workstation's bin directory is NOT on this process's PATH (a
+        // real upgrade only adds it to future shells), and a decoy `gamma`
+        // that fails every command IS: verification must run the copy the
+        // upgrade installed, not whatever PATH finds.
+        let decoys = temp "decoys"
+        let decoy = Path.Combine(decoys, id)
+        File.WriteAllText(decoy, "#!/bin/sh\necho 'decoy gamma on PATH' >&2\nexit 7\n")
+        File.SetUnixFileMode(decoy, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+        Environment.SetEnvironmentVariable("PATH", decoys + string Path.PathSeparator + priorPath)
 
         try
             match Manifest.load manifestPath with
@@ -305,6 +314,24 @@ let run (check: string -> bool -> unit) =
                                 check $"second current upgrade preview succeeds: {details}" false
                             | Ok second ->
                                 check "second current upgrade has zero version transitions" second.Transitions.IsEmpty
+            // The resolution rule itself: a preferred directory wins over
+            // PATH; a name it does not hold still resolves through PATH.
+            let preferred = temp "preferred"
+            let installedCopy = Path.Combine(preferred, id)
+            File.WriteAllText(installedCopy, "#!/bin/sh\nexit 0\n")
+            File.SetUnixFileMode(installedCopy, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+
+            check
+                "a preferred directory resolves before PATH"
+                (ProcessRunner.resolveExecutableIn [ preferred ] id = Some installedCopy)
+
+            check
+                "without a preferred directory, PATH decides"
+                (ProcessRunner.resolveExecutable id = Some decoy)
+
+            check
+                "a name the preferred directory lacks falls back to PATH"
+                (ProcessRunner.resolveExecutableIn [ temp "empty" ] id = Some decoy)
         finally
             Environment.SetEnvironmentVariable("PATH", priorPath)
 

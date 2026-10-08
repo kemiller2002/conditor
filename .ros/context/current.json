@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-06T16:34:03.000Z",
+  "updatedAt": "2026-10-08T03:37:14Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -325,6 +325,56 @@
         }
       },
       "completedAt": "2026-10-06T16:34:03.000Z"
+    },
+    {
+      "id": "WI-0008",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/ProcessRunner.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/CurrentUpgrade.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Installer.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T03:37:14Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T033259063Z-ee7c15cb"
+      ],
+      "latestCheckpoint": {
+        "id": "6e746ae2b0020fb5064ddf02",
+        "recordedAt": "2026-10-08T03:37:13Z",
+        "executionId": "EXE-20261008T033259063Z-ee7c15cb",
+        "repository": "conditor",
+        "branch": "fix/verify-with-installed-workstation",
+        "commit": "b786f3ac8088e94b5f11fe4891fa43b520c06a83",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "fix/verify-with-installed-workstation",
+        "remoteCommit": "b786f3ac8088e94b5f11fe4891fa43b520c06a83",
+        "summary": "Final current-upgrade verification resolves through the workstation bin directory first; decoy-on-PATH regression test fails without the fix and passes with it; CI green on PR #49.",
+        "nextAction": "Complete WI-0008 and merge PR #49.",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T03:37:14Z",
+      "conclusion": "conditor upgrade --current now verifies the repository with the tools it just installed (workstation bin first for resolution and for child PATH), so an optional native CLI with a repository lifecycle installs and verifies; the test that masked the defect now proves it with a failing decoy on PATH."
     }
   ]
 }
