@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 24,
+  "nextSeq": 26,
   "items": [
     {
       "id": "WI-0001",
@@ -619,6 +619,30 @@
         "id": "anthropic/claude-code",
         "provider": "anthropic",
         "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0025",
+      "title": "URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist",
+      "description": "Portfolio deep-linking standard (Praxis SAF-URL-1..10, Limen DF-LIMEN-2026-0006). New web applications get .echelon/routes.json (echelon.routes/v1, hash mode), the routing capability in .echelon/foundations.json, a pure Routes.fs codec with round-trip tests to be replaced by Limen.Routing at 0.9.0, and requirements/URL-ADDRESSABLE-STATE.md.",
+      "tags": [
+        "scaffold",
+        "deep-linking"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T19:33:45.650Z",
+      "updatedAt": "2026-10-08T19:33:51.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
         "runtime": "claude-code"
       },
       "source": "manual",

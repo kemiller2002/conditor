@@ -31,3 +31,4 @@
 | WI-0022 | An established scaffold's seed files belong to the project: stop comparing or recreating them once the lock records the scaffold, so a project that grew past its scaffold can still plan, repair and upgrade --current; roll back governance when the current-upgrade commit step fails | complete | scaffold, upgrade, current | high |
 | WI-0023 | Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60) | complete |  | medium |
 | WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | complete |  | medium |
+| WI-0025 | URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist | ready | scaffold, deep-linking | high |
