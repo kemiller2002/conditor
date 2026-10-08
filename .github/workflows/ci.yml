@@ -289,7 +289,11 @@ jobs:
           assert (repo / ".sde/VERSION").read_text().strip() == "1.5.0"
           PY
           conditor upgrade --current --check "${next[@]}" | grep -F "version transitions: none"
-          conditor status --target "$repo"
+          # The upgrade installed Ordo 1.5.0 into the workstation home and adds its bin
+          # directory to future shells through ~/.profile. Status must run with that
+          # copy: the Ordo 1.4.2 an earlier step put on PATH correctly refuses a 1.5.0
+          # installation with version-mismatch.
+          PATH="$RUNNER_TEMP/sweep-next-home/.local/bin:$PATH" conditor status --target "$repo"
       - name: Qualified VE 1.0.0 -> 1.0.1 current-upgrade transition
         shell: bash
         run: |
