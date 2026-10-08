@@ -6,6 +6,7 @@
     <ProjectReference Include="../../src/Conditor.Core/Conditor.Core.fsproj" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EchelonCurrent.fs" />
     <Compile Include="WorkstationTests.fs" />
     <Compile Include="RepositoryLifecycleTests.fs" />
     <Compile Include="AdoptionTests.fs" />

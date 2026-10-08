@@ -638,6 +638,19 @@ match Presets.resolve "indy-init" with
                 $"the Indy preset materializes the referenced document {document}"
                 (materialized.Contains $"docs/{document}.md")
 
+        // The Indy preset follows the Registry echelon-current channel rather
+        // than the frozen Indy Init 0.1.0 set (Praxis 3.6.0, Ordo 1.4.0).
+        let channel = EchelonCurrent.selections |> Map.ofList
+
+        for request in manifest.Components do
+            check
+                $"the Indy preset pins {request.Id} at its echelon-current selection"
+                (request.Version.IsSome && Map.tryFind request.Id channel = request.Version)
+
+        check
+            "the Indy preset validates against the Conditor compatibility graph"
+            (Compatibility.validate manifest).IsEmpty
+
         check
             "Indy preset requirement ids are unique"
             ((manifest.Requirements |> List.map _.Id |> List.distinct).Length = manifest.Requirements.Length)
