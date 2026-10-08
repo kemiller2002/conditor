@@ -72,6 +72,11 @@ module Scaffolding =
                 $"    {encodedPackage}: {encodedVersion}{comma}")
             |> fun lines -> String.concat "\n" lines + "\n  }"
 
+    /// The Playwright release the browser suite pins exactly (the version
+    /// Signal pins). The pin fixes the Chromium build CI caches.
+    [<Literal>]
+    let PlaywrightVersion = "1.63.0"
+
     let private packageJson projectName manifest =
         let dependencies =
             resolvedBindings manifest
@@ -82,9 +87,9 @@ module Scaffolding =
             |> List.sortBy fst
 
         let dependencyBody = renderDependencies dependencies
-        let encodedName = jsonString (packageSlug projectName + "-kernel")
+        let encodedName = jsonString (packageSlug projectName)
 
-        $"{{\n  \"name\": {encodedName},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n"
+        $"{{\n  \"name\": {encodedName},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\",\n    \"test:browser\": \"playwright test\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"@playwright/test\": \"{PlaywrightVersion}\",\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n"
 
     let private projectFile projectName manifest =
         let packageReferences =
@@ -160,7 +165,9 @@ module Scaffolding =
 
         addCapability "limen" ignore
         addCapability "ordo" ignore
-        addCapability "percepta" ignore
+        // Exactly the capabilities of Praxis' echelon-foundations-v1 schema,
+        // which forbids any other key. Percepta verifies through its own
+        // repository lifecycle (percepta-repo verify), not the foundations.
         addCapability "praxis" ignore
 
         let root = JsonObject()
@@ -403,12 +410,12 @@ let ``scaffold builds and links the library`` () =
 
     /// `dotnet test` exits 0 for an empty or fully skipped run, so the step
     /// also requires at least one passed test and no skipped ones.
-    let private libraryTestStep =
+    let private dotnetTestStep (solution: string) =
         """      - name: Test
         shell: bash
         run: |
           set -uo pipefail
-          output=$(dotnet test @@NS@@.slnx -c Release --no-build 2>&1)
+          output=$(dotnet test @@SOLUTION@@ -c Release --no-build 2>&1)
           status=$?
           echo "$output"
           if [ "$status" -ne 0 ]; then exit "$status"; fi
@@ -419,6 +426,9 @@ let ``scaffold builds and links the library`` () =
             echo "::error::Tests were skipped. A run that skips tests is not a pass."; exit 1
           fi
 """
+        |> fun step -> step.Replace("@@SOLUTION@@", solution)
+
+    let private libraryTestStep = dotnetTestStep "@@NS@@.slnx"
 
     let private libraryBuildWorkflow =
         """name: Build and test
@@ -761,43 +771,438 @@ jobs:
                 @ ordoBaselineFiles (libraryBaselineLocations ns) manifest
             )
 
+    // ---------------------------------------------------------------------
+    // fsharp-limen-web: a new browser application repository.
+    //
+    // The npm project lives at the repository root, as in Signal: the Praxis
+    // foundations verifier reads the root package.json, and the pages under
+    // src/kernel reach node_modules through relative paths. Beyond the
+    // lifecycle components the scaffold establishes an engine test project,
+    // a real-browser smoke suite, a build-and-test workflow (with the cached,
+    // hang-proof Chromium install from signal#24), the foundations check, a
+    // GitHub Pages deployment that stays inert until a target is chosen, and
+    // the branch protection those checks back.
+    // ---------------------------------------------------------------------
+
+    /// The check runs a protected main requires: the job each scaffold
+    /// workflow defines (build-and-test.yml; the reusable foundations
+    /// workflow's job as echelon-foundations.yml calls it) and `validate`,
+    /// the job of the praxis-validation.yml workflow `praxis init` installs.
+    let webRequiredChecks =
+        [ "build-and-test"; "foundations / verify-foundations"; "validate" ]
+
+    /// A pull request merges into main only when the engine builds, its tests
+    /// pass, the pages work in a browser, the foundations verify and Praxis
+    /// validates. Administrators are bound too, so an agent working with the
+    /// owner's credentials cannot merge around CI. No human review is needed.
+    let webBranchProtection =
+        { Branch = "main"
+          RequiredChecks = webRequiredChecks
+          StrictStatusChecks = false
+          EnforceAdmins = true
+          RequirePullRequest = true
+          RequiredApprovingReviewCount = 0
+          AllowForcePushes = false
+          AllowDeletions = false }
+
+    let private webSolution =
+        """<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/engine/App.Engine.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/App.Engine.Tests/App.Engine.Tests.fsproj" />
+  </Folder>
+</Solution>
+"""
+
+    let private webTestProject =
+        """<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/engine/App.Engine.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="EngineTests.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>
+"""
+
+    let private webEngineTests =
+        """module App.Engine.Tests.EngineTests
+
+open Xunit
+open @@NS@@.Engine
+
+[<Fact>]
+let ``the scaffold engine starts uninitialized`` () =
+    Assert.Equal(State.Uninitialized, State.initial)
+
+[<Fact>]
+let ``the Aegis configuration validates at startup`` () =
+    Assert.True(Result.isOk (Operational.validateConfiguration ()))
+"""
+
+    let private webTsconfig =
+        "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ES2022\",\n    \"moduleResolution\": \"Bundler\",\n    \"strict\": true,\n    \"noEmit\": true,\n    \"lib\": [\"ES2022\", \"DOM\"]\n  },\n  \"include\": [\"src/kernel/**/*.ts\"]\n}\n"
+
+    /// Limen's user-owned boundary configuration. `limen init` adopts an
+    /// existing file (`preserved-existing`) and never overwrites it.
+    let private webLimenConfig =
+        "{\n  \"configurationVersion\": 1,\n  \"boundary\": {\n    \"engine\": [\n      \"src/engine\"\n    ],\n    \"kernel\": [\n      \"src/kernel\"\n    ]\n  }\n}\n"
+
+    let private webIndexPage =
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/design-system/dist/all.css\">\n  <title>Application</title>\n</head>\n<body>\n  <main>\n    <ef-button><button type=\"button\">Ready</button></ef-button>\n  </main>\n</body>\n</html>\n"
+
+    let private webPrintPage =
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/print-components/src/styles/print.css\">\n  <script type=\"module\" src=\"../../node_modules/@echelon-foundry/print-components/src/components/register.js\"></script>\n  <title>Printable document</title>\n</head>\n<body>\n  <ef-print-document><main><h1>Printable document</h1></main></ef-print-document>\n</body>\n</html>\n"
+
+    let private webPlaywrightConfig =
+        """// Real-browser checks for the application pages.
+//
+// The .NET tests prove the engine decides correctly; they cannot prove a page
+// loads. These tests serve the repository root (the pages reach into
+// node_modules/ for Forma and Folio) and drive the pages in Chromium.
+import { existsSync } from "node:fs";
+import { defineConfig, devices } from "@playwright/test";
+
+const port = 4321;
+const origin = `http://127.0.0.1:${port}`;
+
+// Some environments ship a Chromium that Playwright did not download itself.
+// Where that binary exists it is used as-is; everywhere else Playwright
+// resolves its own, so CI needs no special case.
+const preinstalledChromium = "/opt/pw-browsers/chromium";
+const launchOptions = existsSync(preinstalledChromium) ? { executablePath: preinstalledChromium } : {};
+
+export default defineConfig({
+  testDir: "./tests/browser",
+  fullyParallel: false,
+  workers: 1,
+  forbidOnly: !!process.env.CI,
+  retries: 0,
+  timeout: 60_000,
+  reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
+  use: { baseURL: origin, trace: "retain-on-failure" },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions } }],
+  webServer: {
+    command: `python3 -m http.server ${port} --bind 127.0.0.1`,
+    url: `${origin}/src/kernel/index.html`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000
+  }
+});
+"""
+
+    let private webSmokeSpec =
+        """// Scaffold smoke suite: every page loads every resource it references and
+// raises no script error. Extend it with the application's real journeys.
+import { expect, test } from "@playwright/test";
+
+const pages = ["src/kernel/index.html", "src/kernel/print.html"];
+
+for (const path of pages) {
+  test(`${path} loads every resource it references`, async ({ page }) => {
+    const failures = [];
+    page.on("response", (response) => {
+      if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`);
+    });
+    page.on("requestfailed", (request) => failures.push(`failed ${request.url()}`));
+    page.on("pageerror", (error) => failures.push(`script error: ${error.message}`));
+
+    await page.goto(`/${path}`);
+    await page.waitForLoadState("networkidle");
+
+    expect(failures).toEqual([]);
+  });
+}
+
+test("the application page renders its first control", async ({ page }) => {
+  await page.goto("/src/kernel/index.html");
+  await expect(page.getByRole("button", { name: "Ready" })).toBeVisible();
+});
+"""
+
+    /// Installs from the lockfile when one is committed. A fresh scaffold has
+    /// none until the first `npm install`; the step then says so loudly.
+    let private npmInstallStep =
+        """      - name: Install npm dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "::warning::package-lock.json is not committed; installing without a lockfile. Commit it so every run installs the same tree."
+            npm install --no-audit --no-fund
+          fi
+"""
+
+    let private webBuildWorkflow =
+        """name: Build and test
+
+# Every pull request and every push to main builds the F# engine and runs its
+# tests, type-checks the browser kernel, and drives the pages in a real
+# browser. Branch protection requires this job (.github/branch-protection.json).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # A normal run takes a few minutes. Anything that stalls fails here
+    # instead of holding a runner for the six-hour default.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Warnings are errors (Directory.Build.props), so this also gates
+      # warning regressions.
+      - name: Build
+        run: dotnet build App.slnx -c Release
+@@TEST_STEP@@@@NPM_INSTALL@@
+      - name: Type-check the browser kernel
+        run: npm run check
+
+      # Chromium is never installed with `--with-deps`: that runs `sudo
+      # apt-get update` on every run, and apt has no overall deadline, so an
+      # unanswered mirror hung browser suites until the six-hour job limit
+      # (signal#21, signal#22, summa#21; fixed in signal#24). The browser is
+      # cached under the installed Playwright version (which fixes the
+      # browser build), and the OS libraries are proved present offline.
+      - name: Resolve the installed Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./node_modules/playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # A stalled cache download falls back to a fresh browser download
+      # after two minutes instead of the default ten.
+      - name: Restore the Chromium build for that version
+        id: chromium-cache
+        uses: actions/cache@v4
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+
+      - name: Download Chromium for the browser suite
+        if: steps.chromium-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install chromium
+
+      # `ldd` proves offline that every shared library the Chromium binaries
+      # link against is on the runner. Only when a future runner image drops
+      # one does apt run at all, with per-request timeouts, retries and an
+      # overall deadline, and the result is checked again. A missing library
+      # fails the step by name; it can no longer hang.
+      - name: Verify Chromium's OS libraries
+        timeout-minutes: 8
+        run: |
+          missing_libraries() {
+            find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell \) -print0 \
+              | xargs -0 --no-run-if-empty ldd \
+              | awk '/not found/ { print $1 }' \
+              | sort -u
+          }
+
+          missing="$(missing_libraries)"
+          if [ -n "$missing" ]; then
+            echo "::warning::Runner image lacks Chromium libraries: $(echo $missing). Installing Chromium's OS dependencies."
+            printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' \
+              | sudo tee /etc/apt/apt.conf.d/99-bounded-network > /dev/null
+            timeout 300 npx playwright install-deps chromium \
+              || echo "::error::Installing Chromium's OS dependencies failed or took longer than five minutes."
+          fi
+
+          still_missing="$(missing_libraries)"
+          if [ -n "$still_missing" ]; then
+            echo "::error::Chromium cannot start; missing shared libraries: $(echo $still_missing)"
+            exit 1
+          fi
+          echo "Every shared library Chromium links against is present."
+
+      - name: Verify the pages in a real browser
+        run: npx playwright test
+
+      - name: Upload browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+"""
+
+    let private webDeployWorkflow =
+        """name: Deploy to GitHub Pages
+
+# The deployment target is not decided yet (Indy-init RQR-005; D-203 prefers
+# GitHub Pages "where practical"). This workflow is wired but inert: it runs
+# only when the repository variable DEPLOY_TARGET is `github-pages` and Pages
+# is enabled with source "GitHub Actions". It deploys what `npm run build`
+# writes to dist/. See DEPLOYMENT.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: vars.DEPLOY_TARGET == 'github-pages'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+@@NPM_INSTALL@@
+      - name: Build the site
+        run: npm run build
+
+      - name: Require the site bundle
+        run: |
+          if [ ! -f dist/index.html ]; then
+            echo "::error::npm run build must write the deployable site, including dist/index.html. See DEPLOYMENT.md."
+            exit 1
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+"""
+
+    let private webDeploymentGuide =
+        """# Deployment
+
+Conditor scaffolded a GitHub Pages deployment, `.github/workflows/deploy-pages.yml`.
+It stays inert until a deployment target is chosen.
+
+## Status
+
+The target is not decided. The Indy-init planning set prefers GitHub Pages
+"where practical" (D-203) and leaves the decision open (RQR-005). A static
+Pages site cannot hold secrets: an AI provider key or an OAuth token exchange
+needs a backend, which this workflow does not provide.
+
+## Contract
+
+- `npm run build` writes the complete deployable site to `dist/`, including
+  `dist/index.html`. The scaffold defines no `build` script; add one with the
+  first bundling decision.
+- Every push to `main` deploys `dist/` once the workflow is enabled.
+
+## Enable GitHub Pages
+
+1. Settings, Pages: set the source to "GitHub Actions"
+   (`gh api -X POST repos/OWNER/REPO/pages -f build_type=workflow`).
+2. Set the repository variable: `gh variable set DEPLOY_TARGET --body github-pages`.
+3. Push to `main`, or run the workflow from the Actions tab.
+
+To choose another target, replace the workflow and update this file in the
+same change.
+"""
+
+    let private webIgnores =
+        "# Build, test, package and browser outputs (Conditor fsharp-limen-web scaffold)\nbin/\nobj/\ndist/\nTestResults/\nnode_modules/\ntest-results/\nplaywright-report/\n"
+
+    let private webFiles (projectName: string) (manifest: ProjectManifest) (limen: string) =
+        let ns = identifier projectName
+
+        let render =
+            fill
+                [ "@@TEST_STEP@@", dotnetTestStep "App.slnx"
+                  "@@NPM_INSTALL@@", npmInstallStep
+                  "@@PRAXIS_REF@@", PraxisFoundationsRef
+                  "@@NS@@", ns ]
+
+        [ "Directory.Build.props",
+          "<Project>\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <LangVersion>latest</LangVersion>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n"
+          "App.slnx", webSolution
+          "src/engine/App.Engine.fsproj", projectFile projectName manifest
+          "src/engine/Operational.fs", operationalFile projectName
+          "src/engine/Domain.fs",
+          $"namespace {ns}.Engine\n\ntype State =\n    | Uninitialized\n\nmodule State =\n    let initial = Uninitialized\n"
+          "tests/App.Engine.Tests/App.Engine.Tests.fsproj", webTestProject
+          "tests/App.Engine.Tests/EngineTests.fs", render webEngineTests
+          ".echelon/foundations.json", foundationManifest projectName manifest
+          "aegis-boundaries.json", aegisBoundaryManifest projectName
+          "package.json", packageJson projectName manifest
+          "tsconfig.json", webTsconfig
+          "limen.config.json", webLimenConfig
+          "src/kernel/bootstrap.ts", kernelBootstrap limen
+          "src/kernel/index.html", webIndexPage
+          "src/kernel/print.html", webPrintPage
+          "playwright.config.js", webPlaywrightConfig
+          "tests/browser/smoke.spec.js", webSmokeSpec
+          ".github/workflows/build-and-test.yml", render webBuildWorkflow
+          ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
+          ".github/workflows/deploy-pages.yml", render webDeployWorkflow
+          BranchProtection.RelativePath, BranchProtection.render webBranchProtection
+          "DEPLOYMENT.md", webDeploymentGuide
+          ".gitignore", webIgnores ]
+        @ ordoBaselineFiles webBaselineLocations manifest
+
     let private desiredFiles (manifest: ProjectManifest) (scaffold: ScaffoldRequest) =
         let projectName =
             scaffold.Name
             |> Option.filter (String.IsNullOrWhiteSpace >> not)
             |> Option.defaultValue manifest.Name
 
-        let ns = identifier projectName
-
         match scaffold.Kind, limenPackage manifest with
         | "fsharp-limen-web", None ->
             Error [ "Scaffold 'fsharp-limen-web' requires an embedded Limen descriptor to name the kernel's protocol package." ]
         | "fsharp-limen-web", Some limen ->
-            let files =
-                [ "Directory.Build.props",
-                  "<Project>\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <LangVersion>latest</LangVersion>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n"
-                  "App.slnx",
-                  "<Solution>\n  <Folder Name=\"/src/\">\n    <Project Path=\"src/engine/App.Engine.fsproj\" />\n  </Folder>\n</Solution>\n"
-                  "src/engine/App.Engine.fsproj", projectFile projectName manifest
-                  ".echelon/foundations.json", foundationManifest projectName manifest
-                  "aegis-boundaries.json", aegisBoundaryManifest projectName
-                  "src/engine/Operational.fs", operationalFile projectName
-                  "src/engine/Domain.fs",
-                  $"namespace {ns}.Engine\n\ntype State =\n    | Uninitialized\n\nmodule State =\n    let initial = Uninitialized\n"
-                  "src/kernel/package.json", packageJson projectName manifest
-                  "src/kernel/tsconfig.json",
-                  "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ES2022\",\n    \"moduleResolution\": \"Bundler\",\n    \"strict\": true,\n    \"noEmit\": true,\n    \"lib\": [\"ES2022\", \"DOM\"]\n  },\n  \"include\": [\"**/*.ts\"]\n}\n"
-                  "src/kernel/bootstrap.ts", kernelBootstrap limen
-                  "src/kernel/index.html",
-                  "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"./node_modules/@echelon-foundry/design-system/dist/all.css\">\n  <title>Application</title>\n</head>\n<body>\n  <main>\n    <ef-button><button type=\"button\">Ready</button></ef-button>\n  </main>\n</body>\n</html>\n"
-                  "src/kernel/print.html",
-                  "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <link rel=\"stylesheet\" href=\"./node_modules/@echelon-foundry/print-components/src/styles/print.css\">\n  <script type=\"module\" src=\"./node_modules/@echelon-foundry/print-components/src/components/register.js\"></script>\n  <title>Printable document</title>\n</head>\n<body>\n  <ef-print-document><main><h1>Printable document</h1></main></ef-print-document>\n</body>\n</html>\n" ]
-
-            let filesWithOrdoBaseline = files @ ordoBaselineFiles webBaselineLocations manifest
+            let files = webFiles projectName manifest limen
 
             match agentEntryFile manifest with
-            | Some agentFile -> Ok(agentFile :: filesWithOrdoBaseline)
-            | None -> Ok filesWithOrdoBaseline
+            | Some agentFile -> Ok(agentFile :: files)
+            | None -> Ok files
         | "fsharp-nuget-library", _ ->
             libraryFiles projectName manifest
             |> Result.map (fun files ->

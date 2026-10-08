@@ -17,6 +17,8 @@
     <Compile Include="ComponentSchemaTests.fs" />
     <Compile Include="VerificationGateTests.fs" />
     <Compile Include="LibraryScaffoldTests.fs" />
+    <Compile Include="WebScaffoldTests.fs" />
+    <Compile Include="BranchProtectionTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

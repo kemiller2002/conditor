@@ -106,7 +106,7 @@ let run (check: string -> bool -> unit) =
 
             check
                 $"Limen {current} scaffold binds @echelon-foundry/limen and never the deprecated package"
-                (scaffoldFile "src/kernel/package.json" plan
+                (scaffoldFile "package.json" plan
                  |> Option.exists (fun text ->
                      text.Contains($"\"{CurrentLimen}\": \"{current}\"", StringComparison.Ordinal)
                      && not (text.Contains(LegacyLimen, StringComparison.Ordinal))))
@@ -130,7 +130,7 @@ let run (check: string -> bool -> unit) =
                  |> Option.exists (fun item ->
                      item.Package = LegacyLimen
                      && item.SourceReference = Some $"npm:{LegacyLimen}@{legacy}")
-                 && scaffoldFile "src/kernel/package.json" plan
+                 && scaffoldFile "package.json" plan
                     |> Option.exists (fun text ->
                         text.Contains($"\"{LegacyLimen}\": \"{legacy}\"", StringComparison.Ordinal)
                         && not (text.Contains($"\"{CurrentLimen}\"", StringComparison.Ordinal)))
@@ -170,7 +170,7 @@ let run (check: string -> bool -> unit) =
 
                 check
                     "clean-room scaffold binds Limen 0.7.1 and Forma 0.4.1 and never the deprecated Limen package"
-                    (scaffoldFile "src/kernel/package.json" plan
+                    (scaffoldFile "package.json" plan
                      |> Option.exists (fun text ->
                          text.Contains($"\"{CurrentLimen}\": \"0.7.1\"", StringComparison.Ordinal)
                          && text.Contains("\"@echelon-foundry/design-system\": \"0.4.1\"", StringComparison.Ordinal)

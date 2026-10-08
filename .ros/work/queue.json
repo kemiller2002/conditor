@@ -300,10 +300,10 @@
       "description": null,
       "tags": [],
       "priority": "medium",
-      "status": "captured",
+      "status": "ready",
       "attachments": [],
       "createdAt": "2026-10-08T07:52:48.507Z",
-      "updatedAt": "2026-10-08T07:52:48.507Z",
+      "updatedAt": "2026-10-08T09:13:02.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
@@ -376,6 +376,30 @@
       "attachments": [],
       "createdAt": "2026-10-08T08:59:18.000Z",
       "updatedAt": "2026-10-08T09:00:39.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0019",
+      "title": "fsharp-limen-web scaffold: engine tests, browser suite, build-and-test CI with cached Playwright, foundations, inert Pages deploy, branch protection",
+      "description": "The web scaffold had no test project, no CI beyond praxis-validation, no deploy and no branch protection (readiness G1-2). Its npm project under src/kernel could never pass praxis foundations verify, which reads the root package.json and a Limen manifest, and its foundations.json declared percepta, which the Praxis schema forbids (G1-6). Move the npm project to the root, add xUnit engine tests, a Playwright smoke suite, build-and-test with the signal#24 cached-Chromium pattern, the foundations workflow, a Pages deployment gated on DEPLOY_TARGET, and a branch-protection declaration with a fail-closed parser and the GitHub payload.",
+      "tags": [
+        "scaffold",
+        "indy-init"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T09:13:02.000Z",
+      "updatedAt": "2026-10-08T09:13:02.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

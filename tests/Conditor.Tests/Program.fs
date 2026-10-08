@@ -154,14 +154,14 @@ withTarget
                         check $"scaffold plan succeeds: {details}" false
                     | Ok plan ->
                         check "scaffold application bindings resolve" (plan.Components.Length = 4)
-                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 12)
+                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 23)
                         check "scaffold does not execute a package-manager Limen lifecycle" (plan.Actions |> List.exists (fun action -> action.ComponentId = "limen" && action.Kind = VerifyLifecycle) |> not)
 
                         let packageJson =
                             plan.Actions
                             |> List.tryPick (fun action ->
                                 match action.Execution with
-                                | EnsureFile("src/kernel/package.json", fileContent) -> Some fileContent
+                                | EnsureFile("package.json", fileContent) -> Some fileContent
                                 | _ -> None)
 
                         let projectFile =
@@ -1197,6 +1197,8 @@ LimenPackageIdentityTests.run check
 ComponentSchemaTests.run check
 VerificationGateTests.run check
 LibraryScaffoldTests.run check
+WebScaffoldTests.run check
+BranchProtectionTests.run check
 
 let exitCode =
     if failures = 0 then
