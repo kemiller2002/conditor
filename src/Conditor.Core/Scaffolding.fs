@@ -1226,6 +1226,43 @@ same change.
 
         if full.StartsWith(rootPrefix, comparison) then Some full else None
 
+    /// The scaffold the Conditor lock records as established, if any.
+    let establishedScaffold (target: string) : ScaffoldRequest option =
+        let path = Path.Combine(target, ".conditor", "lock.json")
+
+        if not (File.Exists path) then
+            None
+        else
+            try
+                let root = JsonNode.Parse(File.ReadAllText path)
+
+                match root with
+                | null -> None
+                | node ->
+                    match node["manifest"] with
+                    | null -> None
+                    | manifest ->
+                        match manifest["scaffold"] with
+                        | :? JsonObject as scaffold ->
+                            let text (name: string) =
+                                match scaffold[name] with
+                                | :? JsonValue as value ->
+                                    match value.TryGetValue<string>() with
+                                    | true, found -> Option.ofObj found
+                                    | _ -> None
+                                | _ -> None
+
+                            text "kind" |> Option.map (fun kind -> { Kind = kind; Name = text "name" })
+                        | _ -> None
+            with _ ->
+                None
+
+    /// The scaffold's files to write. A scaffold is a seed: once the lock
+    /// records it as established for this manifest, its files belong to the
+    /// project, which may grow, rename or remove them. Conditor then neither
+    /// recreates nor compares them, and keeps ensuring only its bounded
+    /// managed regions. Before that, an existing file with other content is
+    /// refused rather than overwritten.
     let plan target (manifest: ProjectManifest) =
         match manifest.Scaffold with
         | None -> Ok []
@@ -1235,6 +1272,7 @@ same change.
             | Ok desired ->
                 let errors = ResizeArray<string>()
                 let changes = ResizeArray<string * string>()
+                let established = establishedScaffold target = Some scaffold
 
                 for relativePath, content in desired do
                     match safeFullPath target relativePath with
@@ -1244,6 +1282,7 @@ same change.
                         // These are shared integration surfaces. The installer owns only
                         // bounded Conditor regions and resolves current file contents at execution time.
                         changes.Add(relativePath, content)
+                    | Some _ when established -> ()
                     | Some fullPath ->
                         if File.Exists fullPath then
                             let existing = File.ReadAllText fullPath
