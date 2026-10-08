@@ -2,7 +2,10 @@
 
 | ID | Work | Status | Tags | Priority |
 |---|---|---|---|---|
+| INDY-0001 | CI smoke checks follow the web scaffold's root package.json | complete | ci, scaffold | high |
+| INDY-0002 | conditor requirements import: pinned planning documents to Praxis slice work items with a full trace | complete | requirements, indy-init | high |
 | INDY-0003 | conditor supervise: sustainable headless Claude launch with explicit permission mode, resume on exit and a deadline | complete | launcher, indy-init | high |
+| INDY-0004 | Indy day-of defaults: demo-readiness never-cut, baseline security and trace view as slice acceptance criteria, Pages deploy, AI, persistence, organizer and demo decisions | complete | indy-init, requirements | high |
 | ROS-INSTALL-3-7-1 | ROS-INSTALL-3-7-1 | complete |  |  |
 | WI-0001 | Govern conditor with Praxis 3.7.1 and Ordo 1.4.0 | complete | praxis, ordo, toolchain | medium |
 | WI-0002 | Safe fail-closed current-upgrade contract for package-distributed web bindings (limen, forma, folio); qualify Praxis 3.7.1 and Ordo 1.4.1 | complete |  | medium |
@@ -27,5 +30,3 @@
 | WI-0021 | Install Registry nuget-library releases distributed as GitHub release assets (ordo-core.nupkg, Arca) into a consumer's local NuGet feed: digest-proven vendor/nuget, lock, NuGet.config source mapping; init, verify and upgrade --current opt-in and version change | complete | nuget, feed, arca, registry | high |
 | WI-0022 | An established scaffold's seed files belong to the project: stop comparing or recreating them once the lock records the scaffold, so a project that grew past its scaffold can still plan, repair and upgrade --current; roll back governance when the current-upgrade commit step fails | complete | scaffold, upgrade, current | high |
 | WI-0023 | Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60) | complete |  | medium |
-| INDY-0002 | conditor requirements import: pinned planning documents to Praxis slice work items with a full trace | complete | requirements, indy-init | high |
-| INDY-0001 | CI smoke checks follow the web scaffold's root package.json | complete | ci, scaffold | high |

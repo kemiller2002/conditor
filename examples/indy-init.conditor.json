@@ -742,9 +742,9 @@
       {
         "id": "demo-readiness",
         "after": "security-hardening",
-        "cutPolicy": "cut-last",
+        "cutPolicy": "never-cut",
         "goal": "hackathon demonstration: understandable in seconds, demo health, graceful degradation, deployment and performance",
-        "basis": "IMPLEMENTATION-SLICES Slice 11; REQUIREMENTS R16; SCREEN-CONTRACTS S25"
+        "basis": "IMPLEMENTATION-SLICES Slice 11; REQUIREMENTS R16; SCREEN-CONTRACTS S25; never-cut because a working demo is required to compete (DF-CON-2026-A002)"
       },
       {
         "id": "advanced-views",
@@ -1106,6 +1106,56 @@
           "D-401..D-412",
           "A60",
           "A220..A225"
+        ]
+      }
+    ],
+    "acceptance": [
+      {
+        "slice": "bootstrap",
+        "criteria": [
+          "Baseline security from the first commit (DF-CON-2026-A002): no credential, token or provider key is committed, bundled into the client, or written to Praxis state, reports or logs (P35.3, R11.3, K-STOP-11). A CI check fails the build when one appears.",
+          "Every page ships a restrictive Content-Security-Policy: no inline script, no eval, and connect-src limited to the GitHub API and the chosen AI provider (P35.9, SECURITY-THREAT-MODEL section 17). A browser test asserts it. GitHub Pages cannot set headers and a meta-tag CSP cannot carry frame-ancestors, so record that gap as a deviation (P40.4).",
+          "Commit package-lock.json so CI installs from the lockfile, and run `npx limen init` (it adopts limen.config.json) so the Limen boundary is verified in CI."
+        ]
+      },
+      {
+        "slice": "workspace",
+        "criteria": [
+          "Baseline input safety (DF-CON-2026-A002): every user and evidence input is validated at the domain boundary through typed commands and refused with an explainable reason, and untrusted text renders inert, never as HTML, script or instructions (P35.7, P35.8, A101, A105)."
+        ]
+      },
+      {
+        "slice": "ai-proposals",
+        "criteria": [
+          "AI transport (RQR-003, OQ-010, D-212 ReversibleChoice; DF-CON-2026-A002): the browser calls the AI provider directly with a key the user enters at runtime. The key is held in memory for the session only: never committed, bundled, stored in localStorage, logged, or sent in prompts or reports (P35.3). Keep it behind a provider interface so a small proxy can replace it without domain changes (P16.1).",
+          "Without a key or a network the investigation stays fully usable by hand, and a clearly labelled recorded proposal is available as the demo fallback (P16.7, P33.13, P38.38). Record the transport choice as a ReversibleChoice decision in this repository."
+        ]
+      },
+      {
+        "slice": "github-provider",
+        "criteria": [
+          "Persistence authentication (RQR-004, OQ-009, D-210; DF-CON-2026-A002): the competition profile uses a fine-grained personal access token scoped to one investigation data repository, contents read and write only, with a short expiry. It is entered at runtime, held in memory for the session only and never stored in localStorage. Document it as the temporary developer-mode deviation SECURITY-THREAT-MODEL sections 4 and 6 permit, and record GitHub App with token exchange as the production target (P35.2, R11.1).",
+          "Investigation data lives in a separate data repository, never in the application repository, so the token cannot change application code (R11.2). The person creates that repository and token; until they exist the app works local-only, and the UI says so honestly (R10.6)."
+        ]
+      },
+      {
+        "slice": "factory-proof",
+        "criteria": [
+          "Publish a generated, read-only requirements trace view in the Factory View (S20, S21; DF-CON-2026-A002). Build it at build time from the requirements-trace.json attachment of COND-MISSION-001 plus Praxis completion state. List every source requirement with its slice, status and evidence, and stamp the view with its build commit. It never edits Praxis state (P38.29, A166, A200)."
+        ]
+      },
+      {
+        "slice": "demo-readiness",
+        "criteria": [
+          "Deploy to GitHub Pages (RQR-005, D-203; DF-CON-2026-A002): add `npm run build` writing the complete site, including dist/index.html, to dist/, so .github/workflows/deploy-pages.yml publishes it; verify the deployed URL before the final freeze (P26.1).",
+          "Demo scenario (RQR-008, OQ-042): the DEMO-PLAN order-delivery case. The order never arrived; the system and the carrier both say delivered; the shipping address may have changed after the order. Seed it as ordinary investigation data through normal commands, with at least one falsified hypothesis, one blocking unknown and one contradiction. The product must not special-case it.",
+          "Demo health (S25) shows the AI key, persistence and deployment state honestly, and the demo still works without the AI key or the data repository."
+        ]
+      },
+      {
+        "slice": "decision-register",
+        "criteria": [
+          "Record the competition defaults of DF-CON-2026-A002 as ReversibleChoice decisions in this repository: AI transport (OQ-010), persistence authentication (OQ-009), deployment (D-203) and demo scenario (OQ-042), each with its rationale and the condition that would change it."
         ]
       }
     ]

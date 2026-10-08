@@ -32,7 +32,9 @@ conditor requirements import --target .                                # apply t
      stretch and deferred are low.
    - **Dependency:** "Depends on" the nearest earlier never-cut slice, which
      `praxis plan` infers.
-   - **Description:** lists the owned IDs as ranges.
+   - **Description:** lists the owned IDs as ranges, plus any acceptance
+     criteria the optional `acceptance` list adds for that slice from factory
+     decisions (for Indy, `DF-CON-2026-A002`).
 6. Reconciles with the Praxis queue:
    - It captures and readies missing items.
    - It readies items that are captured but not ready.

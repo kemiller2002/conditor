@@ -123,6 +123,10 @@ conditor start --preset indy-init --launcher codex
 
 Use `conditor start --check --preset indy-init` only after initialization when you want a read-only readiness check.
 
+## Indy Init day of
+
+The three-step competition sequence is `conditor init` plus `repo create --deploy github-pages`, then `requirements import` with the pinned plan digest, then `supervise` until the deadline. It is in [docs/indy-day-of.md](docs/indy-day-of.md), with the defaults it relies on (DF-CON-2026-A002).
+
 ## Create the GitHub repository
 
 `conditor repo create` publishes a freshly initialized target as a new GitHub repository and prepares it for agent work:

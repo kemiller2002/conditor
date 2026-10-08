@@ -225,6 +225,66 @@ let run (check: string -> bool -> unit) =
             (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "ready" |> Map.remove umbrella.Id) []
              |> failsWith "umbrella work item COND-MISSION-001 is missing")
 
+    // Acceptance criteria from factory decisions.
+    let withCriteria = { spec with Acceptance = [ { Slice = "ui"; Criteria = [ "Every page ships a CSP."; "Input is validated." ] } ] }
+
+    match planWith withCriteria sources with
+    | Error errors -> check $"acceptance criteria plan: {joined errors}" false
+    | Ok plan ->
+        let ui = plan.Items |> List.find (fun item -> item.Id = "SLICE-UI")
+
+        check "a slice lists the acceptance criteria its factory decisions add"
+            (ui.Description.Contains("Acceptance criteria (factory decisions):\n- Every page ships a CSP.\n- Input is validated.", StringComparison.Ordinal))
+
+        check "slices without criteria say nothing about them"
+            (plan.Items |> List.filter (fun item -> item.Id <> "SLICE-UI") |> List.forall (fun item -> not (item.Description.Contains("Acceptance criteria", StringComparison.Ordinal))))
+
+        check "acceptance criteria are part of the plan digest"
+            (match planWith spec sources with
+             | Ok plain -> plain.Digest <> plan.Digest
+             | Error _ -> false)
+
+    check "acceptance criteria for an unknown slice are refused"
+        (planWith { spec with Acceptance = [ { Slice = "nowhere"; Criteria = [ "x" ] } ] } sources
+         |> failsWith "Acceptance criteria name unknown slice 'nowhere'")
+
+    check "two acceptance entries for one slice are refused"
+        (planWith { spec with Acceptance = [ { Slice = "ui"; Criteria = [ "x" ] }; { Slice = "ui"; Criteria = [ "y" ] } ] } sources
+         |> failsWith "Slice 'ui' has more than one acceptance entry")
+
+    check "an acceptance entry without criteria is refused"
+        (parse (specJson.Replace("\"assignments\": [", "\"acceptance\": [{\"slice\": \"ui\", \"criteria\": []}],\n  \"assignments\": ["))
+         |> failsWith "'criteria' must be a non-empty array")
+
+    // The Indy decisions (DF-CON-2026-A002) as the preset carries them.
+    match Presets.resolve "indy-init" |> Result.bind (fun preset -> RequirementsImport.readSpec preset.Content) with
+    | Error errors -> check $"the Indy specification reads: {joined errors}" false
+    | Ok indy ->
+        let criteriaFor slice =
+            indy.Acceptance |> List.tryFind (fun entry -> entry.Slice = slice) |> Option.map (fun entry -> String.concat " " entry.Criteria) |> Option.defaultValue ""
+
+        check "demo readiness is never-cut: a demo is required to compete"
+            (indy.AdditionalSlices |> List.exists (fun slice -> slice.Id = "demo-readiness" && slice.CutPolicy = NeverCut))
+
+        check "security hardening stays cut-last"
+            (indy.AdditionalSlices |> List.exists (fun slice -> slice.Id = "security-hardening" && slice.CutPolicy = CutLast))
+
+        check "multi-agent keeps the kickoff's stretch policy: the preset neither adds nor overrides it"
+            (indy.AdditionalSlices |> List.forall (fun slice -> slice.Id <> "multi-agent")
+             && indy.Acceptance |> List.forall (fun entry -> entry.Slice <> "multi-agent"))
+
+        check "never-cut slices carry baseline security: no secrets in the client, a CSP, input validation"
+            (criteriaFor "bootstrap" |> fun text -> text.Contains("no credential, token or provider key", StringComparison.Ordinal) && text.Contains("Content-Security-Policy", StringComparison.Ordinal)
+             && (criteriaFor "workspace").Contains("validated at the domain boundary", StringComparison.Ordinal)
+             && (criteriaFor "ai-proposals").Contains("held in memory for the session only", StringComparison.Ordinal))
+
+        check "the factory view publishes a generated, read-only trace view"
+            ((criteriaFor "factory-proof").Contains("read-only requirements trace view", StringComparison.Ordinal))
+
+        check "the demo deploys to GitHub Pages with the DEMO-PLAN scenario"
+            ((criteriaFor "demo-readiness").Contains("GitHub Pages", StringComparison.Ordinal)
+             && (criteriaFor "demo-readiness").Contains("order-delivery", StringComparison.Ordinal))
+
     // Fail closed.
     check "a document that changed shape is refused"
         (planWith { spec with Documents = spec.Documents |> List.map (fun document -> { document with Expected = 4 }) } sources

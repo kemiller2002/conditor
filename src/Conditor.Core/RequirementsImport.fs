@@ -30,6 +30,10 @@ type AddedSlice =
 
 type SliceAssignment = { Slice: string; Match: string list }
 
+/// Acceptance criteria a factory decision adds to one slice, beyond its
+/// traced source requirements.
+type SliceAcceptance = { Slice: string; Criteria: string list }
+
 type KickoffCounts =
     { PrioritySlices: int
       SuccessGates: int
@@ -44,7 +48,9 @@ type RequirementsImportSpec =
       Documents: RequirementDocument list
       KickoffExpected: KickoffCounts
       AdditionalSlices: AddedSlice list
-      Assignments: SliceAssignment list }
+      Assignments: SliceAssignment list
+      /// Optional; one entry per slice at most.
+      Acceptance: SliceAcceptance list }
 
 /// One addressable source requirement, such as P3.4 or A12.
 type SourceRequirement =
@@ -262,6 +268,29 @@ module RequirementsImport =
             | Ok slice, Ok rules -> Ok { Slice = slice; Match = rules }
             | slice, rules -> Error(errorsOf slice @ errorsOf rules)
 
+    let private parseAcceptance index (element: JsonElement) =
+        let context = $"requirementsImport.acceptance[{index}]"
+
+        match onlyFields context [ "slice"; "criteria" ] element with
+        | Error errors -> Error errors
+        | Ok() ->
+            let criteria =
+                array context element "criteria"
+                |> Result.bind (fun items ->
+                    items
+                    |> List.map (fun item ->
+                        if item.ValueKind = JsonValueKind.String then
+                            match item.GetString() |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not) with
+                            | Some criterion -> Ok criterion
+                            | None -> Error [ $"{context}: every criterion must be a non-empty string." ]
+                        else
+                            Error [ $"{context}: every criterion must be a non-empty string." ])
+                    |> sequence)
+
+            match text context element "slice", criteria with
+            | Ok slice, Ok criteria -> Ok { Slice = slice; Criteria = criteria }
+            | slice, criteria -> Error(errorsOf slice @ errorsOf criteria)
+
     let private parseKickoffCounts (element: JsonElement) =
         let context = "requirementsImport.kickoffExpected"
 
@@ -277,7 +306,7 @@ module RequirementsImport =
             | slices, gates, stops -> Error(errorsOf slices @ errorsOf gates @ errorsOf stops)
 
     let private fields =
-        [ "workItemPrefix"; "source"; "kickoff"; "traceAttachment"; "documents"; "kickoffExpected"; "additionalSlices"; "assignments" ]
+        [ "workItemPrefix"; "source"; "kickoff"; "traceAttachment"; "documents"; "kickoffExpected"; "additionalSlices"; "assignments"; "acceptance" ]
 
     /// Parses the `requirementsImport` object. Every field is required and
     /// unknown fields are refused.
@@ -314,6 +343,13 @@ module RequirementsImport =
                 array context element "assignments"
                 |> Result.bind (List.mapi parseAssignment >> sequence)
 
+            let acceptance =
+                match property element "acceptance" with
+                | None -> Ok []
+                | Some value when value.ValueKind = JsonValueKind.Array ->
+                    value.EnumerateArray() |> List.ofSeq |> List.mapi parseAcceptance |> sequence
+                | Some _ -> Error [ $"{context}: 'acceptance' must be an array." ]
+
             match
                 prefix,
                 text context element "source",
@@ -322,9 +358,11 @@ module RequirementsImport =
                 documents,
                 kickoffExpected,
                 added,
-                assignments
+                (match assignments, acceptance with
+                 | Ok assignments, Ok acceptance -> Ok(assignments, acceptance)
+                 | assignments, acceptance -> Error(errorsOf assignments @ errorsOf acceptance))
             with
-            | Ok prefix, Ok source, Ok kickoff, Ok attachment, Ok documents, Ok expected, Ok added, Ok assignments ->
+            | Ok prefix, Ok source, Ok kickoff, Ok attachment, Ok documents, Ok expected, Ok added, Ok(assignments, acceptance) ->
                 Ok
                     { WorkItemPrefix = prefix
                       Source = source
@@ -333,7 +371,8 @@ module RequirementsImport =
                       Documents = documents
                       KickoffExpected = expected
                       AdditionalSlices = added
-                      Assignments = assignments }
+                      Assignments = assignments
+                      Acceptance = acceptance }
             | prefix, source, kickoff, attachment, documents, expected, added, assignments ->
                 Error(
                     errorsOf prefix
@@ -673,6 +712,7 @@ module RequirementsImport =
         (slice: ImportSlice)
         (dependsOn: string option)
         (requirements: SourceRequirement list)
+        (criteria: string list)
         =
         let dependency =
             match dependsOn with
@@ -687,7 +727,14 @@ module RequirementsImport =
                 $"- {scheme} ({items.Length}): {ids}")
             |> String.concat "\n"
 
-        $"{slice.Goal}\n\nSlice {order} of {total} in the {spec.Source} requirements queue; cut policy {cutPolicyName slice.CutPolicy}.{dependency}\nBasis: {slice.Basis}.\n\nSource requirements ({requirements.Length}), each traced to this item in the {spec.TraceAttachment} attachment of {umbrella}:\n{schemes}\n\nComplete only when the kickoff completionRule holds for every source requirement above: requirement, implementation, tests, runtime or verification evidence, and Praxis and Aegis obligations."
+        let acceptance =
+            match criteria with
+            | [] -> ""
+            | items ->
+                let lines = items |> List.map (fun criterion -> $"- {criterion}") |> String.concat "\n"
+                $"\n\nAcceptance criteria (factory decisions):\n{lines}"
+
+        $"{slice.Goal}\n\nSlice {order} of {total} in the {spec.Source} requirements queue; cut policy {cutPolicyName slice.CutPolicy}.{dependency}\nBasis: {slice.Basis}.\n\nSource requirements ({requirements.Length}), each traced to this item in the {spec.TraceAttachment} attachment of {umbrella}:\n{schemes}{acceptance}\n\nComplete only when the kickoff completionRule holds for every source requirement above: requirement, implementation, tests, runtime or verification evidence, and Praxis and Aegis obligations."
 
     let private sha256 (value: string) =
         Encoding.UTF8.GetBytes value
@@ -797,6 +844,19 @@ module RequirementsImport =
             else
                 orderSlices kickoffSlices spec.AdditionalSlices
                 |> Result.bind (fun slices ->
+                    let known = slices |> List.map _.Id |> Set.ofList
+
+                    let acceptanceErrors =
+                        (spec.Acceptance
+                         |> List.filter (fun entry -> not (known.Contains entry.Slice))
+                         |> List.map (fun entry -> $"Acceptance criteria name unknown slice '{entry.Slice}'."))
+                        @ (spec.Acceptance
+                           |> List.countBy _.Slice
+                           |> List.filter (fun (_, count) -> count > 1)
+                           |> List.map (fun (slice, _) -> $"Slice '{slice}' has more than one acceptance entry."))
+
+                    if acceptanceErrors.IsEmpty then Ok slices else Error acceptanceErrors)
+                |> Result.bind (fun slices ->
                     assign slices spec.Assignments requirements
                     |> Result.bind (fun assigned ->
                         let total = slices.Length
@@ -820,7 +880,19 @@ module RequirementsImport =
                                   Slice = slice.Id
                                   Order = order
                                   Title = $"Slice {order:D2} {slice.Id}: {slice.Goal}"
-                                  Description = describe spec umbrella total order slice dependsOn owned
+                                  Description =
+                                    describe
+                                        spec
+                                        umbrella
+                                        total
+                                        order
+                                        slice
+                                        dependsOn
+                                        owned
+                                        (spec.Acceptance
+                                         |> List.tryFind (fun entry -> entry.Slice = slice.Id)
+                                         |> Option.map _.Criteria
+                                         |> Option.defaultValue [])
                                   Priority = priorityFor slice.CutPolicy
                                   Tags = [ spec.Source; "slice"; $"cut:{cutPolicyName slice.CutPolicy}" ]
                                   SourceReference = slice.SourceReference
