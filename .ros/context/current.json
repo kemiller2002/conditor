@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T20:53:09.000Z",
+  "updatedAt": "2026-10-08T21:41:28.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1265,6 +1265,17 @@
         }
       },
       "completedAt": "2026-10-08T20:53:09.000Z"
+    },
+    {
+      "id": "WI-0028",
+      "type": "fix",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-08T21:41:28.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T214129261Z-519c1afd"
+      ]
     }
   ]
 }

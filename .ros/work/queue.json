@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 28,
+  "nextSeq": 30,
   "items": [
     {
       "id": "WI-0001",
@@ -684,6 +684,55 @@
       "attachments": [],
       "createdAt": "2026-10-08T20:52:39.995Z",
       "updatedAt": "2026-10-08T20:53:09.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0028",
+      "title": "Scaffold route inventory in Limen 0.9.0's exact echelon.routes/v1 shape, and pin the foundations CI to the Praxis verifier that vendors Limen's schema",
+      "description": "Limen 0.9.0 published contract/routes.schema.json: routes carry guards (array), every parameter carries required/default/values, and a {*rest} wildcard is optional. The fsharp-limen-web inventory still wrote guard: null. Align it byte-compatibly and bump PraxisFoundationsRef to the Praxis commit that vendors the schema (praxis#211).",
+      "tags": [
+        "scaffold",
+        "deep-linking"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T21:41:22.359Z",
+      "updatedAt": "2026-10-08T21:41:28.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0029",
+      "title": "Wire Limen.Routing into the fsharp-limen-web scaffold once Conditor qualifies Limen 0.9.0 and limen-fsharp 0.9.0 (CON-293)",
+      "description": "Limen 0.9.0 (echelon-current 1.11.0) ships @echelon-foundry/limen/routing and EchelonFoundry.Limen.Routing. CON-293 requires the scaffold to use it instead of the src/engine/Routes.fs placeholder once Limen 0.9.0 is the selected Limen. Blocked on qualifying Limen 0.9.0 in Compatibility.fs (qualified list ends at 0.7.1) and on scaffolding the limen-fsharp NuGet binding.",
+      "tags": [
+        "scaffold",
+        "deep-linking",
+        "limen"
+      ],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T21:41:22.803Z",
+      "updatedAt": "2026-10-08T21:41:28.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

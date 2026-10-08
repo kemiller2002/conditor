@@ -167,7 +167,7 @@ module Scaffolding =
   "notFound": "notFound",
   "routes": [
     {
-      "guard": null,
+      "guards": [],
       "name": "home",
       "params": [],
       "pattern": "/",
@@ -175,16 +175,16 @@ module Scaffolding =
       "returnTarget": true
     },
     {
-      "guard": null,
+      "guards": [],
       "name": "notFound",
       "params": [
         {
           "default": null,
           "in": "path",
           "name": "rest",
-          "required": true,
+          "required": false,
           "type": "string",
-          "values": []
+          "values": null
         }
       ],
       "pattern": "/{*rest}",

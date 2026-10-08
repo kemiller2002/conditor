@@ -276,6 +276,18 @@ let run (check: string -> bool -> unit) =
                      && root.GetProperty("notFound").GetString() = "notFound"
                      && names = [ "home"; "notFound" ])
 
+                let hasKeys (element: JsonElement) (required: string list) =
+                    let present = element.EnumerateObject() |> Seq.map _.Name |> Set.ofSeq
+                    required |> List.forall present.Contains
+
+                let routes = root.GetProperty("routes").EnumerateArray() |> List.ofSeq
+                let parameters = routes |> List.collect (fun route -> route.GetProperty("params").EnumerateArray() |> List.ofSeq)
+
+                check "the route inventory carries every key Limen 0.9.0's contract/routes.schema.json requires"
+                    (hasKeys root [ "schema"; "mode"; "home"; "signIn"; "notFound"; "routes"; "legacy" ]
+                     && routes |> List.forall (fun route -> hasKeys route [ "name"; "pattern"; "params"; "guards"; "requires"; "returnTarget" ])
+                     && parameters |> List.forall (fun parameter -> hasKeys parameter [ "name"; "in"; "type"; "required"; "default"; "values" ]))
+
                 let keys = root.EnumerateObject() |> Seq.map _.Name |> List.ofSeq
                 check "the route inventory is written as Limen renders it: sorted keys, final newline"
                     (keys = List.sort keys && text.EndsWith("}\n", StringComparison.Ordinal))
