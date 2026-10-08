@@ -655,10 +655,10 @@
       "description": "WI-0025 qualifies Forma 0.5.0 (echelon-current 1.8.0, kemiller2002/echelon-registry#49) and makes it the default, but v0.6.0 refuses it: its embedded forma descriptor qualifies only 0.2.0, 0.3.0 and 0.4.1, so conditor upgrade --current refuses forma 0.4.1 -> 0.5.0. Request 0.6.1 through release/requested-version.txt so release-orchestrator tags and publishes it.",
       "tags": [],
       "priority": "medium",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T14:42:44.121Z",
-      "updatedAt": "2026-10-08T14:42:44.343Z",
+      "updatedAt": "2026-10-08T14:43:57.422Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
