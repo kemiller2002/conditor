@@ -225,7 +225,14 @@ module Installer =
 
     /// Executes the plan. Returns the lock path (Init only) and the review
     /// signals every integrity gate reported; any gate failure stops the plan.
-    let executeWithSignals target manifestPath (plan: InstallationPlan) =
+    /// Executes a plan, running its processes with `run`, and returns the lock
+    /// path (for init) and the integrity gates' review signals.
+    let executeWithSignalsUsing
+        (run: string -> PlanAction -> ProcessResult)
+        target
+        manifestPath
+        (plan: InstallationPlan)
+        =
         Directory.CreateDirectory target |> ignore
 
         let stopped (action: PlanAction) details =
@@ -265,7 +272,7 @@ module Installer =
                     | Error errors -> stopped action errors
                 | ExternalProcess _
                 | GitHubSourceProcess _ ->
-                    let result = ProcessRunner.run target action
+                    let result = run target action
 
                     match action.Kind with
                     | IntegrityVerifyLifecycle ->
@@ -282,6 +289,9 @@ module Installer =
                              |> List.filter (String.IsNullOrWhiteSpace >> not))
 
         loop [] plan.Actions
+
+    let executeWithSignals target manifestPath (plan: InstallationPlan) =
+        executeWithSignalsUsing ProcessRunner.run target manifestPath plan
 
     let execute target manifestPath (plan: InstallationPlan) =
         executeWithSignals target manifestPath plan |> Result.map fst
