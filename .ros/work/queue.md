@@ -16,5 +16,5 @@
 | WI-0011 | x | abandoned |  | medium |
 | WI-0012 | Scaffold for a new NuGet library package repository: foundations manifest, build-and-test and foundations CI, and the Registry release workflow pattern | complete |  | medium |
 | WI-0013 | AdoptionTests 'Registry-authorized adoption succeeds' discovers real praxis/ordo/percepta on PATH (e.g. after conditor workstation apply puts them in ~/.local/bin) and fails; the fixture should isolate PATH | captured |  | medium |
-| WI-0014 | fsharp-nuget-library scaffold must ignore bin/, obj/, dist/ and packages: build output would otherwise be committed | active | scaffold | high |
+| WI-0014 | fsharp-nuget-library scaffold must ignore bin/, obj/, dist/ and packages: build output would otherwise be committed | complete | scaffold | high |
 | WI-0015 | fsharp-limen-web scaffold has the same .gitignore gap (engine bin/obj): add the build-outputs region there too | captured |  | medium |
