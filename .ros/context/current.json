@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T09:43:31.000Z",
+  "updatedAt": "2026-10-08T09:43:36.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -864,13 +864,43 @@
     {
       "id": "WI-0022",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T09:43:31.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/LibraryScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T09:43:36.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T094331722Z-9d051bfb"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "34773ed7f526ed1fd4cdefe7",
+        "recordedAt": "2026-10-08T09:43:34.000Z",
+        "executionId": "EXE-20261008T094331722Z-9d051bfb",
+        "repository": "conditor",
+        "branch": "fix/established-scaffold-is-user-owned",
+        "commit": "a0c7cb72ec2a82541b0d17b321c669fe2e6da352",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/established-scaffold-is-user-owned",
+        "remoteCommit": "a0c7cb72ec2a82541b0d17b321c669fe2e6da352",
+        "summary": "Established scaffold seeds are project-owned; commit rollback",
+        "nextAction": "PR, CI green, merge",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T09:43:36.000Z"
     }
   ]
 }

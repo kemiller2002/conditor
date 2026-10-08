@@ -471,10 +471,10 @@
         "current"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T09:43:18.000Z",
-      "updatedAt": "2026-10-08T09:43:31.000Z",
+      "updatedAt": "2026-10-08T09:43:36.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
