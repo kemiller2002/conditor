@@ -148,10 +148,10 @@
         "lifecycle"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T03:32:54Z",
-      "updatedAt": "2026-10-08T03:32:58Z",
+      "updatedAt": "2026-10-08T03:37:14Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
