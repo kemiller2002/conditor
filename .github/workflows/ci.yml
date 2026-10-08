@@ -36,8 +36,8 @@ jobs:
           inventory = {item["id"]: item for item in json.load(open(sys.argv[1]))["components"]}
           limen = inventory["limen"]
           assert limen["package"] == "@echelon-foundry/limen", limen
-          assert limen["defaultVersion"] == "0.7.1", limen
-          assert limen["qualifiedVersions"] == ["0.6.1", "0.6.2", "0.7.0", "0.7.1"], limen
+          assert limen["defaultVersion"] == "0.9.0", limen
+          assert limen["qualifiedVersions"] == ["0.6.1", "0.6.2", "0.7.0", "0.7.1", "0.9.0"], limen
           assert limen["historicalPackages"] == [
               {"package": "@echelon-foundry/typescript-wasm-kernel", "versions": ["0.6.1", "0.6.2"]}
           ], limen

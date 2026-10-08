@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T14:43:57.422Z",
+  "updatedAt": "2026-10-08T23:31:57.595Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1178,85 +1178,321 @@
     },
     {
       "id": "WI-0025",
-      "type": "task",
+      "type": "feature",
       "state": "complete",
       "semanticState": "complete",
       "evidence": [
         {
           "type": "implementation",
-          "path": "components/forma.component.json"
+          "path": "src/Conditor.Core/Scaffolding.fs"
         },
         {
           "type": "tests",
-          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        },
+        {
+          "type": "requirement",
+          "path": "requirements/CONDITOR-REQUIREMENTS.md"
         }
       ],
-      "updatedAt": "2026-10-08T14:42:22.764Z",
+      "updatedAt": "2026-10-08T20:49:07.000Z",
       "telemetryExecutionIds": [
-        "EXE-20261008T143332018Z-b87bb281"
+        "EXE-20261008T193353619Z-e254baa3"
       ],
       "latestCheckpoint": {
-        "id": "93d20905749c7d416e35ad18",
-        "recordedAt": "2026-10-08T14:42:21.739Z",
-        "executionId": "EXE-20261008T143332018Z-b87bb281",
+        "id": "1024137e7347ed37add8f0ce",
+        "recordedAt": "2026-10-08T20:49:05.000Z",
+        "executionId": "EXE-20261008T193353619Z-e254baa3",
         "repository": "conditor",
-        "branch": "chore/qualify-forma-0.5.0",
-        "commit": "4de90135386acd6bf367769121af88c314971d5b",
+        "branch": "feature/url-addressable-state",
+        "commit": "aca72e4880fb2414bd869e7d9858f3f6bff12f99",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "chore/qualify-forma-0.5.0",
-        "remoteCommit": "4de90135386acd6bf367769121af88c314971d5b",
-        "summary": "Forma 0.5.0 qualified and default; presets and EchelonCurrent.selections at echelon-current 1.8.0; tests, CI replay and end-to-end upgrade --current pass",
-        "nextAction": "Review the draft PR, CI green, merge; then release Conditor so consumers get it",
+        "remoteBranch": "feature/url-addressable-state",
+        "remoteCommit": "aca72e4880fb2414bd869e7d9858f3f6bff12f99",
+        "summary": "fsharp-limen-web scaffolds .echelon/routes.json (echelon.routes/v1, hash), the routing foundation, a pure Routes.fs codec with round-trip tests (placeholder for Limen.Routing until 0.9.0) and the SAF-URL-1..10 checklist; CON-291..294; foundations CI pinned to praxis b21d70d2; WI-0026 captured for the Indy import counts",
+        "nextAction": "Complete WI-0025, merge PR #68 on green, then release Conditor 0.7.0 in its own release PR",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
       },
-      "completedAt": "2026-10-08T14:42:22.764Z"
+      "completedAt": "2026-10-08T20:49:07.000Z"
     },
     {
-      "id": "WI-0026",
-      "type": "task",
+      "id": "WI-0027",
+      "type": "release",
       "state": "complete",
       "semanticState": "complete",
       "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
         {
           "type": "implementation",
           "path": "release/requested-version.txt"
         },
         {
           "type": "tests",
-          "path": ".github/workflows/release-orchestrator.yml"
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
         }
       ],
-      "updatedAt": "2026-10-08T14:43:57.422Z",
+      "updatedAt": "2026-10-08T20:53:09.000Z",
       "telemetryExecutionIds": [
-        "EXE-20261008T144244911Z-90f3a84f"
+        "EXE-20261008T205244993Z-59db62e6"
       ],
       "latestCheckpoint": {
-        "id": "d21a5614b6e08b7479f1e3fe",
-        "recordedAt": "2026-10-08T14:43:45.839Z",
-        "executionId": "EXE-20261008T144244911Z-90f3a84f",
+        "id": "eef37bd94b399d56404c558c",
+        "recordedAt": "2026-10-08T20:52:55.000Z",
+        "executionId": "EXE-20261008T205244993Z-59db62e6",
         "repository": "conditor",
-        "branch": "chore/qualify-forma-0.5.0",
-        "commit": "c3172e9f0b0f080bb6a87da77156bd6a781ca601",
+        "branch": "release/0.7.0",
+        "commit": "e020929df68fed576fafcef81a722375b956c475",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "chore/qualify-forma-0.5.0",
-        "remoteCommit": "c3172e9f0b0f080bb6a87da77156bd6a781ca601",
-        "summary": "Conditor 0.6.1 requested (Directory.Build.props and release/requested-version.txt) for the Forma 0.5.0 qualification",
-        "nextAction": "Merge after review and green CI; release-orchestrator then tags v0.6.1 and dispatches release.yml",
+        "remoteBranch": "release/0.7.0",
+        "remoteCommit": "e020929df68fed576fafcef81a722375b956c475",
+        "summary": "Directory.Build.props and release/requested-version.txt request 0.7.0",
+        "nextAction": "Merge on green; release-orchestrator publishes v0.7.0",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
       },
-      "completedAt": "2026-10-08T14:43:57.422Z"
+      "completedAt": "2026-10-08T20:53:09.000Z"
+    },
+    {
+      "id": "WI-0028",
+      "type": "fix",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T22:02:59.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T214129261Z-519c1afd"
+      ],
+      "latestCheckpoint": {
+        "id": "860475cc938d90344b4ed6d3",
+        "recordedAt": "2026-10-08T22:02:58.000Z",
+        "executionId": "EXE-20261008T214129261Z-519c1afd",
+        "repository": "conditor",
+        "branch": "fix/limen-routes-shape",
+        "commit": "c514bcde8f92a95ad4654a1dd5a7f3bde74ee8ba",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/limen-routes-shape",
+        "remoteCommit": "c514bcde8f92a95ad4654a1dd5a7f3bde74ee8ba",
+        "summary": "scaffolded inventory in Limen 0.9.0's exact shape with a schema-keys test; foundations CI pinned to praxis aa7c7ca6; WI-0029 captured for wiring Limen.Routing",
+        "nextAction": "Merge on green; release Conditor 0.7.1",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T22:02:59.000Z"
+    },
+    {
+      "id": "WI-0030",
+      "type": "release",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
+        }
+      ],
+      "updatedAt": "2026-10-08T22:13:41.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T221338276Z-1339f6cb"
+      ],
+      "latestCheckpoint": {
+        "id": "247724791073f0fca0b89d0e",
+        "recordedAt": "2026-10-08T22:13:40.000Z",
+        "executionId": "EXE-20261008T221338276Z-1339f6cb",
+        "repository": "conditor",
+        "branch": "release/0.7.1",
+        "commit": "78ba6155103f5049a160cc50455905696e6642e1",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "release/0.7.1",
+        "remoteCommit": "78ba6155103f5049a160cc50455905696e6642e1",
+        "summary": "Directory.Build.props and release/requested-version.txt request 0.7.1",
+        "nextAction": "Merge on green; the release orchestrator publishes v0.7.1",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T22:13:41.000Z"
+    },
+    {
+      "id": "WI-0029",
+      "type": "feature",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "components/limen.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T23:05:26.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T225834244Z-1c4b7404"
+      ],
+      "latestCheckpoint": {
+        "id": "90a0b4dcc6e88278a655a5b2",
+        "recordedAt": "2026-10-08T23:05:24.000Z",
+        "executionId": "EXE-20261008T225834244Z-1c4b7404",
+        "repository": "conditor",
+        "branch": "feature/limen-routing-scaffold",
+        "commit": "6a0fd70e8caf53a1867ea36aa9608838b0821a63",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feature/limen-routing-scaffold",
+        "remoteCommit": "6a0fd70e8caf53a1867ea36aa9608838b0821a63",
+        "summary": "Limen 0.9.0 qualified and default; Limen.Routing scaffold when limen-fsharp >= 0.9.0, verified end to end; CON-293 and README updated",
+        "nextAction": "Merge on green; release with WI-0026",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T23:05:26.000Z"
+    },
+    {
+      "id": "WI-0026",
+      "type": "feature",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "examples/indy-init.conditor.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RequirementsImportTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T23:08:00.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T230638839Z-723c1894"
+      ],
+      "latestCheckpoint": {
+        "id": "fb4eda6a7b25c7c622704abe",
+        "recordedAt": "2026-10-08T23:07:59.000Z",
+        "executionId": "EXE-20261008T230638839Z-723c1894",
+        "repository": "conditor",
+        "branch": "feature/indy-pin-deep-linking",
+        "commit": "3ad72e72d0551f6ab65974798bf83b0e3fbfcaaa",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feature/indy-pin-deep-linking",
+        "remoteCommit": "3ad72e72d0551f6ab65974798bf83b0e3fbfcaaa",
+        "summary": "indy-init preset pinned to Indy-init 2eee2d5; counts R82/P464/OQ48 verified by an actual import plan (digest 5d65d10e...)",
+        "nextAction": "Merge on green; release with WI-0029",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T23:08:00.000Z"
+    },
+    {
+      "id": "WI-0031",
+      "type": "release",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
+        }
+      ],
+      "updatedAt": "2026-10-08T23:20:32.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T232028407Z-f067d293"
+      ],
+      "latestCheckpoint": {
+        "id": "d00126b972d82f40e1fb3c6a",
+        "recordedAt": "2026-10-08T23:20:30.000Z",
+        "executionId": "EXE-20261008T232028407Z-f067d293",
+        "repository": "conditor",
+        "branch": "release/0.8.0",
+        "commit": "53e9e3c2b446268d4f17fb491094e422a308f13e",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "release/0.8.0",
+        "remoteCommit": "53e9e3c2b446268d4f17fb491094e422a308f13e",
+        "summary": "Directory.Build.props and release/requested-version.txt request 0.8.0",
+        "nextAction": "Merge on green; the release orchestrator publishes v0.8.0; record it in echelon-registry",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T23:20:32.000Z"
+    },
+    {
+      "id": "WI-0032",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-08T23:31:57.595Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T233157954Z-e89c4a13"
+      ]
     }
   ]
 }

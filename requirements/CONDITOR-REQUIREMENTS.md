@@ -92,6 +92,15 @@ Conditor must transform an uninitialized Git repository into a reproducible, gov
 - **CON-126** Forma and Folio are conditional until their corresponding UI/document surfaces exist; Aegis is applicable now because Conditor already owns operational boundaries.
 - **CON-127** Shared dependencies MUST be pinned to released versions or immutable artifacts. Missing shared behavior MUST be raised as a gap in the owning shared repository rather than silently reimplemented.
 
+## Web application URL-addressable state
+
+Every web application Conditor scaffolds keeps its navigable state in the URL, under the portfolio deep-linking standard: Praxis `SAF-URL-1..10` in `requirements/SHARED-APPLICATION-FOUNDATIONS.md`, implemented by Limen 0.9.0's routing module (LCP-088..112, `DF-LIMEN-2026-0006`).
+
+- **CON-291** A web-application scaffold (`fsharp-limen-web`) MUST generate the route inventory `.echelon/routes.json` in schema `echelon.routes/v1`. The inventory uses hash mode for static hosting, and its home and not-found routes are written as Limen's `Inventory.render` writes them: sorted keys, two-space indent and a final newline.
+- **CON-292** A web-application scaffold MUST declare the `routing` foundation in `.echelon/foundations.json` (`required`, `hosting: static`, `inventory: .echelon/routes.json`), so that `praxis foundations verify` checks the inventory on every pull request. A library scaffold MUST NOT declare it.
+- **CON-293** When the project declares `limen-fsharp` 0.9.0 or later (Limen 0.9.0 is qualified and is the default), a web-application scaffold MUST route the engine through `EchelonFoundry.Limen.Routing`: the table defined with `RouteTable.define`, a typed `RouteCodec`, adopt/navigate/refine through the codec, `ReturnTo` for sign-in and `Link.share` for Copy link. Its generated tests MUST round-trip every view and hold `.echelon/routes.json` byte-equal to `Inventory.render`. A project that cannot take the F# feed (no Registry authority, or a frozen preset) keeps a pure, total placeholder codec with generated round-trip tests.
+- **CON-294** Every web application's generated requirements MUST include the deep-linking requirements as a checklist (`requirements/URL-ADDRESSABLE-STATE.md`, SAF-URL-1..10), so no future application's requirements omit them.
+
 ## Workstation bootstrap and machine boundaries
 
 Tracked by GitHub issue #3.

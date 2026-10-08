@@ -25,14 +25,15 @@ mkdir ~/indy-app && cd ~/indy-app && git init -b main \
   && conditor init --preset indy-init --target . \
   && conditor repo create --repository kemiller2002/<NAME> --target . --deploy github-pages
 
-# 2. Import the requirements: 23 slice work items, 980 source requirements traced
-conditor requirements import --target . --authorize sha256:668b64b77ecf0d5078209f3de35f66ea70b069f3e6de7f16acd14128dc15fa12
+# 2. Import the requirements: 23 slice work items, 992 source requirements traced
+conditor requirements import --target . --authorize sha256:5d65d10e494465dbc038fb991ff0dd5f82bca7cb92eabc7756815112748e8009
 
 # 3. Start the agent and keep it working until 4:40 PM
 conditor supervise --target . --until 2026-11-07T16:40:00-05:00
 ```
 
-The import digest is fixed by the pinned inputs: Indy-init `012f397` and
+The import digest is fixed by the pinned inputs: Indy-init `2eee2d5` (which
+adds the deep-linking requirements R9.6-R9.10, P34.15-P34.20 and OQ-048) and
 the `requirementsImport` section of the preset. If the plan differs, step 2
 refuses and changes nothing. To stop the agent after its current session,
 touch the stop file the supervisor prints.

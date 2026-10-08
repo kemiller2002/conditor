@@ -152,6 +152,10 @@ let run (check: string -> bool -> unit) =
                      && capabilities.GetProperty("ordo").GetProperty("required").GetBoolean()
                      && not (capabilities.GetProperty("limen").GetProperty("required").GetBoolean()))
 
+                let mutable routing = Unchecked.defaultof<JsonElement>
+                check "a library has no navigable state, so it declares no routing foundation"
+                    (not (capabilities.TryGetProperty("routing", &routing)))
+
             check "Ordo baseline routes the first semantic area to the library"
                 (has "`src/Arca/`" "SDE-MAP.md" && has "`src/Arca/Arca.fsproj`" "SDE-MAP.md")
             check "Ordo baseline names the library placeholder" (has "`src/Arca/Library.fs` value" "context/CURRENT-STATE.md")

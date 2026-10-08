@@ -91,6 +91,34 @@ module Scaffolding =
 
         $"{{\n  \"name\": {encodedName},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\",\n    \"test:browser\": \"playwright test\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"@playwright/test\": \"{PlaywrightVersion}\",\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n"
 
+    /// The Registry system whose NuGet release-asset feed carries the F# Limen
+    /// packages, EchelonFoundry.Limen.Routing among them (Limen LCP-110).
+    [<Literal>]
+    let LimenFsharpSystem = "limen-fsharp"
+
+    /// The first `limen-fsharp` release that ships EchelonFoundry.Limen.Routing.
+    [<Literal>]
+    let LimenRoutingRelease = "0.9.0"
+
+    let private versionParts (version: string) =
+        match version.Split('.') |> Array.map Int32.TryParse with
+        | [| (true, major); (true, minor); (true, patch) |] -> Some(major, minor, patch)
+        | _ -> None
+
+    /// The `limen-fsharp` version the project declares, when it ships
+    /// EchelonFoundry.Limen.Routing. The engine then routes through
+    /// Limen.Routing (CON-293); without it (a project with no Registry
+    /// authority for the feed, or a frozen preset) the scaffold keeps the pure
+    /// placeholder codec.
+    let limenRoutingVersion (manifest: ProjectManifest) =
+        manifest.Components
+        |> List.tryFind (fun request -> request.Id = LimenFsharpSystem)
+        |> Option.bind _.Version
+        |> Option.filter (fun version ->
+            match versionParts version, versionParts LimenRoutingRelease with
+            | Some candidate, Some floor -> candidate >= floor
+            | _ -> false)
+
     let private projectFile projectName manifest =
         let packageReferences =
             resolvedBindings manifest
@@ -98,6 +126,8 @@ module Scaffolding =
                 match binding with
                 | NugetReference -> Some(package, version)
                 | NpmDependency -> None)
+            // EchelonFoundry.Limen.Routing comes from the limen-fsharp NuGet feed.
+            |> List.append (limenRoutingVersion manifest |> Option.map (fun version -> "EchelonFoundry.Limen.Routing", version) |> Option.toList)
             |> List.sortBy fst
 
         let itemGroup =
@@ -114,7 +144,7 @@ module Scaffolding =
 
         let assembly = identifier projectName + ".Engine"
 
-        $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Operational.fs\" />\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
+        $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Operational.fs\" />\n    <Compile Include=\"Routes.fs\" />\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
 
 
     let private requestedComponent id (manifest: ProjectManifest) =
@@ -141,7 +171,448 @@ module Scaffolding =
 
         $"import type {{ ViewState }} from {protocolModule};\n\nexport const scaffoldReady = true as const;\nexport type ScaffoldView = ViewState;\n"
 
-    let private foundationManifest (projectName: string) (manifest: ProjectManifest) =
+    // ---------------------------------------------------------------------
+    // URL-addressable state (Praxis SAF-URL-1..10; Limen LCP-088..112 and
+    // DF-LIMEN-2026-0006). A web application keeps its navigable state in
+    // the URL, publishes a route inventory, and routes through Limen's
+    // routing module from Limen 0.9.0. Until the application can install
+    // 0.9.0, the scaffold gives it a pure placeholder codec with round-trip
+    // tests, and `praxis foundations verify` reports Limen routing as pending
+    // (ECHELON-FND-ROUTING-005), not failed.
+    // ---------------------------------------------------------------------
+
+    /// Where every Echelon web application publishes its route inventory.
+    [<Literal>]
+    let RouteInventoryPath = ".echelon/routes.json"
+
+    /// The starting `echelon.routes/v1` inventory: hash mode for a static
+    /// site, a home route and a not-found route. Written as Limen's
+    /// Inventory.render writes it (sorted keys, two-space indent, final
+    /// newline), so regenerating it with Limen later changes only content.
+    let webRouteInventory =
+        """{
+  "home": "home",
+  "legacy": [],
+  "mode": "hash",
+  "notFound": "notFound",
+  "routes": [
+    {
+      "guards": [],
+      "name": "home",
+      "params": [],
+      "pattern": "/",
+      "requires": [],
+      "returnTarget": true
+    },
+    {
+      "guards": [],
+      "name": "notFound",
+      "params": [
+        {
+          "default": null,
+          "in": "path",
+          "name": "rest",
+          "required": false,
+          "type": "string",
+          "values": null
+        }
+      ],
+      "pattern": "/{*rest}",
+      "requires": [],
+      "returnTarget": false
+    }
+  ],
+  "schema": "echelon.routes/v1",
+  "signIn": null
+}
+"""
+
+    /// The engine's route codec: pure, total, and replaced by Limen.Routing
+    /// once the application is on Limen 0.9.0.
+    let private webRoutesSource =
+        """namespace @@NS@@.Engine
+
+open System
+
+/// The application's navigable views (SAF-URL-1..10). The URL is the source
+/// of truth: the engine derives the view from `Routes.parse` and writes the
+/// URL with `Routes.format`. Routes live in the hash (`index.html#/...`), so a
+/// reloaded or pasted deep link never 404s on GitHub Pages
+/// (DF-LIMEN-2026-0006).
+///
+/// PLACEHOLDER until the project declares limen-fsharp 0.9.0 or later in
+/// conditor.json (Conditor then scaffolds this module on `Limen.Routing`). To
+/// switch by hand, replace it with `Limen.Routing` (package EchelonFoundry.Limen.Routing:
+/// RouteTable.define, RouteCodec.create/parse/format, Navigation.adopt,
+/// navigate and refine, ReturnTo.capture/resume, Link.share), and regenerate
+/// `.echelon/routes.json` with `Inventory.render`. Keep the inventory in step
+/// with this table meanwhile.
+type Route =
+    | Home
+    | NotFound of path: string
+
+[<RequireQualifiedAccess>]
+module Routes =
+    let private pathOf (location: string) =
+        let fragment = if location.StartsWith("#", StringComparison.Ordinal) then location.Substring 1 else location
+
+        match fragment.IndexOf '?' with
+        | -1 -> fragment
+        | index -> fragment.Substring(0, index)
+
+    /// Pure and total: a location hash (with or without the leading '#') to
+    /// its route. Unknown paths are a value, never an exception.
+    let parse (location: string) : Route =
+        match pathOf location with
+        | ""
+        | "/" -> Home
+        | path when path.StartsWith("/", StringComparison.Ordinal) -> NotFound path
+        | path -> NotFound("/" + path)
+
+    /// Pure: the canonical location hash of a route.
+    let format (route: Route) : string =
+        match route with
+        | Home -> "#/"
+        | NotFound path -> "#" + path
+"""
+
+    let private webRouteTests =
+        """module App.Engine.Tests.RouteTests
+
+open System
+open Xunit
+open @@NS@@.Engine
+
+// SAF-URL-9: format (parse url) is the canonical url, and parse (format route)
+// is the route, for generated input.
+let private generated count =
+    let random = Random 20261008
+    let alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-"
+    let segment () = String(Array.init (random.Next(1, 9)) (fun _ -> alphabet[random.Next alphabet.Length]))
+
+    List.init count (fun _ -> "/" + String.Join("/", Array.init (random.Next(1, 4)) (fun _ -> segment ())))
+
+[<Fact>]
+let ``the home route is the empty and the root hash`` () =
+    Assert.Equal(Home, Routes.parse "")
+    Assert.Equal(Home, Routes.parse "#/")
+    Assert.Equal("#/", Routes.format Home)
+
+[<Fact>]
+let ``format (parse url) is the canonical url`` () =
+    for path in generated 500 do
+        Assert.Equal("#" + path, Routes.format (Routes.parse ("#" + path + "?undeclared=1")))
+
+[<Fact>]
+let ``parse (format route) is the route`` () =
+    for path in generated 500 do
+        let route = NotFound path
+        Assert.Equal(route, Routes.parse (Routes.format route))
+"""
+
+    /// The engine's routes through EchelonFoundry.Limen.Routing (SAF-URL-1..10).
+    let private webLimenRoutesSource =
+        """namespace @@NS@@.Engine
+
+open Limen.Routing
+
+/// The application's navigable views (SAF-URL-1..10). The URL is the source of
+/// truth: the engine adopts the location the Limen kernel reports, renders the
+/// view it names, and moves only through Navigation effects. Routes live in the
+/// hash (`index.html#/...`), so a reloaded or pasted deep link never 404s on
+/// GitHub Pages (DF-LIMEN-2026-0006). Extend `View`, the table, `toTarget` and
+/// `ofMatch` together, and regenerate `.echelon/routes.json` with
+/// `Routes.inventory` (the inventory test fails until you do).
+type View =
+    | Home
+
+/// The validated route table and the typed codec over it.
+type Routing =
+    { Table: RouteTable
+      Codec: RouteCodec<View> }
+
+[<RequireQualifiedAccess>]
+module Routes =
+    /// Hash mode: static hosting with relative links and no base href.
+    let mode = LocationMode.Hash
+
+    /// Interface guards decide what the interface shows, never access.
+    let guard: string -> Match -> GuardDecision = Router.allowAll
+
+    let private toTarget (view: View) : Target =
+        match view with
+        | Home -> { Route = "home"; Params = Map.empty; Query = Map.empty }
+
+    let private ofMatch (matched: Match) : Result<View, string> =
+        match matched.Route with
+        | "home" -> Ok Home
+        | route -> Error $"unmapped route {route}"
+
+    /// The URL space as a value, validated when it is defined: a problem is a
+    /// DefinitionError, never an exception.
+    let define () : Result<Routing, DefinitionError list> =
+        RouteTable.define
+            [ Route.create "home" ""
+              { Route.create "signIn" "sign-in" with
+                  ReturnTarget = false
+                  Query = [ QueryParam.optional ReturnTo.parameter ParamType.String ] }
+              Route.create "notFound" "{*rest}" ]
+            []
+            { Home = "home"
+              SignIn = Some "signIn"
+              NotFound = Some "notFound" }
+        |> Result.map (fun table ->
+            { Table = table
+              Codec = RouteCodec.create table toTarget ofMatch })
+
+    /// A routed location ("/path?query") to its view, or the typed reason it
+    /// is not one: NotFound, NotPermitted, Invalid, Malformed, RedirectLoop or
+    /// Unmapped. Render each; none is a blank page or another view.
+    let parse (routing: Routing) (location: string) : Result<View, RouteError> =
+        RouteCodec.parse routing.Codec guard location
+
+    /// A view to its one canonical location.
+    let format (routing: Routing) (view: View) : Result<string, BuildError> = RouteCodec.format routing.Codec view
+
+    /// A deep link (Initialize) or Back/Forward (LocationChanged): never a push,
+    /// at most a replace to the canonical form.
+    let adopt (routing: Routing) (state: RouterState) (location: string) =
+        RouteCodec.adopt routing.Codec guard state location
+
+    /// Moving to another place: a push.
+    let navigate (routing: Routing) (state: RouterState) (view: View) = RouteCodec.navigate routing.Codec state view
+
+    /// Refining the current view (filter, sort, search, tab, page, period): a
+    /// replace, so Back steps between places.
+    let refine (routing: Routing) (state: RouterState) (view: View) = RouteCodec.refine routing.Codec state view
+
+    /// The sign-in location that keeps `location` as its return target.
+    let signInFor (routing: Routing) (location: string) : Result<string, BuildError> =
+        ReturnTo.signIn routing.Table (ReturnTo.capture routing.Table location)
+
+    /// Where to go after sign-in: the kept target when it is still allowed,
+    /// otherwise home. Apply it with Navigation.replace.
+    let afterSignIn (routing: Routing) (target: string option) : string = ReturnTo.resume routing.Table guard target
+
+    /// The absolute URL "Copy link" writes with the Core Clipboard effect.
+    let share (page: PageLocation) (location: string) : string = Link.share mode page location
+
+    /// `.echelon/routes.json` (echelon.routes/v1), byte for byte.
+    let inventory (routing: Routing) : string = Inventory.render mode routing.Table
+"""
+
+    let private webLimenRouteTests =
+        """module App.Engine.Tests.RouteTests
+
+open System
+open System.IO
+open Xunit
+open Limen.Routing
+open @@NS@@.Engine
+
+// SAF-URL-1..10 through Limen.Routing: the table is valid, every view
+// round-trips, history moves are push/replace as specified, sign-in keeps the
+// target, Copy link is absolute, and .echelon/routes.json is the table's
+// Inventory.render output byte for byte.
+
+let private routing =
+    match Routes.define () with
+    | Ok value -> value
+    | Error errors -> failwith $"the route table is invalid: %A{errors}"
+
+/// Every view the application has. Extend it with View.
+let private views = [ Home ]
+
+let private generatedPaths count =
+    let random = Random 20261008
+    let alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-"
+    let segment () = String(Array.init (random.Next(1, 9)) (fun _ -> alphabet[random.Next alphabet.Length]))
+    List.init count (fun _ -> "/" + String.Join("/", Array.init (random.Next(1, 4)) (fun _ -> segment ())))
+
+[<Fact>]
+let ``the route table is valid`` () =
+    Assert.True(Result.isOk (Routes.define ()))
+
+[<Fact>]
+let ``parse (format view) is the view, for every view`` () =
+    for view in views do
+        match Routes.format routing view with
+        | Ok location -> Assert.Equal<Result<View, RouteError>>(Ok view, Routes.parse routing location)
+        | Error problem -> failwith $"{view} has no location: %A{problem}"
+
+[<Fact>]
+let ``format (parse url) is the canonical url, and an unknown url is a typed not-found`` () =
+    Assert.Equal<Result<string, BuildError>>(Ok "/", Routes.format routing Home)
+
+    for path in generatedPaths 500 do
+        match Routes.parse routing path with
+        | Ok view -> Assert.Equal<Result<string, BuildError>>(Ok path, Routes.format routing view)
+        | Error RouteError.NotFound -> ()
+        | Error other -> failwith $"{path}: %A{other}"
+
+[<Fact>]
+let ``a deep link is adopted without a push and replaced by its canonical form`` () =
+    let state, view, effect = Routes.adopt routing Navigation.initial "/"
+    Assert.Equal<Result<View, RouteError>>(Ok Home, view)
+    Assert.Equal(None, effect)
+    Assert.Equal(Some "/", state.Current)
+
+    let _, _, corrected = Routes.adopt routing Navigation.initial "/?undeclared=1"
+    Assert.Equal(Some(NavigationEffect.Replace "/"), corrected)
+
+[<Fact>]
+let ``navigation pushes, refinement replaces, and the current place is no move`` () =
+    let elsewhere = { Current = Some "/sign-in" }
+
+    match Routes.navigate routing elsewhere Home with
+    | Ok(_, effect) -> Assert.Equal(Some(NavigationEffect.Push "/"), effect)
+    | Error problem -> failwith $"%A{problem}"
+
+    match Routes.refine routing elsewhere Home with
+    | Ok(_, effect) -> Assert.Equal(Some(NavigationEffect.Replace "/"), effect)
+    | Error problem -> failwith $"%A{problem}"
+
+    match Routes.navigate routing { Current = Some "/" } Home with
+    | Ok(_, effect) -> Assert.Equal(None, effect)
+    | Error problem -> failwith $"%A{problem}"
+
+[<Fact>]
+let ``sign-in keeps the target and returns to it, never outside the application`` () =
+    match Routes.signInFor routing "/" with
+    | Ok location -> Assert.StartsWith("/sign-in?returnTo=", location)
+    | Error problem -> failwith $"%A{problem}"
+
+    Assert.Equal("/", Routes.afterSignIn routing (ReturnTo.capture routing.Table "/"))
+    Assert.Equal("/", Routes.afterSignIn routing (Some "//evil.example/"))
+    Assert.Equal("/", Routes.afterSignIn routing None)
+
+[<Fact>]
+let ``copy link is the absolute hash url of the canonical location`` () =
+    let page = { Origin = "https://example.org"; Path = "/app/"; Query = ""; Hash = "#/" }
+    Assert.Equal("https://example.org/app/#/", Routes.share page "/")
+
+[<Fact>]
+let ``the committed route inventory is the table's Inventory.render output, byte for byte`` () =
+    let rec find (directory: DirectoryInfo) =
+        let candidate = Path.Combine(directory.FullName, ".echelon", "routes.json")
+
+        if File.Exists candidate then candidate
+        else
+            match directory.Parent with
+            | null -> failwith ".echelon/routes.json not found above the test output"
+            | parent -> find parent
+
+    let committed = File.ReadAllText(find (DirectoryInfo AppContext.BaseDirectory))
+    Assert.Equal(Routes.inventory routing, committed)
+"""
+
+    /// `Inventory.render LocationMode.Hash` of the Limen.Routing table above,
+    /// byte for byte; the generated inventory test keeps the two equal.
+    let webLimenRouteInventory =
+        """{
+  "home": "home",
+  "legacy": [],
+  "mode": "hash",
+  "notFound": "notFound",
+  "routes": [
+    {
+      "guards": [],
+      "name": "home",
+      "params": [],
+      "pattern": "/",
+      "requires": [],
+      "returnTarget": true
+    },
+    {
+      "guards": [],
+      "name": "signIn",
+      "params": [
+        {
+          "default": null,
+          "in": "query",
+          "name": "returnTo",
+          "required": false,
+          "type": "string",
+          "values": null
+        }
+      ],
+      "pattern": "/sign-in",
+      "requires": [],
+      "returnTarget": false
+    },
+    {
+      "guards": [],
+      "name": "notFound",
+      "params": [
+        {
+          "default": null,
+          "in": "path",
+          "name": "rest",
+          "required": false,
+          "type": "string",
+          "values": null
+        }
+      ],
+      "pattern": "/{*rest}",
+      "requires": [],
+      "returnTarget": false
+    }
+  ],
+  "schema": "echelon.routes/v1",
+  "signIn": "signIn"
+}
+"""
+
+    /// The web application's deep-linking requirements, as a checklist the
+    /// application's agent works through (Praxis SAF-URL-1..10).
+    let private webUrlRequirements =
+        """# URL-addressable state (deep linking)
+
+Status: **Required** for this application. The canonical text is
+[Praxis `requirements/SHARED-APPLICATION-FOUNDATIONS.md`](https://github.com/kemiller2002/praxis/blob/main/requirements/SHARED-APPLICATION-FOUNDATIONS.md)
+("URL-addressable state (deep linking)", SAF-URL-1..10). Limen 0.9.0
+implements it (`@echelon-foundry/limen/routing`, `EchelonFoundry.Limen.Routing`;
+LCP-088..112, DF-LIMEN-2026-0006).
+
+Navigable state means the screen or route, entity IDs, and view parameters
+such as the selected date or period, filters, sort, search, tab and page. It
+lives in the URL, so a copied URL opens the same view in another browser.
+
+## Checklist
+
+- [ ] **SAF-URL-1** The URL is the source of truth. A cold load of a copied
+      URL reproduces the view, and sign-in returns to the target.
+- [ ] **SAF-URL-2** IDs are path parameters and view parameters are query
+      parameters, typed (`string`, `int`, `bool`, `date`, `month`, `enum`,
+      `set`). The canonical form has declared parameters only, in
+      declaration order, with defaults omitted, sets sorted and
+      de-duplicated, and `%20` with upper-case hex.
+- [ ] **SAF-URL-3** Navigation pushes history and refinement replaces it.
+      Back, Forward and reload restore the view from the URL alone.
+- [ ] **SAF-URL-4** An unknown, deleted or forbidden ID shows not found or
+      not permitted, with a way back. The page is never blank and never
+      shows another record.
+- [ ] **SAF-URL-5** No secrets, tokens or sensitive personal or financial
+      data in any URL. Limen's reserved parameter names are refused. No
+      transient UI state goes in the URL.
+- [ ] **SAF-URL-6** Hash routes (`index.html#/...`), relative links and no
+      `<base href>`, so a reloaded deep link never 404s on GitHub Pages.
+- [ ] **SAF-URL-7** Renamed routes keep their old URLs as legacy redirects.
+- [ ] **SAF-URL-8** `.echelon/routes.json` (`echelon.routes/v1`) lists every
+      addressable view and stays current with the route table.
+- [ ] **SAF-URL-9** One pure parse/format codec with round-trip property
+      tests (`src/engine/Routes.fs` until Limen 0.9.0, then `Limen.Routing`).
+- [ ] **SAF-URL-10** A Copy link action wherever sharing is natural.
+
+## Verification
+
+`praxis foundations verify` (the `routing` capability in
+`.echelon/foundations.json`) checks the inventory on every pull request.
+Until the application can install Limen 0.9.0, it reports Limen routing as
+pending (`ECHELON-FND-ROUTING-005`), which is not a failure.
+"""
+
+    let private foundationManifest (webApplication: bool) (projectName: string) (manifest: ProjectManifest) =
         let capabilities = JsonObject()
 
         let addCapability (id: string) (configure: JsonObject -> unit) =
@@ -165,10 +636,22 @@ module Scaffolding =
 
         addCapability "limen" ignore
         addCapability "ordo" ignore
-        // Exactly the capabilities of Praxis' echelon-foundations-v1 schema,
-        // which forbids any other key. Percepta verifies through its own
+        // Exactly the capabilities of Praxis' echelon-foundations-v1 schema
+        // (plus routing, below, for a web application), which forbids any
+        // other key. Percepta verifies through its own
         // repository lifecycle (percepta-repo verify), not the foundations.
         addCapability "praxis" ignore
+
+        // URL-addressable state (Praxis SAF-URL-1..10, Praxis 3.9.0 and later):
+        // every web application publishes its route inventory and, from
+        // Limen 0.9.0, routes through Limen. A static (GitHub Pages) site
+        // uses hash routes (DF-LIMEN-2026-0006).
+        if webApplication then
+            let routing = JsonObject()
+            routing["required"] <- JsonValue.Create true
+            routing["hosting"] <- JsonValue.Create "static"
+            routing["inventory"] <- JsonValue.Create RouteInventoryPath
+            capabilities["routing"] <- routing
 
         let root = JsonObject()
         root["schemaVersion"] <- JsonValue.Create 1
@@ -281,9 +764,12 @@ module Scaffolding =
     // ---------------------------------------------------------------------
 
     /// The Praxis commit whose reusable foundations-verify workflow the
-    /// generated CI pins (the same commit sibling package repositories pin).
+    /// generated CI pins: praxis#211 (WI-0079) on main, the verifier that
+    /// checks the routing foundation (SAF-URL-8/9) against Limen 0.9.0's
+    /// published routes schema. A declaration
+    /// without routing verifies exactly as before.
     [<Literal>]
-    let PraxisFoundationsRef = "a95dbf238e561eaac4b38ca7011efc1a496cf1c6"
+    let PraxisFoundationsRef = "aa7c7ca6a6e2cb270bdccfe117ea35ade7b0945c"
 
     /// The echelon-registry commit whose release-contract action and
     /// release-manifest schema the generated release workflow pins.
@@ -762,7 +1248,7 @@ jobs:
                   $"src/{ns}/Library.fs", render librarySource
                   $"tests/{ns}.Tests/{ns}.Tests.fsproj", render libraryTestProject
                   $"tests/{ns}.Tests/LibraryTests.fs", render libraryTests
-                  ".echelon/foundations.json", foundationManifest projectName manifest
+                  ".echelon/foundations.json", foundationManifest false projectName manifest
                   ".github/workflows/build-and-test.yml", render libraryBuildWorkflow
                   ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
                   ".github/workflows/release.yml", render libraryReleaseWorkflow
@@ -827,6 +1313,7 @@ jobs:
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EngineTests.fs" />
+    <Compile Include="RouteTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -1203,17 +1690,28 @@ same change.
                   "@@PRAXIS_REF@@", PraxisFoundationsRef
                   "@@NS@@", ns ]
 
+        // Limen.Routing when the project declares limen-fsharp 0.9.0 or later
+        // (CON-293); otherwise the pure placeholder codec.
+        let routesSource, routeTests, routeInventory =
+            match limenRoutingVersion manifest with
+            | Some _ -> webLimenRoutesSource, webLimenRouteTests, webLimenRouteInventory
+            | None -> webRoutesSource, webRouteTests, webRouteInventory
+
         [ "Directory.Build.props",
           "<Project>\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <LangVersion>latest</LangVersion>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n"
           "App.slnx", webSolution
           "src/engine/App.Engine.fsproj", projectFile projectName manifest
           "src/engine/Operational.fs", operationalFile projectName
+          "src/engine/Routes.fs", render routesSource
           "src/engine/Domain.fs",
           $"namespace {ns}.Engine\n\ntype State =\n    | Uninitialized\n\nmodule State =\n    let initial = Uninitialized\n"
           "tests/App.Engine.Tests/App.Engine.Tests.fsproj", webTestProject
           "tests/App.Engine.Tests/EngineTests.fs", render webEngineTests
-          ".echelon/foundations.json", foundationManifest projectName manifest
+          "tests/App.Engine.Tests/RouteTests.fs", render routeTests
+          ".echelon/foundations.json", foundationManifest true projectName manifest
           "aegis-boundaries.json", aegisBoundaryManifest projectName
+          RouteInventoryPath, routeInventory
+          "requirements/URL-ADDRESSABLE-STATE.md", webUrlRequirements
           "package.json", packageJson projectName manifest
           "tsconfig.json", webTsconfig
           "limen.config.json", webLimenConfig

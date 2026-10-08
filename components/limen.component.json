@@ -13,12 +13,13 @@
       ]
     }
   ],
-  "defaultVersion": "0.7.1",
+  "defaultVersion": "0.9.0",
   "qualifiedVersions": [
     "0.6.1",
     "0.6.2",
     "0.7.0",
-    "0.7.1"
+    "0.7.1",
+    "0.9.0"
   ],
   "applicationBinding": "npm",
   "initArguments": [],

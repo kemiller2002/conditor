@@ -31,5 +31,11 @@
 | WI-0022 | An established scaffold's seed files belong to the project: stop comparing or recreating them once the lock records the scaffold, so a project that grew past its scaffold can still plan, repair and upgrade --current; roll back governance when the current-upgrade commit step fails | complete | scaffold, upgrade, current | high |
 | WI-0023 | Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60) | complete |  | medium |
 | WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | complete |  | medium |
-| WI-0025 | Qualify Forma 0.5.0 (echelon-current 1.8.0) and move the presets that follow the channel | complete | forma, registry, qualification | high |
-| WI-0026 | Release Conditor 0.6.1 so consumers get the Forma 0.5.0 qualification | complete |  | medium |
+| WI-0025 | URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist | complete | scaffold, deep-linking | high |
+| WI-0026 | When the indy-init preset pin moves past Indy-init 2eee2d52 (PR #7, URL-addressable state), update requirementsImport expected counts: R 77->82, P 458->464, OQ 47->48 | complete | indy, requirements-import | medium |
+| WI-0027 | Release Conditor 0.7.0: URL-addressable state in the web scaffold (#68) | complete | release | high |
+| WI-0028 | Scaffold route inventory in Limen 0.9.0's exact echelon.routes/v1 shape, and pin the foundations CI to the Praxis verifier that vendors Limen's schema | complete | scaffold, deep-linking | high |
+| WI-0029 | Wire Limen.Routing into the fsharp-limen-web scaffold once Conditor qualifies Limen 0.9.0 and limen-fsharp 0.9.0 (CON-293) | complete | scaffold, deep-linking, limen | medium |
+| WI-0030 | Release Conditor 0.7.1: scaffold route inventory in Limen 0.9.0's exact shape (#70) | complete | release | high |
+| WI-0031 | Release Conditor 0.8.0: Limen 0.9.0 and Limen.Routing web scaffold (#72), indy-init preset on Indy-init deep-linking requirements (#73) | complete | release | high |
+| WI-0032 | Qualify Forma 0.5.0 and move Conditor's echelon-current pins to 1.13.0 | ready | forma, registry, qualification | high |

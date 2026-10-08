@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 27,
+  "nextSeq": 33,
   "items": [
     {
       "id": "WI-0001",
@@ -626,24 +626,23 @@
     },
     {
       "id": "WI-0025",
-      "title": "Qualify Forma 0.5.0 (echelon-current 1.8.0) and move the presets that follow the channel",
-      "description": "The Registry echelon-current 1.8.0 (kemiller2002/echelon-registry#49) selects Forma 0.5.0 (tag v0.5.0 at 8a5a5993421fbfd808582f735dedcf2adea07010, tarball sha256 c4ad3ae525a85f55a9e9aec4f0e19c59b7f552cececb4224a0bbc3434f4f558f). Conditor main refuses it: forma qualifies only 0.2.0, 0.3.0, 0.4.1. Qualify 0.5.0, make it the default, pin it in the clean-room and indy-init presets and EchelonCurrent.selections, update CI assertions.",
+      "title": "URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist",
+      "description": "Portfolio deep-linking standard (Praxis SAF-URL-1..10, Limen DF-LIMEN-2026-0006). New web applications get .echelon/routes.json (echelon.routes/v1, hash mode), the routing capability in .echelon/foundations.json, a pure Routes.fs codec with round-trip tests to be replaced by Limen.Routing at 0.9.0, and requirements/URL-ADDRESSABLE-STATE.md.",
       "tags": [
-        "forma",
-        "registry",
-        "qualification"
+        "scaffold",
+        "deep-linking"
       ],
       "priority": "high",
       "status": "complete",
       "attachments": [],
-      "createdAt": "2026-10-08T14:33:31.281Z",
-      "updatedAt": "2026-10-08T14:42:22.764Z",
+      "createdAt": "2026-10-08T19:33:45.650Z",
+      "updatedAt": "2026-10-08T20:49:07.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
         "id": "anthropic/claude-code",
         "provider": "anthropic",
-        "model": "unknown",
+        "model": "claude-opus-5-5",
         "runtime": "claude-code"
       },
       "source": "manual",
@@ -651,14 +650,160 @@
     },
     {
       "id": "WI-0026",
-      "title": "Release Conditor 0.6.1 so consumers get the Forma 0.5.0 qualification",
-      "description": "WI-0025 qualifies Forma 0.5.0 (echelon-current 1.8.0, kemiller2002/echelon-registry#49) and makes it the default, but v0.6.0 refuses it: its embedded forma descriptor qualifies only 0.2.0, 0.3.0 and 0.4.1, so conditor upgrade --current refuses forma 0.4.1 -> 0.5.0. Request 0.6.1 through release/requested-version.txt so release-orchestrator tags and publishes it.",
-      "tags": [],
+      "title": "When the indy-init preset pin moves past Indy-init 2eee2d52 (PR #7, URL-addressable state), update requirementsImport expected counts: R 77->82, P 458->464, OQ 47->48",
+      "description": "Indy-init PR #7 added R9.6-R9.10, P34.15-P34.20 and OQ-048 (deep-linking requirements). The new IDs fall under the existing R9.*, P34.* and OQ-* assignments; only the expected counts change. The pin was deliberately not moved (no rehearsal until the owner says so).",
+      "tags": [
+        "indy",
+        "requirements-import"
+      ],
       "priority": "medium",
       "status": "complete",
       "attachments": [],
-      "createdAt": "2026-10-08T14:42:44.121Z",
-      "updatedAt": "2026-10-08T14:43:57.422Z",
+      "createdAt": "2026-10-08T19:43:01.928Z",
+      "updatedAt": "2026-10-08T23:08:00.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0027",
+      "title": "Release Conditor 0.7.0: URL-addressable state in the web scaffold (#68)",
+      "description": "Minor release: fsharp-limen-web scaffolds the route inventory, the routing foundation, a pure route codec placeholder for Limen.Routing and the SAF-URL-1..10 checklist (WI-0025, PR #68).",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T20:52:39.995Z",
+      "updatedAt": "2026-10-08T20:53:09.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0028",
+      "title": "Scaffold route inventory in Limen 0.9.0's exact echelon.routes/v1 shape, and pin the foundations CI to the Praxis verifier that vendors Limen's schema",
+      "description": "Limen 0.9.0 published contract/routes.schema.json: routes carry guards (array), every parameter carries required/default/values, and a {*rest} wildcard is optional. The fsharp-limen-web inventory still wrote guard: null. Align it byte-compatibly and bump PraxisFoundationsRef to the Praxis commit that vendors the schema (praxis#211).",
+      "tags": [
+        "scaffold",
+        "deep-linking"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T21:41:22.359Z",
+      "updatedAt": "2026-10-08T22:02:59.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0029",
+      "title": "Wire Limen.Routing into the fsharp-limen-web scaffold once Conditor qualifies Limen 0.9.0 and limen-fsharp 0.9.0 (CON-293)",
+      "description": "Limen 0.9.0 (echelon-current 1.11.0) ships @echelon-foundry/limen/routing and EchelonFoundry.Limen.Routing. CON-293 requires the scaffold to use it instead of the src/engine/Routes.fs placeholder once Limen 0.9.0 is the selected Limen. Blocked on qualifying Limen 0.9.0 in Compatibility.fs (qualified list ends at 0.7.1) and on scaffolding the limen-fsharp NuGet binding.",
+      "tags": [
+        "scaffold",
+        "deep-linking",
+        "limen"
+      ],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T21:41:22.803Z",
+      "updatedAt": "2026-10-08T23:05:26.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0030",
+      "title": "Release Conditor 0.7.1: scaffold route inventory in Limen 0.9.0's exact shape (#70)",
+      "description": "Patch release: the fsharp-limen-web route inventory matches Limen 0.9.0's published contract/routes.schema.json, and the foundations CI pins the Praxis verifier that vendors it (WI-0028, PR #70).",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T22:13:37.333Z",
+      "updatedAt": "2026-10-08T22:13:41.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0031",
+      "title": "Release Conditor 0.8.0: Limen 0.9.0 and Limen.Routing web scaffold (#72), indy-init preset on Indy-init deep-linking requirements (#73)",
+      "description": "Minor release: Limen 0.9.0 qualified and default; fsharp-limen-web routes the engine through EchelonFoundry.Limen.Routing when limen-fsharp >= 0.9.0 is declared (WI-0029); the indy-init preset pins Indy-init 2eee2d5 with import counts R 82, P 464, OQ 48 (WI-0026).",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T23:20:27.078Z",
+      "updatedAt": "2026-10-08T23:20:32.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0032",
+      "title": "Qualify Forma 0.5.0 and move Conditor's echelon-current pins to 1.13.0",
+      "description": "The Registry echelon-current 1.13.0 (kemiller2002/echelon-registry#49, merged as 39a53bc; linux-x64 set sha256 85a54366126ea1e6ff19570d8eb36838637e639215cf22169276d7381712c169) selects Forma 0.5.0 (tag v0.5.0 at 8a5a5993421fbfd808582f735dedcf2adea07010, tarball sha256 c4ad3ae525a85f55a9e9aec4f0e19c59b7f552cececb4224a0bbc3434f4f558f). Conditor refuses it. Qualify 0.5.0 and make it the default, pin it in the presets, set EchelonCurrent.selections to 1.13.0, update CI assertions. PR #67 first did this under branch-local WI-0025/WI-0026, which collided with main's; no release request (that is a separate PR).",
+      "tags": [
+        "forma",
+        "registry",
+        "qualification"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T23:31:57.065Z",
+      "updatedAt": "2026-10-08T23:31:57.333Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

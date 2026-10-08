@@ -105,7 +105,7 @@ let run (check: string -> bool -> unit) =
             let schemes = indy.Documents |> List.map (fun document -> document.Scheme, document.Expected)
 
             check "the Indy import reads the eight requirement schemes with their expected counts"
-                (schemes = [ "R", 77; "P", 458; "A", 250; "D", 61; "OQ", 47; "I", 20; "S", 25; "F", 10 ])
+                (schemes = [ "R", 82; "P", 464; "A", 250; "D", 61; "OQ", 48; "I", 20; "S", 25; "F", 10 ])
 
             check "the Indy import adds eleven slices to the kickoff's twelve" (indy.AdditionalSlices.Length = 11)
             check "every Indy slice has an assignment" (indy.Assignments.Length = 23)

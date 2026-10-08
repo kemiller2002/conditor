@@ -52,11 +52,15 @@ let private expectedPaths =
       "App.slnx"
       "src/engine/App.Engine.fsproj"
       "src/engine/Operational.fs"
+      "src/engine/Routes.fs"
       "src/engine/Domain.fs"
       "tests/App.Engine.Tests/App.Engine.Tests.fsproj"
       "tests/App.Engine.Tests/EngineTests.fs"
+      "tests/App.Engine.Tests/RouteTests.fs"
       ".echelon/foundations.json"
       "aegis-boundaries.json"
+      ".echelon/routes.json"
+      "requirements/URL-ADDRESSABLE-STATE.md"
       "package.json"
       "tsconfig.json"
       "limen.config.json"
@@ -247,8 +251,57 @@ let run (check: string -> bool -> unit) =
                     |> Seq.map _.Name
                     |> Set.ofSeq
 
-                check "foundations declare only the capabilities the Praxis schema allows"
-                    (keys = set [ "aegis"; "forma"; "folio"; "limen"; "ordo"; "praxis" ])
+                check "foundations declare only the capabilities the Praxis schema allows, routing included for a web application"
+                    (keys = set [ "aegis"; "forma"; "folio"; "limen"; "ordo"; "praxis"; "routing" ])
+
+                let routing = document.RootElement.GetProperty("capabilities").GetProperty("routing")
+
+                check "a web application requires the routing foundation on static hosting, against the scaffolded inventory (SAF-URL-6, SAF-URL-8)"
+                    (routing.GetProperty("required").GetBoolean()
+                     && routing.GetProperty("hosting").GetString() = "static"
+                     && routing.GetProperty("inventory").GetString() = Scaffolding.RouteInventoryPath)
+
+            // URL-addressable state (SAF-URL-1..10).
+            match files |> Map.tryFind Scaffolding.RouteInventoryPath with
+            | None -> check "the route inventory is scaffolded" false
+            | Some text ->
+                use document = JsonDocument.Parse text
+                let root = document.RootElement
+                let names = root.GetProperty("routes").EnumerateArray() |> Seq.map (fun route -> route.GetProperty("name").GetString()) |> List.ofSeq
+
+                check "the route inventory is echelon.routes/v1 in hash mode with home and not-found routes (DF-LIMEN-2026-0006)"
+                    (root.GetProperty("schema").GetString() = "echelon.routes/v1"
+                     && root.GetProperty("mode").GetString() = "hash"
+                     && root.GetProperty("home").GetString() = "home"
+                     && root.GetProperty("notFound").GetString() = "notFound"
+                     && names = [ "home"; "notFound" ])
+
+                let hasKeys (element: JsonElement) (required: string list) =
+                    let present = element.EnumerateObject() |> Seq.map _.Name |> Set.ofSeq
+                    required |> List.forall present.Contains
+
+                let routes = root.GetProperty("routes").EnumerateArray() |> List.ofSeq
+                let parameters = routes |> List.collect (fun route -> route.GetProperty("params").EnumerateArray() |> List.ofSeq)
+
+                check "the route inventory carries every key Limen 0.9.0's contract/routes.schema.json requires"
+                    (hasKeys root [ "schema"; "mode"; "home"; "signIn"; "notFound"; "routes"; "legacy" ]
+                     && routes |> List.forall (fun route -> hasKeys route [ "name"; "pattern"; "params"; "guards"; "requires"; "returnTarget" ])
+                     && parameters |> List.forall (fun parameter -> hasKeys parameter [ "name"; "in"; "type"; "required"; "default"; "values" ]))
+
+                let keys = root.EnumerateObject() |> Seq.map _.Name |> List.ofSeq
+                check "the route inventory is written as Limen renders it: sorted keys, final newline"
+                    (keys = List.sort keys && text.EndsWith("}\n", StringComparison.Ordinal))
+
+            check "the engine owns a pure route codec, placeholder for Limen.Routing, compiled and round-trip tested (SAF-URL-9)"
+                (has "let parse (location: string) : Route" "src/engine/Routes.fs"
+                 && has "let format (route: Route) : string" "src/engine/Routes.fs"
+                 && has "PLACEHOLDER until the project declares limen-fsharp 0.9.0 or later" "src/engine/Routes.fs"
+                 && has "<Compile Include=\"Routes.fs\" />" "src/engine/App.Engine.fsproj"
+                 && has "<Compile Include=\"RouteTests.fs\" />" "tests/App.Engine.Tests/App.Engine.Tests.fsproj"
+                 && has "format (parse url) is the canonical url" "tests/App.Engine.Tests/RouteTests.fs")
+
+            check "the web application's requirements include every deep-linking requirement"
+                ([ 1..10 ] |> List.forall (fun number -> has $"**SAF-URL-{number}**" "requirements/URL-ADDRESSABLE-STATE.md"))
 
             match files |> Map.tryFind ".claude/settings.json" with
             | None -> check "Claude Code settings are scaffolded" false
@@ -273,3 +326,74 @@ let run (check: string -> bool -> unit) =
             check "the scaffold ignores build, test, package and browser outputs"
                 ([ "bin/"; "obj/"; "dist/"; "TestResults/"; "node_modules/"; "test-results/"; "playwright-report/" ]
                  |> List.forall (fun entry -> has (entry + "\n") ".gitignore")))
+
+/// A project on the current channel declares limen-fsharp (the F# Limen
+/// packages through the NuGet release-asset feed). From 0.9.0 the engine then
+/// routes through EchelonFoundry.Limen.Routing (CON-293), not the placeholder.
+let runLimenRouting (check: string -> bool -> unit) =
+    withTarget (fun target ->
+        let json = webManifest.Replace("{\"id\":\"limen\",\"version\":\"0.7.1\"}", "{\"id\":\"limen\",\"version\":\"0.9.0\"}")
+        let path = Path.Combine(Path.GetTempPath(), $"conditor-web-{Guid.NewGuid():N}.json")
+        File.WriteAllText(path, json)
+
+        try
+            match Manifest.load path with
+            | Error errors -> check $"limen-routing manifest loads: {joined errors}" false
+            | Ok manifest ->
+                let declared: ComponentRequest = { Id = Scaffolding.LimenFsharpSystem; Version = Some "0.9.0"; Required = false }
+
+                let withFeed version =
+                    { manifest with Components = manifest.Components @ [ { declared with Version = Some version } ] }
+
+                check "limen-fsharp 0.9.0 or later selects Limen.Routing; earlier, absent or unparsable does not"
+                    (Scaffolding.limenRoutingVersion (withFeed "0.9.0") = Some "0.9.0"
+                     && Scaffolding.limenRoutingVersion (withFeed "0.10.2") = Some "0.10.2"
+                     && Scaffolding.limenRoutingVersion (withFeed "0.8.0") = None
+                     && Scaffolding.limenRoutingVersion (withFeed "latest") = None
+                     && Scaffolding.limenRoutingVersion manifest = None)
+
+                match Scaffolding.plan target (withFeed "0.9.0") with
+                | Error errors -> check $"limen-routing scaffold plans: {joined errors}" false
+                | Ok planned ->
+                    let files = Map.ofList planned
+                    let has needle path = contains needle files path
+
+                    check "the engine references EchelonFoundry.Limen.Routing at the declared limen-fsharp version"
+                        (has "<PackageReference Include=\"EchelonFoundry.Limen.Routing\" Version=\"0.9.0\" />" "src/engine/App.Engine.fsproj"
+                         && has "<Compile Include=\"Routes.fs\" />" "src/engine/App.Engine.fsproj")
+
+                    check "the engine routes through Limen.Routing: table, codec, adopt/navigate/refine, ReturnTo, Link.share and Inventory.render"
+                        ([ "open Limen.Routing"
+                           "RouteTable.define"
+                           "RouteCodec.create"
+                           "RouteCodec.parse"
+                           "RouteCodec.format"
+                           "RouteCodec.adopt"
+                           "RouteCodec.navigate"
+                           "RouteCodec.refine"
+                           "ReturnTo.capture"
+                           "ReturnTo.resume"
+                           "Link.share"
+                           "Inventory.render"
+                           "LocationMode.Hash" ]
+                         |> List.forall (fun needle -> has needle "src/engine/Routes.fs")
+                         && not (has "PLACEHOLDER" "src/engine/Routes.fs"))
+
+                    check "the generated tests round-trip every view and hold the inventory byte-equal to Inventory.render"
+                        ([ "parse (format view) is the view, for every view"
+                           "format (parse url) is the canonical url"
+                           "navigation pushes, refinement replaces"
+                           "sign-in keeps the target"
+                           "copy link is the absolute hash url"
+                           "the committed route inventory is the table's Inventory.render output, byte for byte" ]
+                         |> List.forall (fun needle -> has needle "tests/App.Engine.Tests/RouteTests.fs"))
+
+                    check "the route inventory is the Limen.Routing table's rendered echelon.routes/v1 document"
+                        (files |> Map.tryFind Scaffolding.RouteInventoryPath = Some Scaffolding.webLimenRouteInventory
+                         && has "\"signIn\": \"signIn\"" Scaffolding.RouteInventoryPath
+                         && has "\"mode\": \"hash\"" Scaffolding.RouteInventoryPath)
+
+                    check "no unrendered template tokens remain in the Limen.Routing scaffold"
+                        (files |> Map.forall (fun _ text -> not (text.Contains("@@", StringComparison.Ordinal))))
+        finally
+            if File.Exists path then File.Delete path)
