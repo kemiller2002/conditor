@@ -775,10 +775,10 @@
         "release"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T23:20:27.078Z",
-      "updatedAt": "2026-10-08T23:20:27.000Z",
+      "updatedAt": "2026-10-08T23:20:32.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
