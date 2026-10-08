@@ -1201,6 +1201,7 @@ LibraryScaffoldTests.run check
 WebScaffoldTests.run check
 BranchProtectionTests.run check
 RepositoryCreationTests.run check
+RequirementsImportTests.run check
 
 let exitCode =
     if failures = 0 then
