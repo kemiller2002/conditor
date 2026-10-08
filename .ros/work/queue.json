@@ -704,10 +704,10 @@
         "deep-linking"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T21:41:22.359Z",
-      "updatedAt": "2026-10-08T21:41:28.000Z",
+      "updatedAt": "2026-10-08T22:02:59.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

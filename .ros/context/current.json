@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T21:41:28.000Z",
+  "updatedAt": "2026-10-08T22:02:59.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1269,13 +1269,43 @@
     {
       "id": "WI-0028",
       "type": "fix",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T21:41:28.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T22:02:59.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T214129261Z-519c1afd"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "860475cc938d90344b4ed6d3",
+        "recordedAt": "2026-10-08T22:02:58.000Z",
+        "executionId": "EXE-20261008T214129261Z-519c1afd",
+        "repository": "conditor",
+        "branch": "fix/limen-routes-shape",
+        "commit": "c514bcde8f92a95ad4654a1dd5a7f3bde74ee8ba",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/limen-routes-shape",
+        "remoteCommit": "c514bcde8f92a95ad4654a1dd5a7f3bde74ee8ba",
+        "summary": "scaffolded inventory in Limen 0.9.0's exact shape with a schema-keys test; foundations CI pinned to praxis aa7c7ca6; WI-0029 captured for wiring Limen.Routing",
+        "nextAction": "Merge on green; release Conditor 0.7.1",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T22:02:59.000Z"
     }
   ]
 }
