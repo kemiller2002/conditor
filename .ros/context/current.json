@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T08:59:18.000Z",
+  "updatedAt": "2026-10-08T09:00:39.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -651,13 +651,43 @@
     {
       "id": "WI-0018",
       "type": "feature",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T08:59:18.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "examples/indy-init.conditor.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T09:00:39.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T085921331Z-415862b7"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "49bb8ec0536aa45d06a00b66",
+        "recordedAt": "2026-10-08T09:00:38.000Z",
+        "executionId": "EXE-20261008T085921331Z-415862b7",
+        "repository": "conditor",
+        "branch": "chore/indy-preset-echelon-current",
+        "commit": "449de74d19531c7ef19043724a15a92ab924a9d7",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/indy-preset-echelon-current",
+        "remoteCommit": "449de74d19531c7ef19043724a15a92ab924a9d7",
+        "summary": "Indy preset pins every component at its echelon-current selection; bound by tests",
+        "nextAction": "Open the PR and merge when green",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T09:00:39.000Z"
     }
   ]
 }

@@ -20,4 +20,4 @@
 | WI-0015 | fsharp-limen-web scaffold has the same .gitignore gap (engine bin/obj): add the build-outputs region there too | captured |  | medium |
 | WI-0016 | fsharp-nuget-library scaffold: make the test project a real dotnet test project (xUnit) so Dokimos and other TRX consumers get test evidence | complete | scaffold, dokimos | high |
 | WI-0017 | Indy preset: materialize every Indy-init doc the requirements reference, pinned at the corrected kickoff-path commit | complete | preset, indy-init | high |
-| WI-0018 | Indy preset follows echelon-current: Praxis 3.7.2, Ordo 1.5.0, Limen 0.7.1, Forma 0.4.1 | ready | preset, indy-init | high |
+| WI-0018 | Indy preset follows echelon-current: Praxis 3.7.2, Ordo 1.5.0, Limen 0.7.1, Forma 0.4.1 | complete | preset, indy-init | high |
