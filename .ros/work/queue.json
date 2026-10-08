@@ -410,6 +410,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0020",
+      "title": "conditor repo create: publish an initialized target as a protected GitHub repository",
+      "description": "Nothing created the GitHub repository on the day or configured it for agent work (readiness G1-1). Add conditor repo create: a pure plan (bootstrap commit, gh repo create, origin, push main, merge-commit-only auto-merge, read-only workflow token, scaffold-declared branch protection, optional Pages) from observed local and remote state, fail-closed preconditions, an injected-runner executor that stops at the first failure, and --dry-run. Tested with fakes and real Git; never executed against GitHub.",
+      "tags": [
+        "github",
+        "indy-init"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T09:20:30.000Z",
+      "updatedAt": "2026-10-08T09:20:36.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

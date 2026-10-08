@@ -28,6 +28,7 @@
     <Compile Include="Doctor.fs" />
     <Compile Include="Repair.fs" />
     <Compile Include="Upgrade.fs" />
+    <Compile Include="RepositoryCreation.fs" />
     <Compile Include="Launcher.fs" />
     <Compile Include="Execution.fs" />
     <Compile Include="Workstation/OfflineBundle.fs" />

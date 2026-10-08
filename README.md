@@ -119,6 +119,19 @@ conditor start --preset indy-init --launcher claude
 
 Use `conditor start --check --preset indy-init` only after initialization when you want a read-only readiness check.
 
+## Create the GitHub repository
+
+`conditor repo create` publishes a freshly initialized target as a new GitHub repository and prepares it for agent work:
+
+```bash
+conditor repo create --repository OWNER/NAME --target . --dry-run   # read-only: prints every step
+conditor repo create --repository OWNER/NAME --target .
+```
+
+It records the bootstrap as the first commit when the target has none, creates the repository (private unless `--public`), adds it as `origin` and pushes `main`. It then allows auto-merge with merge commits only (squash or rebase merges would orphan Praxis checkpoint commits), deletes merged branches, gives workflows a read-only token, and applies the branch protection the scaffold declares in `.github/branch-protection.json`. `--deploy github-pages` also enables Pages for GitHub Actions and sets `DEPLOY_TARGET`.
+
+It refuses, creating nothing, when the target is not on `main`, has uncommitted changes on top of commits, already has `origin`, or when the GitHub repository already exists or its existence cannot be determined. It uses the `gh` CLI and its authentication. A step that fails stops the run; nothing is rolled back, and the remaining commands are printed.
+
 ## CLI
 
 ```bash

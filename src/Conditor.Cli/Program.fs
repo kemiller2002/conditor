@@ -26,6 +26,7 @@ let private usage () =
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
+    Console.WriteLine "  conditor repo create --repository OWNER/NAME [--target PATH] [--public] [--deploy github-pages] [--dry-run]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
@@ -1256,6 +1257,107 @@ let private runAdopt (args: string array) =
 
                 0
 
+let private runRepository (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "create" ->
+        let target =
+            optionValue "--target" args
+            |> Option.defaultValue (Directory.GetCurrentDirectory())
+            |> Path.GetFullPath
+
+        let deploy =
+            match optionValue "--deploy" args with
+            | None -> Ok NoDeployment
+            | Some "github-pages" -> Ok GitHubPages
+            | Some other -> Error [ $"Unsupported deployment target '{other}'. Supported: github-pages." ]
+
+        let repository =
+            match optionValue "--repository" args with
+            | None -> Error [ "conditor repo create requires --repository OWNER/NAME." ]
+            | Some value -> RepositoryCreation.parseRepository value
+
+        match repository, deploy with
+        | Error errors, _
+        | _, Error errors ->
+            writeErrors errors
+            2
+        | Ok(owner, name), Ok deploy ->
+            let request =
+                { Owner = owner
+                  Name = name
+                  Visibility = if hasFlag "--public" args then PublicRepository else PrivateRepository
+                  Deploy = deploy }
+
+            let run executable arguments = ProcessRunner.runProcess target executable arguments
+
+            let planned =
+                RepositoryCreation.readProtection target
+                |> Result.bind (fun protection ->
+                    let local = RepositoryCreation.observeLocal run
+                    let remote = RepositoryCreation.observeRemote run request
+                    RepositoryCreation.plan request local remote protection)
+
+            match planned with
+            | Error errors ->
+                Console.Error.WriteLine $"Conditor will not create {RepositoryCreation.fullName request}:"
+                errors |> List.iter (fun error -> Console.Error.WriteLine $"  - {error}")
+                3
+            | Ok steps when hasFlag "--dry-run" args ->
+                Console.WriteLine $"Dry run: nothing was created or changed. Creating {RepositoryCreation.fullName request} from {target} would run:"
+
+                steps
+                |> List.iteri (fun index step ->
+                    Console.WriteLine $"  {index + 1}. {step.Description}"
+                    Console.WriteLine $"     {RepositoryCreation.commandLine step}"
+
+                    match step.Command with
+                    | GitHubWithBody(_, body) ->
+                        body.TrimEnd().Split('\n') |> Array.iter (fun line -> Console.WriteLine $"       {line}")
+                    | _ -> ())
+
+                0
+            | Ok steps ->
+                let withBody (body: string) (action: string -> ProcessResult) =
+                    let path = Path.Combine(Path.GetTempPath(), $"conditor-github-{Guid.NewGuid():N}.json")
+
+                    try
+                        File.WriteAllText(path, body)
+                        action path
+                    finally
+                        if File.Exists path then
+                            File.Delete path
+
+                let outcome = RepositoryCreation.execute run withBody steps
+
+                for step in outcome.Completed do
+                    Console.WriteLine $"  done     {step.Description}"
+
+                match outcome.Failed with
+                | None ->
+                    Console.WriteLine $"Created https://github.com/{RepositoryCreation.fullName request} and pushed {RepositoryCreation.Branch}."
+                    0
+                | Some(step, result) ->
+                    Console.Error.WriteLine $"  FAILED   {step.Description}"
+                    Console.Error.WriteLine $"           {RepositoryCreation.commandLine step} exited with {result.ExitCode}"
+
+                    [ result.StandardError.Trim(); result.StandardOutput.Trim() ]
+                    |> List.filter (String.IsNullOrWhiteSpace >> not)
+                    |> List.iter (fun line -> Console.Error.WriteLine $"           {line}")
+
+                    for remaining in step :: outcome.Remaining do
+                        Console.Error.WriteLine $"  to do    {remaining.Description}: {RepositoryCreation.commandLine remaining}"
+
+                        match remaining.Command with
+                        | GitHubWithBody(_, body) ->
+                            body.TrimEnd().Split('\n') |> Array.iter (fun line -> Console.Error.WriteLine $"             {line}")
+                        | _ -> ()
+
+                    Console.Error.WriteLine "Nothing was rolled back. Fix the cause, then run the remaining steps by hand."
+                    1
+    | _ ->
+        usage ()
+        2
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -1289,6 +1391,8 @@ let private execute (args: string array) =
             printCompatibility (hasFlag "--json" args)
         elif command = "adopt" then
             runAdopt args
+        elif command = "repo" then
+            runRepository args
         else
             let target =
                 optionValue "--target" args

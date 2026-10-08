@@ -1199,6 +1199,7 @@ VerificationGateTests.run check
 LibraryScaffoldTests.run check
 WebScaffoldTests.run check
 BranchProtectionTests.run check
+RepositoryCreationTests.run check
 
 let exitCode =
     if failures = 0 then
