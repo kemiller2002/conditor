@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 14,
+  "nextSeq": 16,
   "items": [
     {
       "id": "WI-0001",
@@ -260,6 +260,50 @@
       "attachments": [],
       "createdAt": "2026-10-08T07:30:10.099Z",
       "updatedAt": "2026-10-08T07:30:10.099Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0014",
+      "title": "fsharp-nuget-library scaffold must ignore bin/, obj/, dist/ and packages: build output would otherwise be committed",
+      "description": "Found while bootstrapping kemiller2002/arca: the .gitignore that the lifecycle components install has no .NET build-output entries, so 'git add -A' after a build stages bin/ and obj/. The scaffold adds a bounded '# conditor:build-outputs' region to .gitignore. Managed-region markers now follow the host file's comment syntax.",
+      "tags": [
+        "scaffold"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T07:52:46.000Z",
+      "updatedAt": "2026-10-08T07:53:09.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0015",
+      "title": "fsharp-limen-web scaffold has the same .gitignore gap (engine bin/obj): add the build-outputs region there too",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "captured",
+      "attachments": [],
+      "createdAt": "2026-10-08T07:52:48.507Z",
+      "updatedAt": "2026-10-08T07:52:48.507Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

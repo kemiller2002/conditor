@@ -83,15 +83,32 @@ module Installer =
                         File.Delete temporary
 
 
-    let private managedRegionStart regionId =
-        $"<!-- conditor:{regionId}:start -->"
+    /// Region markers use the host file's own comment syntax: `#` lines in
+    /// files whose syntax has no block comments (.gitignore and similar),
+    /// HTML comments in Markdown.
+    let private usesHashComments (relativePath: string) =
+        match Path.GetFileName relativePath with
+        | ".gitignore"
+        | ".gitattributes"
+        | ".dockerignore"
+        | ".npmignore" -> true
+        | _ -> false
 
-    let private managedRegionEnd regionId =
-        $"<!-- conditor:{regionId}:end -->"
+    let private managedRegionStart relativePath regionId =
+        if usesHashComments relativePath then
+            $"# conditor:{regionId}:start"
+        else
+            $"<!-- conditor:{regionId}:start -->"
 
-    let private renderManagedRegion (regionId: string) (content: string) =
+    let private managedRegionEnd relativePath regionId =
+        if usesHashComments relativePath then
+            $"# conditor:{regionId}:end"
+        else
+            $"<!-- conditor:{regionId}:end -->"
+
+    let private renderManagedRegion (relativePath: string) (regionId: string) (content: string) =
         let body = normalize content |> fun value -> value.TrimEnd('\r', '\n')
-        $"{managedRegionStart regionId}\n{body}\n{managedRegionEnd regionId}\n"
+        $"{managedRegionStart relativePath regionId}\n{body}\n{managedRegionEnd relativePath regionId}\n"
 
     let private writeAtomically (fullPath: string) (content: string) (errorLabel: string) =
         ensureParent fullPath
@@ -118,15 +135,15 @@ module Installer =
         | None ->
             Error $"Managed scaffold path escapes the target repository: {relativePath}"
         | Some fullPath ->
-            let managed = renderManagedRegion regionId content
+            let managed = renderManagedRegion relativePath regionId content
 
             if not (File.Exists fullPath) then
                 writeAtomically fullPath managed $"Unable to create managed scaffold file '{relativePath}'"
             else
                 let existing = File.ReadAllText fullPath
                 let normalizedExisting = normalize existing
-                let startMarker = managedRegionStart regionId
-                let endMarker = managedRegionEnd regionId
+                let startMarker = managedRegionStart relativePath regionId
+                let endMarker = managedRegionEnd relativePath regionId
                 let startIndex = normalizedExisting.IndexOf(startMarker, StringComparison.Ordinal)
                 let endIndex = normalizedExisting.IndexOf(endMarker, StringComparison.Ordinal)
 
