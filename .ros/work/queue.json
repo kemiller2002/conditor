@@ -633,10 +633,10 @@
         "deep-linking"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T19:33:45.650Z",
-      "updatedAt": "2026-10-08T19:33:51.000Z",
+      "updatedAt": "2026-10-08T20:49:07.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
