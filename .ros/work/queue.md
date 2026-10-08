@@ -32,3 +32,4 @@
 | WI-0023 | Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60) | complete |  | medium |
 | WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | complete |  | medium |
 | WI-0025 | Qualify Forma 0.5.0 (echelon-current 1.8.0) and move the presets that follow the channel | complete | forma, registry, qualification | high |
+| WI-0026 | Release Conditor 0.6.1 so consumers get the Forma 0.5.0 qualification | ready |  | medium |
