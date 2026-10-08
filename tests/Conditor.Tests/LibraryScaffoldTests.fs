@@ -60,7 +60,8 @@ let private expectedPaths =
       ".github/workflows/release.yml"
       "release/echelon.release-input.json"
       "SDE-MAP.md"
-      "context/CURRENT-STATE.md" ]
+      "context/CURRENT-STATE.md"
+      ".gitignore" ]
 
 let private contains (needle: string) (files: Map<string, string>) path =
     files |> Map.tryFind path |> Option.exists (fun text -> text.Contains(needle, StringComparison.Ordinal))
@@ -141,7 +142,17 @@ let run (check: string -> bool -> unit) =
 
             check "Ordo baseline routes the first semantic area to the library"
                 (has "`src/Arca/`" "SDE-MAP.md" && has "`src/Arca/Arca.fsproj`" "SDE-MAP.md")
-            check "Ordo baseline names the library placeholder" (has "`src/Arca/Library.fs` value" "context/CURRENT-STATE.md"))
+            check "Ordo baseline names the library placeholder" (has "`src/Arca/Library.fs` value" "context/CURRENT-STATE.md")
+
+            check "library scaffold ignores build and pack outputs"
+                (has "bin/\n" ".gitignore" && has "obj/\n" ".gitignore" && has "dist/\n" ".gitignore" && has "*.nupkg" ".gitignore")
+
+            check "the .gitignore region is a bounded managed region, never a whole-file write"
+                (plan.Actions
+                 |> List.exists (fun action ->
+                     match action.Execution with
+                     | EnsureManagedRegion(".gitignore", "build-outputs", _) -> true
+                     | _ -> false)))
 
     withTarget (fun target ->
         match planFor target (libraryManifest """{"id":"aegis","version":"1.0.0"}""") with
@@ -181,3 +192,34 @@ let run (check: string -> bool -> unit) =
                  && contains "`src/kernel/bootstrap.ts`" files "SDE-MAP.md"
                  && contains "Boundary checks: installed Limen and Aegis contracts where required." files "SDE-MAP.md"
                  && contains "The generated `src/engine/Domain.fs` state is a scaffold placeholder" files "context/CURRENT-STATE.md"))
+
+    // A .gitignore region uses '#' markers and keeps what the lifecycle
+    // components (and the user) already put in the file.
+    withTarget (fun target ->
+        let ignorePath = Path.Combine(target, ".gitignore")
+        File.WriteAllText(ignorePath, "# Node\nnode_modules/\n")
+
+        let plan region =
+            { ProjectName = "gitignore-region"
+              Operation = Verify
+              Components = []
+              Actions =
+                [ { Sequence = 1
+                    ComponentId = "scaffold:fsharp-nuget-library"
+                    ComponentVersion = "1"
+                    Kind = ScaffoldFile
+                    Execution = EnsureManagedRegion(".gitignore", "build-outputs", region) } ] }
+
+        match Installer.execute target "test-manifest.json" (plan "bin/\nobj/\n") with
+        | Error errors -> check $".gitignore region executes: {joined errors}" false
+        | Ok _ ->
+            let first = File.ReadAllText ignorePath
+
+            check ".gitignore region uses hash-comment markers and keeps existing entries"
+                (first.StartsWith("# Node\nnode_modules/\n", StringComparison.Ordinal)
+                 && first.Contains("# conditor:build-outputs:start\nbin/\nobj/\n# conditor:build-outputs:end", StringComparison.Ordinal)
+                 && not (first.Contains("<!--", StringComparison.Ordinal)))
+
+            match Installer.execute target "test-manifest.json" (plan "bin/\nobj/\n") with
+            | Error errors -> check $".gitignore region is idempotent: {joined errors}" false
+            | Ok _ -> check ".gitignore region is idempotent" (File.ReadAllText ignorePath = first))

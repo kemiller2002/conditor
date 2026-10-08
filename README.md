@@ -36,6 +36,7 @@ A new project-bound F# library (for example a shared data layer published to NuG
 - `.github/workflows/build-and-test.yml`;
 - `.github/workflows/release.yml` and `release/echelon.release-input.json`: the Registry release contract for the `nuget-library` class. It packs once, checksums the exact bytes, generates and schema-validates `echelon-release.json`, and publishes to nuget.org through Trusted Publishing plus an attested GitHub release. Version `0.0.0` is never published, and publication refuses to run without the `NUGET_USER` repository variable;
 - the Ordo baseline (`SDE-MAP.md`, `context/CURRENT-STATE.md`) routed to the library.
+- a bounded `# conditor:build-outputs` region in `.gitignore` (`bin/`, `obj/`, `dist/`, `*.nupkg`), leaving the rest of the file to the lifecycle components and the user.
 
 NuGet components such as Aegis are bound into the library project. npm packages are refused because a library has no browser kernel to bind them to.
 

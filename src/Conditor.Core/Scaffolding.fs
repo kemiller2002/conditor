@@ -702,6 +702,12 @@ jobs:
             dist/release/*.nupkg dist/release/checksums.txt dist/release/echelon-release.json
 """
 
+    /// Build and pack outputs never belong in the repository. The lifecycle
+    /// components own the rest of .gitignore, so the scaffold adds only its
+    /// own bounded region.
+    let private libraryIgnores =
+        "# .NET build and pack outputs (Conditor fsharp-nuget-library scaffold)\nbin/\nobj/\ndist/\n*.nupkg\n"
+
     let private libraryFiles (projectName: string) (manifest: ProjectManifest) =
         let npmBindings =
             resolvedBindings manifest
@@ -743,7 +749,8 @@ jobs:
                   ".github/workflows/build-and-test.yml", render libraryBuildWorkflow
                   ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
                   ".github/workflows/release.yml", render libraryReleaseWorkflow
-                  "release/echelon.release-input.json", render libraryReleaseInput ]
+                  "release/echelon.release-input.json", render libraryReleaseInput
+                  ".gitignore", libraryIgnores ]
                 @ ordoBaselineFiles (libraryBaselineLocations ns) manifest
             )
 
@@ -821,7 +828,7 @@ jobs:
                     match safeFullPath target relativePath with
                     | None ->
                         errors.Add $"Scaffold path escapes the target repository: {relativePath}"
-                    | Some fullPath when relativePath = "AGENTS.md" || relativePath = "context/CURRENT-STATE.md" ->
+                    | Some fullPath when relativePath = "AGENTS.md" || relativePath = "context/CURRENT-STATE.md" || relativePath = ".gitignore" ->
                         // These are shared integration surfaces. The installer owns only
                         // bounded Conditor regions and resolves current file contents at execution time.
                         changes.Add(relativePath, content)

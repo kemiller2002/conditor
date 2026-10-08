@@ -412,6 +412,8 @@ module Planner =
                             EnsureManagedRegion(relativePath, "agent-entry", fileContent)
                         | "context/CURRENT-STATE.md" ->
                             EnsureManagedRegion(relativePath, "ordo-baseline", fileContent)
+                        | ".gitignore" ->
+                            EnsureManagedRegion(relativePath, "build-outputs", fileContent)
                         | _ ->
                             EnsureFile(relativePath, fileContent)
 
