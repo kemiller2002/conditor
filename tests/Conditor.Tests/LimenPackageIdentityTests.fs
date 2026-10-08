@@ -58,16 +58,17 @@ let run (check: string -> bool -> unit) =
     match Registry.tryFind "limen", Registry.qualifiedVersions "limen" with
     | Some limen, Some qualified ->
         check
-            "Limen 0.7.0 and 0.7.1 are qualified alongside the legacy 0.6.1 and 0.6.2 releases"
-            (qualified = Set.ofList [ "0.6.1"; "0.6.2"; "0.7.0"; "0.7.1" ])
+            "Limen 0.7.0, 0.7.1 and 0.9.0 are qualified alongside the legacy 0.6.1 and 0.6.2 releases"
+            (qualified = Set.ofList [ "0.6.1"; "0.6.2"; "0.7.0"; "0.7.1"; "0.9.0" ])
 
         check "Limen's current package identity is @echelon-foundry/limen" (limen.Package = CurrentLimen)
-        check "Limen's default version is 0.7.1" (limen.DefaultVersion = "0.7.1")
+        check "Limen's default version is 0.9.0, the echelon-current selection with the routing module" (limen.DefaultVersion = "0.9.0")
 
         check
-            "Limen 0.7.0 and 0.7.1 resolve to @echelon-foundry/limen"
+            "Limen 0.7.0, 0.7.1 and 0.9.0 resolve to @echelon-foundry/limen"
             (ComponentDefinition.packageFor "0.7.0" limen = CurrentLimen
-             && ComponentDefinition.packageFor "0.7.1" limen = CurrentLimen)
+             && ComponentDefinition.packageFor "0.7.1" limen = CurrentLimen
+             && ComponentDefinition.packageFor "0.9.0" limen = CurrentLimen)
 
         check
             "Limen 0.6.1 and 0.6.2 keep their historical @echelon-foundry/typescript-wasm-kernel identity"
