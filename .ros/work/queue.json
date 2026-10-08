@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 26,
+  "nextSeq": 27,
   "items": [
     {
       "id": "WI-0001",
@@ -637,6 +637,30 @@
       "attachments": [],
       "createdAt": "2026-10-08T19:33:45.650Z",
       "updatedAt": "2026-10-08T19:33:51.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0026",
+      "title": "When the indy-init preset pin moves past Indy-init 2eee2d52 (PR #7, URL-addressable state), update requirementsImport expected counts: R 77->82, P 458->464, OQ 47->48",
+      "description": "Indy-init PR #7 added R9.6-R9.10, P34.15-P34.20 and OQ-048 (deep-linking requirements). The new IDs fall under the existing R9.*, P34.* and OQ-* assignments; only the expected counts change. The pin was deliberately not moved (no rehearsal until the owner says so).",
+      "tags": [
+        "indy",
+        "requirements-import"
+      ],
+      "priority": "medium",
+      "status": "captured",
+      "attachments": [],
+      "createdAt": "2026-10-08T19:43:01.928Z",
+      "updatedAt": "2026-10-08T19:43:01.928Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
