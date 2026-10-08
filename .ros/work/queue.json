@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 16,
+  "nextSeq": 17,
   "items": [
     {
       "id": "WI-0001",
@@ -304,6 +304,30 @@
       "attachments": [],
       "createdAt": "2026-10-08T07:52:48.507Z",
       "updatedAt": "2026-10-08T07:52:48.507Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0016",
+      "title": "fsharp-nuget-library scaffold: make the test project a real dotnet test project (xUnit) so Dokimos and other TRX consumers get test evidence",
+      "description": "Found on kemiller2002/fides#3. The Dokimos quality gate requires tests.total and tests.failed from the TRX that 'dotnet test --logger trx' writes. The scaffold's dependency-free console test runner is invisible to dotnet test, so the gate reported required-evidence-unavailable (exit 3). Generate an xUnit test project (Microsoft.NET.Test.Sdk 17.11.1, xunit 2.9.2, xunit.runner.visualstudio 2.8.2, the versions Chrona and Signal pin), run it with dotnet test in build-and-test and release, fail when zero tests run, and ignore TestResults/.",
+      "tags": [
+        "scaffold",
+        "dokimos"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T08:24:06.000Z",
+      "updatedAt": "2026-10-08T08:24:06.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

@@ -53,7 +53,7 @@ let private expectedPaths =
       "src/Arca/Arca.fsproj"
       "src/Arca/Library.fs"
       "tests/Arca.Tests/Arca.Tests.fsproj"
-      "tests/Arca.Tests/Program.fs"
+      "tests/Arca.Tests/LibraryTests.fs"
       ".echelon/foundations.json"
       ".github/workflows/build-and-test.yml"
       ".github/workflows/echelon-foundations.yml"
@@ -84,11 +84,23 @@ let run (check: string -> bool -> unit) =
             check "a fresh library declares the unreleased version" (has "<Version>0.0.0</Version>" "Directory.Build.props")
             check "solution names the library and its tests"
                 (has "src/Arca/Arca.fsproj" "Arca.slnx" && has "tests/Arca.Tests/Arca.Tests.fsproj" "Arca.slnx")
-            check "test runner fails the process on a failed check" (has "failures" "tests/Arca.Tests/Program.fs" && has "Arca.Library.scaffoldReady" "tests/Arca.Tests/Program.fs")
+            check "the test project is a dotnet test (xUnit) project, so test-result consumers get evidence"
+                (has "<IsTestProject>true</IsTestProject>" "tests/Arca.Tests/Arca.Tests.fsproj"
+                 && has "Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.11.1\"" "tests/Arca.Tests/Arca.Tests.fsproj"
+                 && has "Include=\"xunit\" Version=\"2.9.2\"" "tests/Arca.Tests/Arca.Tests.fsproj"
+                 && has "Include=\"xunit.runner.visualstudio\" Version=\"2.8.2\"" "tests/Arca.Tests/Arca.Tests.fsproj"
+                 && has "[<Fact>]" "tests/Arca.Tests/LibraryTests.fs"
+                 && has "Arca.Library.scaffoldReady" "tests/Arca.Tests/LibraryTests.fs")
 
             check "build-and-test builds and runs the tests"
                 (has "dotnet build Arca.slnx -c Release" ".github/workflows/build-and-test.yml"
-                 && has "dotnet run --project tests/Arca.Tests/Arca.Tests.fsproj" ".github/workflows/build-and-test.yml")
+                 && has "dotnet test Arca.slnx -c Release --no-build" ".github/workflows/build-and-test.yml"
+                 && has "dotnet test Arca.slnx -c Release --no-build" ".github/workflows/release.yml")
+
+            check "the test step fails an empty or skipped run"
+                ([ ".github/workflows/build-and-test.yml"; ".github/workflows/release.yml" ]
+                 |> List.forall (fun path ->
+                     has "Passed:[[:space:]]*[1-9]" path && has "Skipped:[[:space:]]*[1-9]" path))
 
             check "foundations CI pins the Praxis verifier commit"
                 (has $"foundations-verify.yml@{Scaffolding.PraxisFoundationsRef}" ".github/workflows/echelon-foundations.yml"
@@ -145,7 +157,7 @@ let run (check: string -> bool -> unit) =
             check "Ordo baseline names the library placeholder" (has "`src/Arca/Library.fs` value" "context/CURRENT-STATE.md")
 
             check "library scaffold ignores build and pack outputs"
-                (has "bin/\n" ".gitignore" && has "obj/\n" ".gitignore" && has "dist/\n" ".gitignore" && has "*.nupkg" ".gitignore")
+                (has "bin/\n" ".gitignore" && has "obj/\n" ".gitignore" && has "dist/\n" ".gitignore" && has "TestResults/\n" ".gitignore" && has "*.nupkg" ".gitignore")
 
             check "the .gitignore region is a bounded managed region, never a whole-file write"
                 (plan.Actions

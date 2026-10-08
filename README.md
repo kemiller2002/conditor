@@ -31,12 +31,12 @@ A new project-bound F# library (for example a shared data layer published to NuG
 
 `conditor init` then installs Praxis, Ordo and any other declared lifecycle components and adds, without overwriting anything that already exists:
 
-- `Directory.Build.props` (`<Version>0.0.0</Version>`, meaning "not released yet"), `<Name>.slnx`, `src/<Name>/` (package id `EchelonFoundry.<Name>`) and a dependency-free test runner in `tests/<Name>.Tests/`;
+- `Directory.Build.props` (`<Version>0.0.0</Version>`, meaning "not released yet"), `<Name>.slnx`, `src/<Name>/` (package id `EchelonFoundry.<Name>`) and an xUnit test project in `tests/<Name>.Tests/` that `dotnet test` (and every tool reading its TRX results) sees; the workflows fail an empty or skipped run;
 - `.echelon/foundations.json` and `.github/workflows/echelon-foundations.yml`, pinned to the Praxis foundations verifier;
 - `.github/workflows/build-and-test.yml`;
 - `.github/workflows/release.yml` and `release/echelon.release-input.json`: the Registry release contract for the `nuget-library` class. It packs once, checksums the exact bytes, generates and schema-validates `echelon-release.json`, and publishes to nuget.org through Trusted Publishing plus an attested GitHub release. Version `0.0.0` is never published, and publication refuses to run without the `NUGET_USER` repository variable;
 - the Ordo baseline (`SDE-MAP.md`, `context/CURRENT-STATE.md`) routed to the library.
-- a bounded `# conditor:build-outputs` region in `.gitignore` (`bin/`, `obj/`, `dist/`, `*.nupkg`), leaving the rest of the file to the lifecycle components and the user.
+- a bounded `# conditor:build-outputs` region in `.gitignore` (`bin/`, `obj/`, `dist/`, `TestResults/`, `*.nupkg`), leaving the rest of the file to the lifecycle components and the user.
 
 NuGet components such as Aegis are bound into the library project. npm packages are refused because a library has no browser kernel to bind them to.
 
