@@ -40,6 +40,19 @@ A new project-bound F# library (for example a shared data layer published to NuG
 
 NuGet components such as Aegis are bound into the library project. npm packages are refused because a library has no browser kernel to bind them to.
 
+## New browser application repository
+
+A browser application (an F# engine behind a Limen boundary, with Forma and Folio pages) uses the `fsharp-limen-web` scaffold, as the `indy-init` preset does. `conditor init` adds, without overwriting anything that already exists:
+
+- `App.slnx` with the engine (`src/engine/`, Aegis bound) and an xUnit test project (`tests/App.Engine.Tests/`); the workflow fails an empty or skipped test run;
+- the npm project at the repository root (`package.json`, `tsconfig.json`, `limen.config.json`), where the foundations verifier reads it, with the pages and Limen kernel in `src/kernel/` and Playwright pinned exactly;
+- a real-browser smoke suite (`playwright.config.js`, `tests/browser/`): every page loads every resource and raises no script error;
+- `.github/workflows/build-and-test.yml`: build, tests, kernel type-check and the browser suite. Chromium is cached under the installed Playwright version and its OS libraries are proved offline, never fetched with `--with-deps` (the apt hang fixed in signal#24); the job has a 20-minute ceiling;
+- `.echelon/foundations.json` (exactly the capabilities the Praxis schema allows) and `.github/workflows/echelon-foundations.yml`;
+- `.github/workflows/deploy-pages.yml` and `DEPLOYMENT.md`: a GitHub Pages deployment that stays inert until the repository variable `DEPLOY_TARGET` is `github-pages`, because the target is not decided;
+- `.github/branch-protection.json`: the protection for `main` (pull requests, the three required checks, administrators included), which the repository-creation step applies;
+- the Ordo baseline and a bounded `# conditor:build-outputs` region in `.gitignore` (`bin/`, `obj/`, `dist/`, `TestResults/`, `node_modules/`, `test-results/`, `playwright-report/`).
+
 ## Native installation
 
 Tagged releases produce self-contained binaries for Linux, macOS, and Windows on x64 and ARM64. The installers verify the selected release artifact against its published SHA-256 before installation. See `docs/installation.md`.
