@@ -446,10 +446,10 @@
         "registry"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T09:34:10.000Z",
-      "updatedAt": "2026-10-08T09:34:23.000Z",
+      "updatedAt": "2026-10-08T09:34:28.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
