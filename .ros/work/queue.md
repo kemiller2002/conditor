@@ -31,4 +31,4 @@
 | WI-0022 | An established scaffold's seed files belong to the project: stop comparing or recreating them once the lock records the scaffold, so a project that grew past its scaffold can still plan, repair and upgrade --current; roll back governance when the current-upgrade commit step fails | complete | scaffold, upgrade, current | high |
 | WI-0023 | Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60) | complete |  | medium |
 | WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | complete |  | medium |
-| WI-0025 | Qualify Forma 0.5.0 (echelon-current 1.8.0) and move the presets that follow the channel | ready | forma, registry, qualification | high |
+| WI-0025 | Qualify Forma 0.5.0 (echelon-current 1.8.0) and move the presets that follow the channel | complete | forma, registry, qualification | high |

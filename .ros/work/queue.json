@@ -634,10 +634,10 @@
         "qualification"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T14:33:31.281Z",
-      "updatedAt": "2026-10-08T14:33:31.000Z",
+      "updatedAt": "2026-10-08T14:42:22.764Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

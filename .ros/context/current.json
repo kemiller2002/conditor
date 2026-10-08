@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T14:33:31.000Z",
+  "updatedAt": "2026-10-08T14:42:22.764Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1179,13 +1179,43 @@
     {
       "id": "WI-0025",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T14:33:31.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/forma.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T14:42:22.764Z",
       "telemetryExecutionIds": [
         "EXE-20261008T143332018Z-b87bb281"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "93d20905749c7d416e35ad18",
+        "recordedAt": "2026-10-08T14:42:21.739Z",
+        "executionId": "EXE-20261008T143332018Z-b87bb281",
+        "repository": "conditor",
+        "branch": "chore/qualify-forma-0.5.0",
+        "commit": "4de90135386acd6bf367769121af88c314971d5b",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/qualify-forma-0.5.0",
+        "remoteCommit": "4de90135386acd6bf367769121af88c314971d5b",
+        "summary": "Forma 0.5.0 qualified and default; presets and EchelonCurrent.selections at echelon-current 1.8.0; tests, CI replay and end-to-end upgrade --current pass",
+        "nextAction": "Review the draft PR, CI green, merge; then release Conditor so consumers get it",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T14:42:22.764Z"
     }
   ]
 }
