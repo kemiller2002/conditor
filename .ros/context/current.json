@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T11:42:10.000Z",
+  "updatedAt": "2026-10-08T11:42:13.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -950,13 +950,47 @@
     {
       "id": "INDY-0003",
       "type": "feature",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T11:42:10.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Supervisor.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Launcher.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/SupervisorTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T11:42:13.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T114210438Z-d058c3a3"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "32ab890664424b396087ad01",
+        "recordedAt": "2026-10-08T11:42:12.000Z",
+        "executionId": "EXE-20261008T114210438Z-d058c3a3",
+        "repository": "conditor",
+        "branch": "feat/agent-supervisor",
+        "commit": "931d3b00b120f9863dff432692d3cc7d3d28db72",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/agent-supervisor",
+        "remoteCommit": "931d3b00b120f9863dff432692d3cc7d3d28db72",
+        "summary": "conditor supervise launches Claude headless with an explicit permission mode and relaunches until a stop condition; tests pass",
+        "nextAction": "Merge once Actions runs and passes",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T11:42:13.000Z"
     }
   ]
 }
