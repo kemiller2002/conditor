@@ -34,3 +34,5 @@
 | WI-0025 | URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist | complete | scaffold, deep-linking | high |
 | WI-0026 | When the indy-init preset pin moves past Indy-init 2eee2d52 (PR #7, URL-addressable state), update requirementsImport expected counts: R 77->82, P 458->464, OQ 47->48 | captured | indy, requirements-import | medium |
 | WI-0027 | Release Conditor 0.7.0: URL-addressable state in the web scaffold (#68) | complete | release | high |
+| WI-0028 | Scaffold route inventory in Limen 0.9.0's exact echelon.routes/v1 shape, and pin the foundations CI to the Praxis verifier that vendors Limen's schema | complete | scaffold, deep-linking | high |
+| WI-0029 | Wire Limen.Routing into the fsharp-limen-web scaffold once Conditor qualifies Limen 0.9.0 and limen-fsharp 0.9.0 (CON-293) | ready | scaffold, deep-linking, limen | medium |

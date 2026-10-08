@@ -167,7 +167,7 @@ module Scaffolding =
   "notFound": "notFound",
   "routes": [
     {
-      "guard": null,
+      "guards": [],
       "name": "home",
       "params": [],
       "pattern": "/",
@@ -175,16 +175,16 @@ module Scaffolding =
       "returnTarget": true
     },
     {
-      "guard": null,
+      "guards": [],
       "name": "notFound",
       "params": [
         {
           "default": null,
           "in": "path",
           "name": "rest",
-          "required": true,
+          "required": false,
           "type": "string",
-          "values": []
+          "values": null
         }
       ],
       "pattern": "/{*rest}",
@@ -480,11 +480,12 @@ pending (`ECHELON-FND-ROUTING-005`), which is not a failure.
     // ---------------------------------------------------------------------
 
     /// The Praxis commit whose reusable foundations-verify workflow the
-    /// generated CI pins: praxis#209 (WI-0077) on main, the first verifier
-    /// that checks the routing foundation (SAF-URL-8/9). A declaration
+    /// generated CI pins: praxis#211 (WI-0079) on main, the verifier that
+    /// checks the routing foundation (SAF-URL-8/9) against Limen 0.9.0's
+    /// published routes schema. A declaration
     /// without routing verifies exactly as before.
     [<Literal>]
-    let PraxisFoundationsRef = "b21d70d20aff96c4120b695c143d8d0a5d183bde"
+    let PraxisFoundationsRef = "aa7c7ca6a6e2cb270bdccfe117ea35ade7b0945c"
 
     /// The echelon-registry commit whose release-contract action and
     /// release-manifest schema the generated release workflow pins.
