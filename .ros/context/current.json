@@ -942,6 +942,51 @@
         }
       },
       "completedAt": "2026-10-08T11:32:16.000Z"
+    },
+    {
+      "id": "WI-0023",
+      "type": "feature",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
+        }
+      ],
+      "updatedAt": "2026-10-08T11:18:32Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T111543196Z-ea72551a"
+      ],
+      "latestCheckpoint": {
+        "id": "159a776ac9da7dd31e780d74",
+        "recordedAt": "2026-10-08T11:18:23Z",
+        "executionId": "EXE-20261008T111543196Z-ea72551a",
+        "repository": "conditor",
+        "branch": "release/0.5.0-local-feed",
+        "commit": "33dc76877f8eb8cabc7c730933bd21d954dca797",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "release/0.5.0-local-feed",
+        "remoteCommit": "33dc76877f8eb8cabc7c730933bd21d954dca797",
+        "summary": "Version 0.5.0 set in Directory.Build.props and requested in release/requested-version.txt (commit 33dc768)",
+        "nextAction": "Merge once every check on the PR head is green; release orchestrator tags v0.5.0",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T11:18:32Z"
     }
   ]
 }
