@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T09:20:30.000Z",
+  "updatedAt": "2026-10-08T09:20:36.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -782,13 +782,43 @@
     {
       "id": "WI-0020",
       "type": "feature",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T09:20:30.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/RepositoryCreation.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RepositoryCreationTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T09:20:36.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T092033017Z-a5a3c04c"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "11f44de7d00d8a05a0f0a4f9",
+        "recordedAt": "2026-10-08T09:20:35.000Z",
+        "executionId": "EXE-20261008T092033017Z-a5a3c04c",
+        "repository": "conditor",
+        "branch": "feat/repo-create",
+        "commit": "ede6bd6f46823cc842fc596c3181a3b861849df9",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/repo-create",
+        "remoteCommit": "ede6bd6f46823cc842fc596c3181a3b861849df9",
+        "summary": "conditor repo create plans, refuses fail-closed and executes with an injected runner; tests pass",
+        "nextAction": "Open the PR and merge when green",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T09:20:36.000Z"
     }
   ]
 }
