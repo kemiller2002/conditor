@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 9,
+  "nextSeq": 10,
   "items": [
     {
       "id": "WI-0001",
@@ -152,6 +152,29 @@
       "attachments": [],
       "createdAt": "2026-10-08T03:32:54Z",
       "updatedAt": "2026-10-08T03:37:14Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0009",
+      "title": "Current upgrade opts a project in to an optional native lifecycle tool",
+      "description": "A project could not adopt an optional native repository-lifecycle component its resolved set selects (strata 0.1.0 in echelon-current 1.2.0): declaring it in conditor.json made --current refuse ('manifest has changed since the environment was established'), and the suggested 'conditor init' runs '<tool> init' with a tool nothing had installed. --current now accepts a manifest whose only change since the lock is newly declared components the target set selects as native repository-lifecycle tools at exactly the selected version: it installs them through the workstation plan, runs their lifecycle init with the installed copy, verifies, and commits authority and lock. Any other manifest change still refuses.",
+      "tags": [
+        "lifecycle"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T03:45:21Z",
+      "updatedAt": "2026-10-08T03:48:34Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
