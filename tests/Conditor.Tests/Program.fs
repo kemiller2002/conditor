@@ -600,6 +600,48 @@ match Presets.resolve "indy-init" with
     | Ok manifest ->
         check "embedded Indy preset is execution enabled" (manifest.Execution |> Option.exists _.Enabled)
 
+        let indySources =
+            manifest.Requirements
+            |> List.filter (fun requirement -> requirement.Source.Repository = "kemiller2002/Indy-init")
+
+        // Indy-init PR #6 (merge 012f397) fixed the packet's kickoff entry path.
+        check
+            "every Indy-init governing input is pinned to the corrected kickoff-path commit"
+            (not indySources.IsEmpty
+             && indySources
+                |> List.forall (fun requirement ->
+                    requirement.Source.Commit = "012f39773079692a778b98cadf3dbd264df36469"))
+
+        // Relative links between the planning documents resolve only when each
+        // file keeps its planning-repository path.
+        check
+            "every Indy-init governing input keeps its planning-repository path"
+            (indySources
+             |> List.forall (fun requirement ->
+                 match requirement.Source.Entrypoint with
+                 | FileArtifact path -> requirement.TargetPath = path
+                 | _ -> false))
+
+        // The 17 documents the materialized requirements link to that the
+        // preset once omitted (readiness G1-4, requirements review RQR-006).
+        let referencedDocuments =
+            [ "ADVANCED-VISUALIZATIONS"; "BOUNDED-AUTONOMOUS-INVESTIGATION"; "COMPETITION-AMBITION"
+              "CROSS-INVESTIGATION-INTELLIGENCE"; "DOMAIN-PACK-CONTRACT"; "ENGINEERING-PROOF-BUNDLE"
+              "EVIDENCE-INGESTION-PIPELINE"; "FORMAL-VALIDATION"; "INVESTIGATION-ACCEPTANCE-SCENARIOS"
+              "INVESTIGATION-PLANNER"; "LOCAL-WASM-ANALYTICS"; "MULTI-AGENT-INVESTIGATION"; "OPEN-QUESTIONS"
+              "PROOF-CARRYING-PROPOSALS"; "RESEARCH-HARNESS"; "SEMANTIC-COMPILER"; "TOOL-EXECUTION-GATEWAY" ]
+
+        let materialized = indySources |> List.map _.TargetPath |> Set.ofList
+
+        for document in referencedDocuments do
+            check
+                $"the Indy preset materializes the referenced document {document}"
+                (materialized.Contains $"docs/{document}.md")
+
+        check
+            "Indy preset requirement ids are unique"
+            ((manifest.Requirements |> List.map _.Id |> List.distinct).Length = manifest.Requirements.Length)
+
         match Planner.create "/tmp/embedded-indy-plan" Init manifest with
         | Error errors ->
             let details = String.concat "; " errors
