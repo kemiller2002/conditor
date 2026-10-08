@@ -5,11 +5,11 @@
   "components": [
     {
       "id": "praxis",
-      "version": "3.6.0"
+      "version": "3.7.2"
     },
     {
       "id": "ordo",
-      "version": "1.4.0"
+      "version": "1.5.0"
     },
     {
       "id": "percepta",
@@ -21,11 +21,11 @@
     },
     {
       "id": "limen",
-      "version": "0.6.2"
+      "version": "0.7.1"
     },
     {
       "id": "forma",
-      "version": "0.3.0"
+      "version": "0.4.1"
     },
     {
       "id": "folio",

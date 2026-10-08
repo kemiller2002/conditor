@@ -106,8 +106,8 @@ Status: governed preset assembled, embedded in release binaries, and execution-e
 
 The target command is `conditor start --preset indy-init`. The preset defaults to Codex and can be started with Claude through the safe launcher override. It currently pins:
 
-- Praxis, Ordo, Visual Engineering, Communication Engineering, Limen, Forma, Folio, Aegis, and Tutela;
-- the Indy Init kickoff contract and normative requirements to an exact Indy Init commit; and
+- Praxis, Ordo, Percepta, Aegis, Limen, Forma and Folio at their Registry `echelon-current` selections (Praxis 3.7.2, Ordo 1.5.0, Percepta 0.1.0, Aegis 1.0.0, Limen 0.7.1, Forma 0.4.1, Folio 0.3.0). A test binds the preset to the channel; the Registry's frozen `indy-init` 0.1.0 set is a separate, older freeze;
+- the Indy Init kickoff contract, its schema and the 42 planning documents the requirements reference to an exact Indy Init commit; and
 - the validated Percepta application and 25-screen contract package to an exact Percepta commit.
 
 The target acceptance test is:
