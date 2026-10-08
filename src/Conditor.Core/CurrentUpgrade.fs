@@ -36,7 +36,11 @@ type CurrentUpgradePlan =
       TargetProfile: WorkstationProfile
       TargetManifestText: string
       Transitions: CurrentUpgradeTransition list
+      /// Components conditor.json newly declares that the target set selects:
+      /// installed by the workstation plan and initialised by GenericInitPlan.
+      OptIns: ComponentRequest list
       WorkstationPlan: WorkstationPlan option
+      GenericInitPlan: LifecyclePlan option
       GenericUpgradePlan: LifecyclePlan option
       GenericVerifyPlan: LifecyclePlan option
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
@@ -47,6 +51,8 @@ type CurrentUpgradePlan =
 
 type CurrentUpgradeResult =
     { ChangedComponents: string list
+      /// Components newly declared and established, as "id@version".
+      OptedIn: string list
       LockPath: string
       AuthorityPath: string
       NoRemainingVersionChanges: bool }
@@ -248,6 +254,22 @@ module CurrentUpgrade =
                           VerifyArguments = VerificationGate.argumentsFor entry.Version definition }
         | _ -> refuse "Conditor has no qualified package lifecycle descriptor for it."
 
+    /// The components conditor.json declares that the lock's manifest
+    /// snapshot does not, when adding them is the ONLY change since the
+    /// environment was established -- an opt-in, for example of an optional
+    /// native tool the target set selects. Any other change is not one.
+    let optIns target (manifest: ProjectManifest) : ComponentRequest list option =
+        match LockFile.readManifestSnapshot target |> Result.bind Manifest.parseText with
+        | Error _ -> None
+        | Ok established ->
+            let known = established.Components |> List.map _.Id |> Set.ofList
+            let added = manifest.Components |> List.filter (fun request -> not (known.Contains request.Id))
+
+            let withoutAdded =
+                { manifest with Components = manifest.Components |> List.filter (fun request -> known.Contains request.Id) }
+
+            if not added.IsEmpty && withoutAdded = established then Some added else None
+
     let private prepare
         target
         manifestPath
@@ -261,9 +283,18 @@ module CurrentUpgrade =
         let normalizedDigest = normalizeSha256 targetDigest
         let rid = Platform.runtimeIdentifier ()
 
-        LockFile.verifyManifest target manifestPath
-        |> Result.mapError (List.iter errors.Add)
-        |> ignore
+        // A manifest changed since the lock refuses, unless the only change is
+        // declaring components to opt in to (checked against the target set
+        // below).
+        let added =
+            match LockFile.verifyManifest target manifestPath with
+            | Ok() -> []
+            | Error lockErrors ->
+                match optIns target manifest with
+                | Some added -> added
+                | None ->
+                    lockErrors |> List.iter errors.Add
+                    []
 
         let targetProfile =
             match ResolvedReleaseSets.loadFile rid targetSetPath normalizedDigest with
@@ -368,6 +399,21 @@ module CurrentUpgrade =
                     $"Component '{request.Id}' has no explicit installed version; current upgrade requires an exact old version before selecting {targetEntry.Version}."
             | _ -> ()
 
+        // An opt-in installs and initialises a native repository-lifecycle
+        // tool at exactly the version the target set selects. Anything else
+        // added to conditor.json is not something --current can establish.
+        for request in added do
+            match request.Version, entryMap |> Map.tryFind request.Id, profileMap |> Map.tryFind request.Id with
+            | Some declared, Some entry, Some release when declared = entry.Version && release.Lifecycle.IsSome -> ()
+            | declared, entry, _ ->
+                let selected =
+                    entry |> Option.map (fun value -> $"selects {value.Version}") |> Option.defaultValue "does not select it"
+
+                let asked = declared |> Option.defaultValue "no version"
+
+                errors.Add
+                    $"'{request.Id}' ({asked}) was added to conditor.json, but --current can only opt in to a native repository-lifecycle component at exactly the version the target set selects; the target set {selected}."
+
         let transitionList : CurrentUpgradeTransition list =
             transitions
             |> Seq.toList
@@ -391,6 +437,23 @@ module CurrentUpgrade =
                 else
                     let prerequisites = Engine.discover probe profile.Prerequisites
                     let plan = Engine.plan ctx profile rid prerequisites []
+                    plan.Refusals |> List.iter errors.Add
+                    Some plan)
+
+        let addedIds = added |> List.map _.Id |> Set.ofList
+
+        let genericInitPlan =
+            targetProfile
+            |> Option.bind (fun profile ->
+                let components =
+                    profile.Components
+                    |> List.filter (fun release -> addedIds.Contains release.Id && release.Lifecycle.IsSome)
+                    |> List.map (fun release -> { release with Role = Some "repository-lifecycle" })
+
+                if components.IsEmpty then
+                    None
+                else
+                    let plan = Lifecycle.plan ctx { profile with Components = components } rid (Path.GetFullPath target) LifecycleOperation.Init
                     plan.Refusals |> List.iter errors.Add
                     Some plan)
 
@@ -456,9 +519,7 @@ module CurrentUpgrade =
                 $"profile={profile.Id}@{profile.Version}|{sourceIdentity}")
             |> Option.defaultValue "profile=<invalid>"
 
-        let digestMaterial =
-            String.concat
-                "\n"
+        let planLines =
                 [ "conditor.current-upgrade-plan/v1"
                   $"target={Path.GetFullPath target}"
                   $"manifest=sha256:{currentManifestSha}"
@@ -480,6 +541,21 @@ module CurrentUpgrade =
                   |> Seq.map WebPackageTransition.digestMaterial
                   |> String.concat "\n" ]
 
+        // Only a plan that opts in carries these lines, so every other plan's
+        // digest -- and any authorization already given for it -- is
+        // unchanged.
+        let optInLines =
+            if added.IsEmpty then
+                []
+            else
+                [ added
+                  |> List.sortBy _.Id
+                  |> List.map (fun request -> $"opt-in|{request.Id}@{request.Version |> Option.defaultValue String.Empty}")
+                  |> String.concat "\n"
+                  genericInitPlan |> Option.map (fun plan -> $"lifecycleInit={plan.Digest}") |> Option.defaultValue "lifecycleInit=-" ]
+
+        let digestMaterial = String.concat "\n" (planLines @ optInLines)
+
         targetProfile
         |> Option.map (fun profile ->
             { Target = Path.GetFullPath target
@@ -490,7 +566,9 @@ module CurrentUpgrade =
               TargetProfile = profile
               TargetManifestText = targetManifestText
               Transitions = transitionList
+              OptIns = added
               WorkstationPlan = workstationPlan
+              GenericInitPlan = genericInitPlan
               GenericUpgradePlan = genericUpgradePlan
               GenericVerifyPlan = genericVerifyPlan
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
@@ -613,6 +691,18 @@ module CurrentUpgrade =
 
             workstationResult
             |> Result.bind (fun () ->
+                // An opted-in tool, just installed, establishes itself in the
+                // repository before anything verifies it.
+                match plan.GenericInitPlan with
+                | None -> Ok()
+                | Some lifecycle ->
+                    match Lifecycle.apply ctx probe lifecycle lifecycle.Digest with
+                    | Error error -> Error [ $"Repository lifecycle opt-in failed: {error}" ]
+                    | Ok result ->
+                        match result.Failed with
+                        | Some(step, detail) -> Error [ $"Repository lifecycle opt-in failed at {step}: {detail}" ]
+                        | None -> Ok())
+            |> Result.bind (fun () ->
                 match plan.GenericUpgradePlan with
                 | None -> Ok()
                 | Some lifecycle ->
@@ -729,6 +819,9 @@ module CurrentUpgrade =
 
                                             Ok
                                                 { ChangedComponents = plan.Transitions |> List.map _.Id
+                                                  OptedIn =
+                                                    plan.OptIns
+                                                    |> List.map (fun request -> $"{request.Id}@{request.Version |> Option.defaultValue String.Empty}")
                                                   LockPath = lockPath
                                                   AuthorityPath = finalAuthorityPath
                                                   NoRemainingVersionChanges = remaining }

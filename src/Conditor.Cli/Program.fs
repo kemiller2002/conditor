@@ -359,6 +359,20 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
     | None ->
         Console.WriteLine "  workstation effects: none"
 
+    match plan.GenericInitPlan with
+    | Some lifecycle ->
+        let optIns =
+            plan.OptIns
+            |> List.map (fun request -> $"{request.Id}@{request.Version |> Option.defaultValue String.Empty}")
+            |> String.concat ", "
+
+        Console.WriteLine $"  repository lifecycle opt-ins: {optIns} (nested plan {lifecycle.Digest})"
+
+        for step in lifecycle.Steps do
+            let arguments = String.concat " " step.Arguments
+            Console.WriteLine $"    {step.Component}@{step.Version}: {step.Executable} {arguments}"
+    | None -> ()
+
     match plan.GenericUpgradePlan with
     | Some lifecycle ->
         Console.WriteLine $"  repository lifecycle upgrades: {lifecycle.Steps.Length} (nested plan {lifecycle.Digest})"
@@ -471,6 +485,10 @@ let private runCurrentUpgrade (args: string array) checkOnly target manifestPath
                             else
                                 let changed = String.Join(", ", result.ChangedComponents)
                                 Console.WriteLine $"Current upgrade completed: {changed}"
+
+                            if not result.OptedIn.IsEmpty then
+                                let optedIn = String.Join(", ", result.OptedIn)
+                                Console.WriteLine $"  opted in: {optedIn}"
 
                             Console.WriteLine $"  authority: {result.AuthorityPath}"
                             Console.WriteLine $"  lock:      {result.LockPath}"

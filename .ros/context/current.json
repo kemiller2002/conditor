@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T03:37:14Z",
+  "updatedAt": "2026-10-08T03:45:25Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -375,6 +375,17 @@
       },
       "completedAt": "2026-10-08T03:37:14Z",
       "conclusion": "conditor upgrade --current now verifies the repository with the tools it just installed (workstation bin first for resolution and for child PATH), so an optional native CLI with a repository lifecycle installs and verifies; the test that masked the defect now proves it with a failing decoy on PATH."
+    },
+    {
+      "id": "WI-0009",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-08T03:45:25Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T034526166Z-b483d216"
+      ]
     }
   ]
 }

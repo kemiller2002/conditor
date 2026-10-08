@@ -705,3 +705,130 @@ let run (check: string -> bool -> unit) =
         (Registry.tryFind "visual-engineering"
          |> Option.exists (fun definition -> definition.DefaultVersion = "1.0.1")
          && Registry.qualifiedVersions "visual-engineering" = Some(Set.ofList [ "1.0.0"; "1.0.1" ]))
+
+/// Opting a project in to an optional native repository-lifecycle tool the
+/// target set selects: declared in conditor.json at exactly the selected
+/// version, installed into the workstation, initialised in the repository and
+/// verified with the installed copy, in one --current upgrade. This is the
+/// path a project takes to adopt strata from echelon-current 1.2.0; before
+/// it, --current refused any manifest change and `conditor init` could not
+/// run a tool nothing had installed.
+let runOptIn (check: string -> bool -> unit) =
+    if OperatingSystem.IsWindows() then
+        check "current upgrade opt-in fixture is skipped on Windows" true
+    else
+        let target = temp "optin-target"
+        let home = temp "optin-home"
+        let mirror = temp "optin-mirror"
+        let rid = Platform.runtimeIdentifier ()
+        let id = "gamma"
+        let repository = "example/gamma"
+        let commit = String.replicate 40 "d"
+        let assetName, assetSha = lifecycleBundle mirror id "2.0.0" repository commit rid
+        let resolvedPath = Path.Combine(mirror, "optin.resolved.json")
+        let resolvedSha = resolvedSet resolvedPath id "2.0.0" repository commit rid assetName assetSha
+        let manifestPath = Path.Combine(target, "conditor.json")
+
+        let manifestWith (components: string) (name: string) =
+            File.WriteAllText(
+                manifestPath,
+                $$"""{
+  "schemaVersion": 1,
+  "name": "{{name}}",
+  "components": [{{components}}],
+  "requirements": [],
+  "execution": { "enabled": false }
+}
+"""
+            )
+
+        // The environment was established with no components at all.
+        manifestWith "" "optin-test"
+
+        LockFile.write
+            target
+            manifestPath
+            { ProjectName = "optin-test"
+              Operation = Init
+              Components = []
+              Actions = [] }
+        |> ignore
+
+        let ctx = context home mirror
+        let priorPath = Environment.GetEnvironmentVariable "PATH"
+
+        // As on a fresh machine: nothing installed on PATH, only a decoy that
+        // fails, so init and verify must use the copy the upgrade installs.
+        let decoys = temp "optin-decoys"
+        let decoy = Path.Combine(decoys, id)
+        File.WriteAllText(decoy, "#!/bin/sh\necho 'decoy gamma on PATH' >&2\nexit 7\n")
+        File.SetUnixFileMode(decoy, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+        Environment.SetEnvironmentVariable("PATH", decoys + string Path.PathSeparator + priorPath)
+
+        let probe executable arguments = ProcessRunner.runProcess target executable arguments
+
+        let preview () =
+            Manifest.load manifestPath
+            |> Result.bind (fun manifest ->
+                CurrentUpgrade.preview target manifestPath manifest resolvedPath resolvedSha ctx probe
+                |> Result.map (fun plan -> manifest, plan))
+
+        let refusedWith (fragment: string) =
+            match preview () with
+            | Ok(_, plan) -> plan.Refusals |> List.exists (fun refusal -> refusal.Contains fragment)
+            | Error errors -> errors |> List.exists (fun error -> error.Contains fragment)
+
+        try
+            // Not opt-ins: a different version, a tool the set does not
+            // select, or any other change to conditor.json.
+            manifestWith """{ "id": "gamma", "version": "1.5.0", "required": true }""" "optin-test"
+            check "opt-in refuses a version other than the selected one" (refusedWith "exactly the version the target set selects")
+
+            manifestWith """{ "id": "gamma", "version": "2.0.0", "required": true }""" "renamed"
+            check "a manifest change that is not only an addition still refuses" (refusedWith "manifest has changed")
+
+            manifestWith """{ "id": "gamma", "version": "2.0.0", "required": true }""" "optin-test"
+
+            match preview () with
+            | Error errors ->
+                let details = String.concat "; " errors
+                check $"opt-in preview succeeds: {details}" false
+            | Ok(manifest, plan) ->
+                check "opt-in plan has no refusals" plan.Refusals.IsEmpty
+                check "opt-in is named in the plan" (plan.OptIns |> List.map _.Id = [ id ])
+                check "opt-in plans the tool's lifecycle init" plan.GenericInitPlan.IsSome
+                check
+                    "opt-in installs the exact Registry artifact"
+                    (plan.WorkstationPlan
+                     |> Option.exists (fun workstation ->
+                         workstation.Steps
+                         |> List.exists (fun step -> step.Artifact |> Option.exists (fun (_, digest) -> digest = "sha256:" + assetSha))))
+
+                check "opt-in planning is read-only" (not (Directory.Exists(Path.Combine(target, ".gamma"))))
+
+                match CurrentUpgrade.apply target manifestPath manifest resolvedPath resolvedSha ctx probe plan.Digest with
+                | Error errors ->
+                    let details = String.concat "; " errors
+                    check $"authorized opt-in succeeds: {details}" false
+                | Ok result ->
+                    check
+                        "opt-in initialises the tool in the repository with the installed copy"
+                        (File.ReadAllText(Path.Combine(target, ".gamma", "version")).Trim() = "2.0.0")
+
+                    check "opt-in reports what it opted in to" (result.OptedIn = [ "gamma@2.0.0" ])
+                    check "opt-in commits the Registry authority" (File.Exists result.AuthorityPath && sha256File result.AuthorityPath = resolvedSha)
+
+                    match LockFile.readManifestSnapshot target |> Result.bind Manifest.parseText with
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"opt-in lock snapshot parses: {details}" false
+                    | Ok established ->
+                        check "the lock now establishes the opted-in tool" (established.Components |> List.exists (fun c -> c.Id = id))
+
+                    match preview () with
+                    | Ok(_, second) -> check "a second plan has nothing left to opt in to" (second.OptIns.IsEmpty && second.Refusals.IsEmpty)
+                    | Error errors ->
+                        let details = String.concat "; " errors
+                        check $"second opt-in preview succeeds: {details}" false
+        finally
+            Environment.SetEnvironmentVariable("PATH", priorPath)

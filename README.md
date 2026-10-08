@@ -203,7 +203,21 @@ For each already-declared system, Conditor uses the strongest available generic 
 
 Conditor never silently adds a new component to a repository during `--current`, never downgrades a declared component, and never guesses a project-binding migration. A changed Forma, Folio, Limen, Aegis, or other application binding is refused until its distribution exposes a safe generic migration contract.
 
-After component upgrades, Conditor verifies the complete target repository against a staged copy of the new Registry authority. Only after that succeeds does it atomically replace the persisted authority and `conditor.json`, write a fresh lock, and calculate the same current plan again. A successful operation requires that second plan to contain zero remaining version transitions.
+#### Opting in to an optional native tool
+
+A resolved set can select optional components, such as `strata` in echelon-current 1.2.0, that a project has not declared. To adopt one:
+1. Declare it in `conditor.json` at exactly the version the set selects.
+2. Run `upgrade --current`.
+
+The plan names it under `repository lifecycle opt-ins`. When applied, it:
+1. installs the tool through the workstation engine;
+2. runs its `init --root` and `verify --root` with the installed copy;
+3. verifies the whole repository;
+4. commits the authority and a lock that establishes it.
+
+This is the only change to `conditor.json` that `--current` accepts since the lock was written. A different version, a tool the set does not select, or a tool without an `echelon.repository-lifecycle` contract is refused, and so is any other edit.
+
+After component upgrades, Conditor verifies the complete target repository against a staged copy of the new Registry authority. It runs that verification with the tools the upgrade installed (the workstation bin directory first), not whatever else is on `PATH`. Only after that succeeds does it atomically replace the persisted authority and `conditor.json`, write a fresh lock, and calculate the same current plan again. A successful operation requires that second plan to contain zero remaining version transitions.
 
 ### Explicit declaration upgrade
 
