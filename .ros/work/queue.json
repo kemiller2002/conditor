@@ -578,6 +578,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "INDY-0004",
+      "title": "Indy day-of defaults: demo-readiness never-cut, baseline security and trace view as slice acceptance criteria, Pages deploy, AI, persistence, organizer and demo decisions",
+      "description": "Apply the user-accepted day-of decisions: keep auto permission mode (R0 must prove merges), make demo-readiness never-cut, add baseline security (no secrets in the client, CSP, input validation) to never-cut slices, publish a read-only trace view in the Factory View, deploy to GitHub Pages, and record defaults for RQR-003, RQR-004, RQR-001 and RQR-008 (DF-CON-2026-A002). Adds an acceptance list to requirementsImport; the import digest changes to 668b64b7.",
+      "tags": [
+        "indy-init",
+        "requirements"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T12:02:52.000Z",
+      "updatedAt": "2026-10-08T12:02:53.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

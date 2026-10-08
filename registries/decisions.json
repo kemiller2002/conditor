@@ -41,5 +41,48 @@
     "title": "Conditor owns the one-command requirements import; Praxis keeps the queue and holds the trace as a work-item attachment",
     "updated": "2026-10-08",
     "version": "1.0.0"
+  },
+  {
+    "confidence": "medium",
+    "created": "2026-10-08",
+    "decision_type": "product",
+    "id": "DF-CON-2026-A002",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A002--indy-day-of-defaults.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261008T120253862Z-ae6f0581": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "agent",
+            "model": "unknown",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-10-08T12:02:54.191Z",
+          "operations": [
+            "created"
+          ],
+          "reason": "Record the Indy day-of defaults the user accepted and the RQR-001/003/004/008 defaults"
+        }
+      }
+    },
+    "related_documents": [
+      "DF-CON-2026-A001",
+      "docs/indy-day-of.md",
+      "examples/indy-init.conditor.json"
+    ],
+    "research_area": "factory-bootstrap",
+    "status": "accepted",
+    "tags": [
+      "decision",
+      "indy-init",
+      "defaults"
+    ],
+    "title": "Indy Init day-of defaults for launch mode, slice policy, trace visibility, deployment, AI transport, persistence auth, organizer sign-off and demo scenario",
+    "updated": "2026-10-08",
+    "version": "1.0.0"
   }
 ]
