@@ -16,7 +16,7 @@ module Compatibility =
     let private notes =
         Map.ofList
             [ "praxis", "Native Praxis 3.6.0 is the frozen Indy Init host-tool baseline; 3.7.1 and 3.7.2 (the Registry echelon-current selection) are qualified; 3.1.x remains qualified only for existing compatibility fixtures."
-              "ordo", "Native Ordo 1.4.0 is the frozen Indy Init host-tool baseline; 1.4.1 is qualified for the Registry echelon-current selection; 1.4.2 is qualified with its integrity-only gate, which fails closed on installation integrity and records SDE-STRUCT-001 structural review signals instead of refusing on them."
+              "ordo", "Native Ordo 1.4.0 is the frozen Indy Init host-tool baseline; 1.4.1 stays qualified as an upgrade source; 1.4.2 (echelon-current 1.1.0) and 1.5.0 (echelon-current 1.2.0) are qualified with the integrity-only gate, which fails closed on installation integrity and records SDE-STRUCT-001 structural review signals instead of refusing on them."
               "percepta", "Native Percepta repository lifecycle 0.1.0 is the frozen Indy Init repository-lifecycle baseline."
               "visual-engineering", "Qualified Registry-package lifecycle release. 1.0.1 is the Registry echelon-current selection and the default; 1.0.0 stays qualified as its upgrade source. 1.0.0 -> 1.0.1 is a planned upgrade --current transition: VE upgrade rewrites its managed .gitignore region to !.visual-engineering/, then verify --strict must pass."
               "communication-engineering", "Pinned immutable-source lifecycle release."

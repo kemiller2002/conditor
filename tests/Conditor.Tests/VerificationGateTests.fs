@@ -137,6 +137,11 @@ let private gateSelection check =
          && VerificationGate.argumentsFor "1.4.2" ordo = gateArguments)
 
     check
+        "Ordo 1.5.0 (echelon-current 1.2.0) is qualified and verified through the integrity-only gate"
+        (Registry.qualifiedVersions "ordo" |> Option.exists (Set.contains "1.5.0")
+         && VerificationGate.argumentsFor "1.5.0" ordo = gateArguments)
+
+    check
         "Ordo releases without the integrity gate keep the fail-closed strict verify"
         (VerificationGate.argumentsFor "1.4.1" ordo = [ "verify"; "--strict" ]
          && VerificationGate.argumentsFor "1.4.0" ordo = [ "verify"; "--strict" ])
@@ -186,6 +191,19 @@ let private interpretation check =
     check
         "a zero exit whose report does not claim to pass fails closed"
         (interpret (result 0 (ordoReport false [] []) "") |> Result.isError)
+
+    // `ordo verify --integrity-only --json` exactly as the released Ordo 1.5.0
+    // emits it: the 1.4.2 fields plus the additive tool, state, problems,
+    // strictFailures, structural and exitCode members, which the gate ignores.
+    let ordo150Report =
+        """{"schemaVersion":1,"command":"verify","tool":"sde","package":"@echelon-foundry/sde","state":"installed","installedVersion":"1.5.0","managedFileCount":19,"mode":"integrity-only","strict":false,"passed":true,"problems":[],"strictFailures":[],"failures":[],"reviewSignals":[{"code":"SDE-STRUCT-001","band":"strong-review","path":"src/Big.fs","lineCount":1366}],"structural":{"ran":true,"error":null,"enabled":true,"configurationSource":"defaults","inspectedFiles":49,"findings":[{"code":"SDE-STRUCT-001","band":"strong-review","path":"src/Big.fs","lineCount":1366}]},"exitCode":0}"""
+
+    check
+        "an Ordo 1.5.0 integrity-only report passes the gate with its review signals"
+        (match VerificationGate.interpret "ordo" "1.5.0" ordo (result 0 ordo150Report "") with
+         | Ok signals ->
+             signals |> List.map (fun signal -> signal.Code, signal.Path, signal.LineCount) = [ ("SDE-STRUCT-001", "src/Big.fs", 1366) ]
+         | Error _ -> false)
 
     check
         "a failing exit fails closed even if the report claims to pass"
