@@ -1,1 +1,45 @@
-[]
+[
+  {
+    "confidence": "high",
+    "created": "2026-10-08",
+    "decision_type": "architecture",
+    "id": "DF-CON-2026-A001",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A001--requirements-import-in-conditor.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261008T113449054Z-2ff9c0f5": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "agent",
+            "model": "unknown",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-10-08T11:34:49.360Z",
+          "operations": [
+            "created"
+          ],
+          "reason": "Record where the one-command requirements import lives and why"
+        }
+      }
+    },
+    "related_documents": [
+      "docs/requirements-import.md",
+      "examples/indy-init.conditor.json"
+    ],
+    "research_area": "factory-bootstrap",
+    "status": "accepted",
+    "tags": [
+      "decision",
+      "requirements",
+      "praxis",
+      "indy-init"
+    ],
+    "title": "Conditor owns the one-command requirements import; Praxis keeps the queue and holds the trace as a work-item attachment",
+    "updated": "2026-10-08",
+    "version": "1.0.0"
+  }
+]

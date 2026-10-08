@@ -136,6 +136,10 @@ It records the bootstrap as the first commit when the target has none, creates t
 
 It refuses, creating nothing, when the target is not on `main`, has uncommitted changes on top of commits, already has `origin`, or when the GitHub repository already exists or its existence cannot be determined. It uses the `gh` CLI and its authentication. A step that fails stops the run; nothing is rolled back, and the remaining commands are printed.
 
+## Import the requirements
+
+`conditor requirements import --target .` turns the materialized planning documents into ordered Praxis slice work items (`SLICE-*`, 23 for Indy Init). It also traces every source requirement ID (980 for Indy Init) to its item through the `requirements-trace.json` attachment of `COND-MISSION-001`. It is deterministic, idempotent and fails closed; `--check` previews the plan and its digest, and `--authorize sha256:<digest>` applies exactly that plan. See [docs/requirements-import.md](docs/requirements-import.md).
+
 ## CLI
 
 ```bash

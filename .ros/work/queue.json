@@ -530,6 +530,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "INDY-0002",
+      "title": "conditor requirements import: pinned planning documents to Praxis slice work items with a full trace",
+      "description": "No command turned the Indy-init requirements into Praxis work (readiness step 2 blocker). Add a declarative requirementsImport section to the manifest (documents with heading patterns and expected counts, added slices, assignment rules), a pure planner (extract, order, assign, items, trace, digest, reconcile), a thin shell over the Praxis CLI and Git, the CLI with --check and --authorize, the Indy mapping (23 slices, 980 source IDs), DF-CON-2026-A001 and docs.",
+      "tags": [
+        "requirements",
+        "indy-init"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T11:34:48.000Z",
+      "updatedAt": "2026-10-08T11:35:10.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }
