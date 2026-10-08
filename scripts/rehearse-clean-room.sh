@@ -60,13 +60,13 @@ test -f "$TARGET/kickoff/evidence-triage.kickoff.json"
 test -f "$TARGET/kickoff/completion-evidence.schema.json"
 test -f "$TARGET/src/engine/App.Engine.fsproj"
 test -f "$TARGET/src/engine/Domain.fs"
-test -f "$TARGET/src/kernel/package.json"
+test -f "$TARGET/package.json"
 test -f "$TARGET/src/kernel/bootstrap.ts"
 
 grep -F "kickoff/evidence-triage.kickoff.json" "$TARGET/AGENTS.md"
 grep -F "Build the Incident Evidence Triage Board" "$TARGET/AGENTS.md"
-grep -F "@echelon-foundry/design-system" "$TARGET/src/kernel/package.json"
-grep -F "@echelon-foundry/print-components" "$TARGET/src/kernel/package.json"
+grep -F "@echelon-foundry/design-system" "$TARGET/package.json"
+grep -F "@echelon-foundry/print-components" "$TARGET/package.json"
 grep -F "EchelonFoundry.Aegis.Core" "$TARGET/src/engine/App.Engine.fsproj"
 
 if find "$TARGET" -maxdepth 3 -type f \( -name 'App.fs' -o -name 'Program.fs' \) | grep . >/dev/null 2>&1; then
