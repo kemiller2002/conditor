@@ -1353,6 +1353,51 @@
       "completedAt": "2026-10-08T22:13:41.000Z"
     },
     {
+      "id": "WI-0029",
+      "type": "feature",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "components/limen.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T23:05:26.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T225834244Z-1c4b7404"
+      ],
+      "latestCheckpoint": {
+        "id": "90a0b4dcc6e88278a655a5b2",
+        "recordedAt": "2026-10-08T23:05:24.000Z",
+        "executionId": "EXE-20261008T225834244Z-1c4b7404",
+        "repository": "conditor",
+        "branch": "feature/limen-routing-scaffold",
+        "commit": "6a0fd70e8caf53a1867ea36aa9608838b0821a63",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feature/limen-routing-scaffold",
+        "remoteCommit": "6a0fd70e8caf53a1867ea36aa9608838b0821a63",
+        "summary": "Limen 0.9.0 qualified and default; Limen.Routing scaffold when limen-fsharp >= 0.9.0, verified end to end; CON-293 and README updated",
+        "nextAction": "Merge on green; release with WI-0026",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T23:05:26.000Z"
+    },
+    {
       "id": "WI-0026",
       "type": "feature",
       "state": "complete",

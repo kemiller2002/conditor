@@ -1204,6 +1204,7 @@ VerificationGateTests.run check
 NugetFeedTests.run check
 LibraryScaffoldTests.run check
 WebScaffoldTests.run check
+WebScaffoldTests.runLimenRouting check
 BranchProtectionTests.run check
 RepositoryCreationTests.run check
 SupervisorTests.run check
