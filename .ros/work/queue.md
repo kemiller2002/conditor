@@ -36,3 +36,4 @@
 | WI-0027 | Release Conditor 0.7.0: URL-addressable state in the web scaffold (#68) | complete | release | high |
 | WI-0028 | Scaffold route inventory in Limen 0.9.0's exact echelon.routes/v1 shape, and pin the foundations CI to the Praxis verifier that vendors Limen's schema | complete | scaffold, deep-linking | high |
 | WI-0029 | Wire Limen.Routing into the fsharp-limen-web scaffold once Conditor qualifies Limen 0.9.0 and limen-fsharp 0.9.0 (CON-293) | ready | scaffold, deep-linking, limen | medium |
+| WI-0030 | Release Conditor 0.7.1: scaffold route inventory in Limen 0.9.0's exact shape (#70) | ready | release | high |

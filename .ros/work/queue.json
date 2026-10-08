@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 30,
+  "nextSeq": 31,
   "items": [
     {
       "id": "WI-0001",
@@ -733,6 +733,29 @@
       "attachments": [],
       "createdAt": "2026-10-08T21:41:22.803Z",
       "updatedAt": "2026-10-08T21:41:28.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0030",
+      "title": "Release Conditor 0.7.1: scaffold route inventory in Limen 0.9.0's exact shape (#70)",
+      "description": "Patch release: the fsharp-limen-web route inventory matches Limen 0.9.0's published contract/routes.schema.json, and the foundations CI pins the Praxis verifier that vendors it (WI-0028, PR #70).",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T22:13:37.333Z",
+      "updatedAt": "2026-10-08T22:13:37.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
