@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T07:06:34.639Z",
+  "updatedAt": "2026-10-08T07:30:27.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -483,6 +483,47 @@
       },
       "completedAt": "2026-10-08T07:06:34.639Z",
       "conclusion": "Ordo 1.5.0 qualified through the integrity gate; conditor's own Ordo pins consistent at 1.5.0; 544 local checks pass"
+    },
+    {
+      "id": "WI-0012",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/LibraryScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T07:30:27.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T072454732Z-49c7bcac"
+      ],
+      "latestCheckpoint": {
+        "id": "cc6c01c3ffc46975e20394e2",
+        "recordedAt": "2026-10-08T07:30:22.000Z",
+        "executionId": "EXE-20261008T072454732Z-49c7bcac",
+        "repository": "conditor",
+        "branch": "feat/fsharp-nuget-library-scaffold",
+        "commit": "97de5f15cc068457414e6060f38211ec437b648b",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/fsharp-nuget-library-scaffold",
+        "remoteCommit": "97de5f15cc068457414e6060f38211ec437b648b",
+        "summary": "fsharp-nuget-library scaffold implemented, documented and tested (565 checks pass)",
+        "nextAction": "Open PR, get CI green, merge, then use it to bootstrap Arca",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T07:30:27.000Z"
     }
   ]
 }

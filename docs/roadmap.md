@@ -31,6 +31,7 @@ Implemented:
 - `plan --preset`, `init --preset`, and one-command `start --preset` bootstrap
 - external private-source Git authentication without persisting credentials
 - `fsharp-limen-web` scaffold
+- `fsharp-nuget-library` scaffold for new NuGet package repositories (foundations, build-and-test and foundations CI, Registry `nuget-library` release workflow)
 - explicit package binding for Forma, Folio, Aegis, and Limen
 - foundation and Aegis boundary manifests
 - bounded shared-file ownership for integration surfaces

@@ -21,6 +21,24 @@ Supported lifecycle components in the proven clean-room slice are Praxis/ROS, Or
 
 Conditor now owns a deterministic F#/Limen scaffold, so Forma, Folio, and Aegis can be bound to explicit generated targets without guessing. The scaffold also emits foundation metadata and an Aegis boundary manifest; application dependencies still require an explicit scaffold/binding target and Conditor will stop rather than guess.
 
+## New NuGet package repository
+
+A new project-bound F# library (for example a shared data layer published to NuGet) uses the `fsharp-nuget-library` scaffold. Declare it next to the lifecycle components and the Registry authority:
+
+```json
+"scaffold": { "kind": "fsharp-nuget-library", "name": "Arca" }
+```
+
+`conditor init` then installs Praxis, Ordo and any other declared lifecycle components and adds, without overwriting anything that already exists:
+
+- `Directory.Build.props` (`<Version>0.0.0</Version>`, meaning "not released yet"), `<Name>.slnx`, `src/<Name>/` (package id `EchelonFoundry.<Name>`) and a dependency-free test runner in `tests/<Name>.Tests/`;
+- `.echelon/foundations.json` and `.github/workflows/echelon-foundations.yml`, pinned to the Praxis foundations verifier;
+- `.github/workflows/build-and-test.yml`;
+- `.github/workflows/release.yml` and `release/echelon.release-input.json`: the Registry release contract for the `nuget-library` class. It packs once, checksums the exact bytes, generates and schema-validates `echelon-release.json`, and publishes to nuget.org through Trusted Publishing plus an attested GitHub release. Version `0.0.0` is never published, and publication refuses to run without the `NUGET_USER` repository variable;
+- the Ordo baseline (`SDE-MAP.md`, `context/CURRENT-STATE.md`) routed to the library.
+
+NuGet components such as Aegis are bound into the library project. npm packages are refused because a library has no browser kernel to bind them to.
+
 ## Native installation
 
 Tagged releases produce self-contained binaries for Linux, macOS, and Windows on x64 and ARM64. The installers verify the selected release artifact against its published SHA-256 before installation. See `docs/installation.md`.

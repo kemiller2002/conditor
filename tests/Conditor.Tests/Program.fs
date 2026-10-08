@@ -1141,6 +1141,7 @@ RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
 ComponentSchemaTests.run check
 VerificationGateTests.run check
+LibraryScaffoldTests.run check
 
 let exitCode =
     if failures = 0 then
