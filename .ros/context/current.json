@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T03:48:34Z",
+  "updatedAt": "2026-10-08T07:06:34.639Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -425,6 +425,64 @@
       },
       "completedAt": "2026-10-08T03:48:34Z",
       "conclusion": "A project can now adopt an optional native repository-lifecycle component through upgrade --current: declared at exactly the selected version, it is installed, initialised and verified with the installed copy before authority and lock are committed; any other manifest change still refuses."
+    },
+    {
+      "id": "WI-0010",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/ordo.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/VerificationGateTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        },
+        {
+          "type": "ci",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "configuration",
+          "path": ".echelon/toolchain.json"
+        },
+        {
+          "type": "configuration",
+          "path": "conditor.json"
+        }
+      ],
+      "updatedAt": "2026-10-08T07:06:34.639Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T070159068Z-89894392"
+      ],
+      "latestCheckpoint": {
+        "id": "a32642f03a2531ef6aa5dc4e",
+        "recordedAt": "2026-10-08T07:06:22.372Z",
+        "executionId": "EXE-20261008T070159068Z-89894392",
+        "repository": "conditor",
+        "branch": "chore/ordo-1.5.0",
+        "commit": "57635c368df0f4bf0b22c11264b3ea0772117348",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/ordo-1.5.0",
+        "remoteCommit": "57635c368df0f4bf0b22c11264b3ea0772117348",
+        "summary": "Ordo 1.5.0 qualified (descriptor, integrity gate, tests, CI); conditor's own toolchain/.sde/conditor.json Ordo pins at 1.5.0; pushed chore/ordo-1.5.0",
+        "nextAction": "Open the PR, get CI green and merge; then run the consumer sweep with upgrade --current against echelon-current 1.2.0",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T07:06:34.639Z",
+      "conclusion": "Ordo 1.5.0 qualified through the integrity gate; conditor's own Ordo pins consistent at 1.5.0; 544 local checks pass"
     }
   ]
 }
