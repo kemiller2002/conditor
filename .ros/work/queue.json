@@ -338,6 +338,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0017",
+      "title": "Indy preset: materialize every Indy-init doc the requirements reference, pinned at the corrected kickoff-path commit",
+      "description": "17 docs referenced by the materialized Indy-init requirements (INVESTIGATION-ACCEPTANCE-SCENARIOS, OPEN-QUESTIONS, SEMANTIC-COMPILER, ENGINEERING-PROOF-BUNDLE and 13 more) are not materialized, so a fresh agent hits dead links (readiness G1-4, RQR-006). Indy-init PR #6 fixed the kickoff entry path in KICKOFF-EXECUTION-PACKET (G1-5); move every Indy-init pin to its merge commit 012f397 and add the 17 docs.",
+      "tags": [
+        "preset",
+        "indy-init"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T08:54:04.000Z",
+      "updatedAt": "2026-10-08T08:55:39.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T08:26:53.000Z",
+  "updatedAt": "2026-10-08T08:55:39.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -606,6 +606,47 @@
         }
       },
       "completedAt": "2026-10-08T08:26:53.000Z"
+    },
+    {
+      "id": "WI-0017",
+      "type": "feature",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "examples/indy-init.conditor.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Program.fs"
+        }
+      ],
+      "updatedAt": "2026-10-08T08:55:39.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T085408743Z-5e67e454"
+      ],
+      "latestCheckpoint": {
+        "id": "7b465a19c9b62a2352a647a6",
+        "recordedAt": "2026-10-08T08:55:38.000Z",
+        "executionId": "EXE-20261008T085408743Z-5e67e454",
+        "repository": "conditor",
+        "branch": "feat/indy-preset-docs",
+        "commit": "29bacce270fb375c4bc4bef433e9c1f52d5207f4",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/indy-preset-docs",
+        "remoteCommit": "29bacce270fb375c4bc4bef433e9c1f52d5207f4",
+        "summary": "Indy preset materializes the 17 referenced docs at Indy-init 012f397; tests pass",
+        "nextAction": "Open the PR and merge when green",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T08:55:39.000Z"
     }
   ]
 }
