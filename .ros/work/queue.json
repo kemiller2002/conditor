@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 24,
+  "nextSeq": 27,
   "items": [
     {
       "id": "WI-0001",
@@ -619,6 +619,54 @@
         "id": "anthropic/claude-code",
         "provider": "anthropic",
         "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0025",
+      "title": "URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist",
+      "description": "Portfolio deep-linking standard (Praxis SAF-URL-1..10, Limen DF-LIMEN-2026-0006). New web applications get .echelon/routes.json (echelon.routes/v1, hash mode), the routing capability in .echelon/foundations.json, a pure Routes.fs codec with round-trip tests to be replaced by Limen.Routing at 0.9.0, and requirements/URL-ADDRESSABLE-STATE.md.",
+      "tags": [
+        "scaffold",
+        "deep-linking"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T19:33:45.650Z",
+      "updatedAt": "2026-10-08T20:49:07.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0026",
+      "title": "When the indy-init preset pin moves past Indy-init 2eee2d52 (PR #7, URL-addressable state), update requirementsImport expected counts: R 77->82, P 458->464, OQ 47->48",
+      "description": "Indy-init PR #7 added R9.6-R9.10, P34.15-P34.20 and OQ-048 (deep-linking requirements). The new IDs fall under the existing R9.*, P34.* and OQ-* assignments; only the expected counts change. The pin was deliberately not moved (no rehearsal until the owner says so).",
+      "tags": [
+        "indy",
+        "requirements-import"
+      ],
+      "priority": "medium",
+      "status": "captured",
+      "attachments": [],
+      "createdAt": "2026-10-08T19:43:01.928Z",
+      "updatedAt": "2026-10-08T19:43:01.928Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
         "runtime": "claude-code"
       },
       "source": "manual",

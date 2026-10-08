@@ -114,7 +114,7 @@ module Scaffolding =
 
         let assembly = identifier projectName + ".Engine"
 
-        $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Operational.fs\" />\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
+        $"<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <AssemblyName>{assembly}</AssemblyName>\n  </PropertyGroup>{itemGroup}\n  <ItemGroup>\n    <Compile Include=\"Operational.fs\" />\n    <Compile Include=\"Routes.fs\" />\n    <Compile Include=\"Domain.fs\" />\n  </ItemGroup>\n</Project>\n"
 
 
     let private requestedComponent id (manifest: ProjectManifest) =
@@ -141,7 +141,194 @@ module Scaffolding =
 
         $"import type {{ ViewState }} from {protocolModule};\n\nexport const scaffoldReady = true as const;\nexport type ScaffoldView = ViewState;\n"
 
-    let private foundationManifest (projectName: string) (manifest: ProjectManifest) =
+    // ---------------------------------------------------------------------
+    // URL-addressable state (Praxis SAF-URL-1..10; Limen LCP-088..112 and
+    // DF-LIMEN-2026-0006). A web application keeps its navigable state in
+    // the URL, publishes a route inventory, and routes through Limen's
+    // routing module from Limen 0.9.0. Until the application can install
+    // 0.9.0, the scaffold gives it a pure placeholder codec with round-trip
+    // tests, and `praxis foundations verify` reports Limen routing as pending
+    // (ECHELON-FND-ROUTING-005), not failed.
+    // ---------------------------------------------------------------------
+
+    /// Where every Echelon web application publishes its route inventory.
+    [<Literal>]
+    let RouteInventoryPath = ".echelon/routes.json"
+
+    /// The starting `echelon.routes/v1` inventory: hash mode for a static
+    /// site, a home route and a not-found route. Written as Limen's
+    /// Inventory.render writes it (sorted keys, two-space indent, final
+    /// newline), so regenerating it with Limen later changes only content.
+    let webRouteInventory =
+        """{
+  "home": "home",
+  "legacy": [],
+  "mode": "hash",
+  "notFound": "notFound",
+  "routes": [
+    {
+      "guard": null,
+      "name": "home",
+      "params": [],
+      "pattern": "/",
+      "requires": [],
+      "returnTarget": true
+    },
+    {
+      "guard": null,
+      "name": "notFound",
+      "params": [
+        {
+          "default": null,
+          "in": "path",
+          "name": "rest",
+          "required": true,
+          "type": "string",
+          "values": []
+        }
+      ],
+      "pattern": "/{*rest}",
+      "requires": [],
+      "returnTarget": false
+    }
+  ],
+  "schema": "echelon.routes/v1",
+  "signIn": null
+}
+"""
+
+    /// The engine's route codec: pure, total, and replaced by Limen.Routing
+    /// once the application is on Limen 0.9.0.
+    let private webRoutesSource =
+        """namespace @@NS@@.Engine
+
+open System
+
+/// The application's navigable views (SAF-URL-1..10). The URL is the source
+/// of truth: the engine derives the view from `Routes.parse` and writes the
+/// URL with `Routes.format`. Routes live in the hash (`index.html#/...`), so a
+/// reloaded or pasted deep link never 404s on GitHub Pages
+/// (DF-LIMEN-2026-0006).
+///
+/// PLACEHOLDER until the application installs Limen 0.9.0: replace this
+/// module with `Limen.Routing` (package EchelonFoundry.Limen.Routing:
+/// RouteTable.define, RouteCodec.create/parse/format, Navigation.adopt,
+/// navigate and refine, ReturnTo.capture/resume, Link.share), and regenerate
+/// `.echelon/routes.json` with `Inventory.render`. Keep the inventory in step
+/// with this table meanwhile.
+type Route =
+    | Home
+    | NotFound of path: string
+
+[<RequireQualifiedAccess>]
+module Routes =
+    let private pathOf (location: string) =
+        let fragment = if location.StartsWith("#", StringComparison.Ordinal) then location.Substring 1 else location
+
+        match fragment.IndexOf '?' with
+        | -1 -> fragment
+        | index -> fragment.Substring(0, index)
+
+    /// Pure and total: a location hash (with or without the leading '#') to
+    /// its route. Unknown paths are a value, never an exception.
+    let parse (location: string) : Route =
+        match pathOf location with
+        | ""
+        | "/" -> Home
+        | path when path.StartsWith("/", StringComparison.Ordinal) -> NotFound path
+        | path -> NotFound("/" + path)
+
+    /// Pure: the canonical location hash of a route.
+    let format (route: Route) : string =
+        match route with
+        | Home -> "#/"
+        | NotFound path -> "#" + path
+"""
+
+    let private webRouteTests =
+        """module App.Engine.Tests.RouteTests
+
+open System
+open Xunit
+open @@NS@@.Engine
+
+// SAF-URL-9: format (parse url) is the canonical url, and parse (format route)
+// is the route, for generated input.
+let private generated count =
+    let random = Random 20261008
+    let alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-"
+    let segment () = String(Array.init (random.Next(1, 9)) (fun _ -> alphabet[random.Next alphabet.Length]))
+
+    List.init count (fun _ -> "/" + String.Join("/", Array.init (random.Next(1, 4)) (fun _ -> segment ())))
+
+[<Fact>]
+let ``the home route is the empty and the root hash`` () =
+    Assert.Equal(Home, Routes.parse "")
+    Assert.Equal(Home, Routes.parse "#/")
+    Assert.Equal("#/", Routes.format Home)
+
+[<Fact>]
+let ``format (parse url) is the canonical url`` () =
+    for path in generated 500 do
+        Assert.Equal("#" + path, Routes.format (Routes.parse ("#" + path + "?undeclared=1")))
+
+[<Fact>]
+let ``parse (format route) is the route`` () =
+    for path in generated 500 do
+        let route = NotFound path
+        Assert.Equal(route, Routes.parse (Routes.format route))
+"""
+
+    /// The web application's deep-linking requirements, as a checklist the
+    /// application's agent works through (Praxis SAF-URL-1..10).
+    let private webUrlRequirements =
+        """# URL-addressable state (deep linking)
+
+Status: **Required** for this application. The canonical text is
+[Praxis `requirements/SHARED-APPLICATION-FOUNDATIONS.md`](https://github.com/kemiller2002/praxis/blob/main/requirements/SHARED-APPLICATION-FOUNDATIONS.md)
+("URL-addressable state (deep linking)", SAF-URL-1..10). Limen 0.9.0
+implements it (`@echelon-foundry/limen/routing`, `EchelonFoundry.Limen.Routing`;
+LCP-088..112, DF-LIMEN-2026-0006).
+
+Navigable state means the screen or route, entity IDs, and view parameters
+such as the selected date or period, filters, sort, search, tab and page. It
+lives in the URL, so a copied URL opens the same view in another browser.
+
+## Checklist
+
+- [ ] **SAF-URL-1** The URL is the source of truth. A cold load of a copied
+      URL reproduces the view, and sign-in returns to the target.
+- [ ] **SAF-URL-2** IDs are path parameters and view parameters are query
+      parameters, typed (`string`, `int`, `bool`, `date`, `month`, `enum`,
+      `set`). The canonical form has declared parameters only, in
+      declaration order, with defaults omitted, sets sorted and
+      de-duplicated, and `%20` with upper-case hex.
+- [ ] **SAF-URL-3** Navigation pushes history and refinement replaces it.
+      Back, Forward and reload restore the view from the URL alone.
+- [ ] **SAF-URL-4** An unknown, deleted or forbidden ID shows not found or
+      not permitted, with a way back. The page is never blank and never
+      shows another record.
+- [ ] **SAF-URL-5** No secrets, tokens or sensitive personal or financial
+      data in any URL. Limen's reserved parameter names are refused. No
+      transient UI state goes in the URL.
+- [ ] **SAF-URL-6** Hash routes (`index.html#/...`), relative links and no
+      `<base href>`, so a reloaded deep link never 404s on GitHub Pages.
+- [ ] **SAF-URL-7** Renamed routes keep their old URLs as legacy redirects.
+- [ ] **SAF-URL-8** `.echelon/routes.json` (`echelon.routes/v1`) lists every
+      addressable view and stays current with the route table.
+- [ ] **SAF-URL-9** One pure parse/format codec with round-trip property
+      tests (`src/engine/Routes.fs` until Limen 0.9.0, then `Limen.Routing`).
+- [ ] **SAF-URL-10** A Copy link action wherever sharing is natural.
+
+## Verification
+
+`praxis foundations verify` (the `routing` capability in
+`.echelon/foundations.json`) checks the inventory on every pull request.
+Until the application can install Limen 0.9.0, it reports Limen routing as
+pending (`ECHELON-FND-ROUTING-005`), which is not a failure.
+"""
+
+    let private foundationManifest (webApplication: bool) (projectName: string) (manifest: ProjectManifest) =
         let capabilities = JsonObject()
 
         let addCapability (id: string) (configure: JsonObject -> unit) =
@@ -165,10 +352,22 @@ module Scaffolding =
 
         addCapability "limen" ignore
         addCapability "ordo" ignore
-        // Exactly the capabilities of Praxis' echelon-foundations-v1 schema,
-        // which forbids any other key. Percepta verifies through its own
+        // Exactly the capabilities of Praxis' echelon-foundations-v1 schema
+        // (plus routing, below, for a web application), which forbids any
+        // other key. Percepta verifies through its own
         // repository lifecycle (percepta-repo verify), not the foundations.
         addCapability "praxis" ignore
+
+        // URL-addressable state (Praxis SAF-URL-1..10, Praxis 3.9.0 and later):
+        // every web application publishes its route inventory and, from
+        // Limen 0.9.0, routes through Limen. A static (GitHub Pages) site
+        // uses hash routes (DF-LIMEN-2026-0006).
+        if webApplication then
+            let routing = JsonObject()
+            routing["required"] <- JsonValue.Create true
+            routing["hosting"] <- JsonValue.Create "static"
+            routing["inventory"] <- JsonValue.Create RouteInventoryPath
+            capabilities["routing"] <- routing
 
         let root = JsonObject()
         root["schemaVersion"] <- JsonValue.Create 1
@@ -281,9 +480,11 @@ module Scaffolding =
     // ---------------------------------------------------------------------
 
     /// The Praxis commit whose reusable foundations-verify workflow the
-    /// generated CI pins (the same commit sibling package repositories pin).
+    /// generated CI pins: praxis#209 (WI-0077) on main, the first verifier
+    /// that checks the routing foundation (SAF-URL-8/9). A declaration
+    /// without routing verifies exactly as before.
     [<Literal>]
-    let PraxisFoundationsRef = "a95dbf238e561eaac4b38ca7011efc1a496cf1c6"
+    let PraxisFoundationsRef = "b21d70d20aff96c4120b695c143d8d0a5d183bde"
 
     /// The echelon-registry commit whose release-contract action and
     /// release-manifest schema the generated release workflow pins.
@@ -762,7 +963,7 @@ jobs:
                   $"src/{ns}/Library.fs", render librarySource
                   $"tests/{ns}.Tests/{ns}.Tests.fsproj", render libraryTestProject
                   $"tests/{ns}.Tests/LibraryTests.fs", render libraryTests
-                  ".echelon/foundations.json", foundationManifest projectName manifest
+                  ".echelon/foundations.json", foundationManifest false projectName manifest
                   ".github/workflows/build-and-test.yml", render libraryBuildWorkflow
                   ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
                   ".github/workflows/release.yml", render libraryReleaseWorkflow
@@ -827,6 +1028,7 @@ jobs:
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EngineTests.fs" />
+    <Compile Include="RouteTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -1208,12 +1410,16 @@ same change.
           "App.slnx", webSolution
           "src/engine/App.Engine.fsproj", projectFile projectName manifest
           "src/engine/Operational.fs", operationalFile projectName
+          "src/engine/Routes.fs", render webRoutesSource
           "src/engine/Domain.fs",
           $"namespace {ns}.Engine\n\ntype State =\n    | Uninitialized\n\nmodule State =\n    let initial = Uninitialized\n"
           "tests/App.Engine.Tests/App.Engine.Tests.fsproj", webTestProject
           "tests/App.Engine.Tests/EngineTests.fs", render webEngineTests
-          ".echelon/foundations.json", foundationManifest projectName manifest
+          "tests/App.Engine.Tests/RouteTests.fs", render webRouteTests
+          ".echelon/foundations.json", foundationManifest true projectName manifest
           "aegis-boundaries.json", aegisBoundaryManifest projectName
+          RouteInventoryPath, webRouteInventory
+          "requirements/URL-ADDRESSABLE-STATE.md", webUrlRequirements
           "package.json", packageJson projectName manifest
           "tsconfig.json", webTsconfig
           "limen.config.json", webLimenConfig
