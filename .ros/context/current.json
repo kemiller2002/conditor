@@ -1230,7 +1230,27 @@
       "updatedAt": "2026-10-08T20:52:44.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T205244993Z-59db62e6"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "eef37bd94b399d56404c558c",
+        "recordedAt": "2026-10-08T20:52:55.000Z",
+        "executionId": "EXE-20261008T205244993Z-59db62e6",
+        "repository": "conditor",
+        "branch": "release/0.7.0",
+        "commit": "e020929df68fed576fafcef81a722375b956c475",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "release/0.7.0",
+        "remoteCommit": "e020929df68fed576fafcef81a722375b956c475",
+        "summary": "Directory.Build.props and release/requested-version.txt request 0.7.0",
+        "nextAction": "Merge on green; release-orchestrator publishes v0.7.0",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
