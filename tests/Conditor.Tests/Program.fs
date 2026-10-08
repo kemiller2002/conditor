@@ -608,13 +608,14 @@ match Presets.resolve "indy-init" with
             manifest.Requirements
             |> List.filter (fun requirement -> requirement.Source.Repository = "kemiller2002/Indy-init")
 
-        // Indy-init PR #6 (merge 012f397) fixed the packet's kickoff entry path.
+        // Indy-init PR #7 (merge 2eee2d5) adds the deep-linking requirements on top
+        // of PR #6 (merge 012f397), which fixed the packet's kickoff entry path.
         check
-            "every Indy-init governing input is pinned to the corrected kickoff-path commit"
+            "every Indy-init governing input is pinned to the deep-linking requirements commit"
             (not indySources.IsEmpty
              && indySources
                 |> List.forall (fun requirement ->
-                    requirement.Source.Commit = "012f39773079692a778b98cadf3dbd264df36469"))
+                    requirement.Source.Commit = "2eee2d52b51173d4e8ec6e0a2d7ec28ea13011b3"))
 
         // Relative links between the planning documents resolve only when each
         // file keeps its planning-repository path.

@@ -657,10 +657,10 @@
         "requirements-import"
       ],
       "priority": "medium",
-      "status": "captured",
+      "status": "ready",
       "attachments": [],
       "createdAt": "2026-10-08T19:43:01.928Z",
-      "updatedAt": "2026-10-08T19:43:01.928Z",
+      "updatedAt": "2026-10-08T23:06:38.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
