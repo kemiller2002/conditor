@@ -495,10 +495,10 @@
         "scaffold"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T11:31:59.000Z",
-      "updatedAt": "2026-10-08T11:32:00.000Z",
+      "updatedAt": "2026-10-08T11:32:16.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
