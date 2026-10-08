@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 24,
+  "nextSeq": 26,
   "items": [
     {
       "id": "WI-0001",
@@ -614,6 +614,31 @@
       "createdAt": "2026-10-08T12:10:59Z",
       "updatedAt": "2026-10-08T12:11:24Z",
       "createdBy": "anthropic/claude-code",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0025",
+      "title": "Qualify Forma 0.5.0 (echelon-current 1.8.0) and move the presets that follow the channel",
+      "description": "The Registry echelon-current 1.8.0 (kemiller2002/echelon-registry#49) selects Forma 0.5.0 (tag v0.5.0 at 8a5a5993421fbfd808582f735dedcf2adea07010, tarball sha256 c4ad3ae525a85f55a9e9aec4f0e19c59b7f552cececb4224a0bbc3434f4f558f). Conditor main refuses it: forma qualifies only 0.2.0, 0.3.0, 0.4.1. Qualify 0.5.0, make it the default, pin it in the clean-room and indy-init presets and EchelonCurrent.selections, update CI assertions.",
+      "tags": [
+        "forma",
+        "registry",
+        "qualification"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T14:33:31.281Z",
+      "updatedAt": "2026-10-08T14:33:31.000Z",
+      "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
         "id": "anthropic/claude-code",

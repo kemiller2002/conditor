@@ -43,7 +43,7 @@ let private scaffoldFiles (plan: InstallationPlan) =
     |> Map.ofList
 
 let private webManifest =
-    """{"schemaVersion":1,"name":"Indy Web","components":[{"id":"praxis","version":"3.7.2"},{"id":"ordo","version":"1.5.0"},{"id":"percepta","version":"0.1.0"},{"id":"aegis","version":"1.0.0"},{"id":"limen","version":"0.7.1"},{"id":"forma","version":"0.4.1"},{"id":"folio","version":"0.3.0"}],"requirements":[],"execution":{"enabled":false},"scaffold":{"kind":"fsharp-limen-web","name":"Indy Web"}}"""
+    """{"schemaVersion":1,"name":"Indy Web","components":[{"id":"praxis","version":"3.7.2"},{"id":"ordo","version":"1.5.0"},{"id":"percepta","version":"0.1.0"},{"id":"aegis","version":"1.0.0"},{"id":"limen","version":"0.7.1"},{"id":"forma","version":"0.5.0"},{"id":"folio","version":"0.3.0"}],"requirements":[],"execution":{"enabled":false},"scaffold":{"kind":"fsharp-limen-web","name":"Indy Web"}}"""
 
 let private joined (errors: string list) = String.concat "; " errors
 
@@ -121,7 +121,7 @@ let run (check: string -> bool -> unit) =
 
                 check "the root package binds Limen, Forma and Folio"
                     (dependencies.GetProperty("@echelon-foundry/limen").GetString() = "0.7.1"
-                     && dependencies.GetProperty("@echelon-foundry/design-system").GetString() = "0.4.1"
+                     && dependencies.GetProperty("@echelon-foundry/design-system").GetString() = "0.5.0"
                      && (dependencies.GetProperty("@echelon-foundry/print-components").GetString()
                          |> Option.ofObj
                          |> Option.exists (fun spec -> spec.Contains("/v0.3.0/", StringComparison.Ordinal))))

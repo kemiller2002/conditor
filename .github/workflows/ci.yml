@@ -43,8 +43,8 @@ jobs:
           ], limen
           forma = inventory["forma"]
           assert forma["package"] == "@echelon-foundry/design-system", forma
-          assert forma["defaultVersion"] == "0.4.1", forma
-          assert forma["qualifiedVersions"] == ["0.2.0", "0.3.0", "0.4.1"], forma
+          assert forma["defaultVersion"] == "0.5.0", forma
+          assert forma["qualifiedVersions"] == ["0.2.0", "0.3.0", "0.4.1", "0.5.0"], forma
           PY
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility --json > "$RUNNER_TEMP/conditor-compatibility.json"
@@ -434,7 +434,7 @@ jobs:
           test -f "$RUNNER_TEMP/conditor-empty/src/engine/Domain.fs"
           test -f "$RUNNER_TEMP/conditor-empty/package.json"
           test -f "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"
-          grep -F '"@echelon-foundry/design-system": "0.4.1"' "$RUNNER_TEMP/conditor-empty/package.json"
+          grep -F '"@echelon-foundry/design-system": "0.5.0"' "$RUNNER_TEMP/conditor-empty/package.json"
           grep -F "@echelon-foundry/print-components" "$RUNNER_TEMP/conditor-empty/package.json"
           grep -F '"@echelon-foundry/limen": "0.7.1"' "$RUNNER_TEMP/conditor-empty/package.json"
           if grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/package.json" "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"; then
@@ -714,12 +714,13 @@ jobs:
           # Indy Init 0.1.0 is a Registry release freeze (CON-INDY-090,
           # freezes/indy-init-0.1.0.freeze.json): it pins Limen 0.6.2, which was
           # published as @echelon-foundry/typescript-wasm-kernel. Limen 0.7.x
-          # (@echelon-foundry/limen) and Forma 0.4.1 are not part of this frozen
-          # release set.
+          # (@echelon-foundry/limen) and Forma 0.4.1 and 0.5.0 are not part of
+          # this frozen release set.
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/limen/echelon-foundry-typescript-wasm-kernel-0.6.2.tgz"
           test -z "$(find "$RUNNER_TEMP/indy-init-bundle/packages/limen" -name 'echelon-foundry-limen-*')"
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/forma/echelon-foundry-design-system-0.3.0.tgz"
           test -z "$(find "$RUNNER_TEMP/indy-init-bundle/packages/forma" -name 'echelon-foundry-design-system-0.4.*')"
+          test -z "$(find "$RUNNER_TEMP/indy-init-bundle/packages/forma" -name 'echelon-foundry-design-system-0.5.*')"
           test -f "$RUNNER_TEMP/indy-init-bundle/packages/folio/echelon-foundry-print-components-0.3.0.tgz"
 
       - name: Plan frozen workstation from bundled resolved set
