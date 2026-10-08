@@ -18,4 +18,4 @@
 | WI-0013 | AdoptionTests 'Registry-authorized adoption succeeds' discovers real praxis/ordo/percepta on PATH (e.g. after conditor workstation apply puts them in ~/.local/bin) and fails; the fixture should isolate PATH | captured |  | medium |
 | WI-0014 | fsharp-nuget-library scaffold must ignore bin/, obj/, dist/ and packages: build output would otherwise be committed | complete | scaffold | high |
 | WI-0015 | fsharp-limen-web scaffold has the same .gitignore gap (engine bin/obj): add the build-outputs region there too | captured |  | medium |
-| WI-0016 | fsharp-nuget-library scaffold: make the test project a real dotnet test project (xUnit) so Dokimos and other TRX consumers get test evidence | ready | scaffold, dokimos | high |
+| WI-0016 | fsharp-nuget-library scaffold: make the test project a real dotnet test project (xUnit) so Dokimos and other TRX consumers get test evidence | complete | scaffold, dokimos | high |

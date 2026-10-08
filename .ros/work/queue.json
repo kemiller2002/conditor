@@ -324,10 +324,10 @@
         "dokimos"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T08:24:06.000Z",
-      "updatedAt": "2026-10-08T08:24:06.000Z",
+      "updatedAt": "2026-10-08T08:26:53.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
