@@ -15,6 +15,7 @@
     <Compile Include="LimenPackageIdentityTests.fs" />
     <Compile Include="ComponentSchemaTests.fs" />
     <Compile Include="VerificationGateTests.fs" />
+    <Compile Include="LibraryScaffoldTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

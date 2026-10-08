@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 12,
+  "nextSeq": 14,
   "items": [
     {
       "id": "WI-0001",
@@ -228,6 +228,48 @@
       "source": "manual",
       "sourceReference": null,
       "abandonedReason": "Captured by accident: a mistyped 'add x --help' probe, not a real obligation."
+    },
+    {
+      "id": "WI-0012",
+      "title": "Scaffold for a new NuGet library package repository: foundations manifest, build-and-test and foundations CI, and the Registry release workflow pattern",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T07:24:41.447Z",
+      "updatedAt": "2026-10-08T07:24:54.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0013",
+      "title": "AdoptionTests 'Registry-authorized adoption succeeds' discovers real praxis/ordo/percepta on PATH (e.g. after conditor workstation apply puts them in ~/.local/bin) and fails; the fixture should isolate PATH",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "captured",
+      "attachments": [],
+      "createdAt": "2026-10-08T07:30:10.099Z",
+      "updatedAt": "2026-10-08T07:30:10.099Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

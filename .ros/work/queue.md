@@ -14,3 +14,5 @@
 | WI-0009 | Current upgrade opts a project in to an optional native lifecycle tool | complete | lifecycle | high |
 | WI-0010 | Qualify Ordo 1.5.0 (echelon-current 1.2.0) and make conditor's own Ordo pins consistent at 1.5.0 | complete |  | medium |
 | WI-0011 | x | abandoned |  | medium |
+| WI-0012 | Scaffold for a new NuGet library package repository: foundations manifest, build-and-test and foundations CI, and the Registry release workflow pattern | active |  | medium |
+| WI-0013 | AdoptionTests 'Registry-authorized adoption succeeds' discovers real praxis/ordo/percepta on PATH (e.g. after conditor workstation apply puts them in ~/.local/bin) and fails; the fixture should isolate PATH | captured |  | medium |
