@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T20:52:44.000Z",
+  "updatedAt": "2026-10-08T20:53:09.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1224,10 +1224,23 @@
     {
       "id": "WI-0027",
       "type": "release",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T20:52:44.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
+        }
+      ],
+      "updatedAt": "2026-10-08T20:53:09.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T205244993Z-59db62e6"
       ],
@@ -1250,7 +1263,8 @@
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
-      }
+      },
+      "completedAt": "2026-10-08T20:53:09.000Z"
     }
   ]
 }
