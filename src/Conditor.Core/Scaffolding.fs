@@ -368,52 +368,63 @@ module Library =
     let scaffoldReady = true
 """
 
+    /// The test project is a real `dotnet test` project (xUnit, the
+    /// versions Chrona and Signal pin) so test evidence reaches every TRX
+    /// consumer, quality gates that read test results included.
     let private libraryTestProject =
         """<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/@@NS@@/@@NS@@.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.fs" />
+    <Compile Include="LibraryTests.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 </Project>
 """
 
     let private libraryTests =
-        """// Dependency-free test runner: every check prints PASS/FAIL and the
-// process exits non-zero when any check failed, so CI cannot read a skipped
-// or empty run as success.
-open System
+        """module @@NS@@.Tests.LibraryTests
 
-let mutable failures = 0
+open Xunit
 
-let check name condition =
-    if condition then
-        Console.WriteLine $"PASS {name}"
-    else
-        failures <- failures + 1
-        Console.Error.WriteLine $"FAIL {name}"
+[<Fact>]
+let ``scaffold builds and links the library`` () =
+    Assert.True @@NS@@.Library.scaffoldReady
+"""
 
-check "scaffold builds and links the library" @@NS@@.Library.scaffoldReady
-
-[<EntryPoint>]
-let main _ =
-    if failures = 0 then 0
-    else
-        Console.Error.WriteLine $"{failures} check(s) failed."
-        1
+    /// `dotnet test` exits 0 for an empty or fully skipped run, so the step
+    /// also requires at least one passed test and no skipped ones.
+    let private libraryTestStep =
+        """      - name: Test
+        shell: bash
+        run: |
+          set -uo pipefail
+          output=$(dotnet test @@NS@@.slnx -c Release --no-build 2>&1)
+          status=$?
+          echo "$output"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          if ! echo "$output" | grep -qE 'Passed:[[:space:]]*[1-9]'; then
+            echo "::error::No test passed. An empty test run is not a pass."; exit 1
+          fi
+          if echo "$output" | grep -qE 'Skipped:[[:space:]]*[1-9]'; then
+            echo "::error::Tests were skipped. A run that skips tests is not a pass."; exit 1
+          fi
 """
 
     let private libraryBuildWorkflow =
         """name: Build and test
 
 # Build the library and run its tests on every pull request and on main.
-# The test project is a plain executable that exits non-zero on any failed
-# check, so an empty or skipped run cannot pass.
+# The test step fails an empty or skipped run as well as a failing one.
 
 on:
   pull_request:
@@ -437,9 +448,7 @@ jobs:
           dotnet-version: "10.0.x"
       - name: Build
         run: dotnet build @@NS@@.slnx -c Release
-      - name: Test
-        run: dotnet run --project tests/@@NS@@.Tests/@@NS@@.Tests.fsproj -c Release --no-build
-      - name: Pack
+@@TEST_STEP@@      - name: Pack
         run: dotnet pack src/@@NS@@/@@NS@@.fsproj -c Release --no-build -o dist
 """
 
@@ -582,9 +591,7 @@ jobs:
           dotnet-version: "10.0.x"
       - name: Build
         run: dotnet build @@NS@@.slnx -c Release -p:ContinuousIntegrationBuild=true
-      - name: Test
-        run: dotnet run --project tests/@@NS@@.Tests/@@NS@@.Tests.fsproj -c Release --no-build
-      - name: Pack
+@@TEST_STEP@@      - name: Pack
         shell: bash
         run: |
           set -euo pipefail
@@ -706,7 +713,7 @@ jobs:
     /// components own the rest of .gitignore, so the scaffold adds only its
     /// own bounded region.
     let private libraryIgnores =
-        "# .NET build and pack outputs (Conditor fsharp-nuget-library scaffold)\nbin/\nobj/\ndist/\n*.nupkg\n"
+        "# .NET build, test and pack outputs (Conditor fsharp-nuget-library scaffold)\nbin/\nobj/\ndist/\nTestResults/\n*.nupkg\n"
 
     let private libraryFiles (projectName: string) (manifest: ProjectManifest) =
         let npmBindings =
@@ -736,7 +743,7 @@ jobs:
                   "@@PRAXIS_REF@@", PraxisFoundationsRef
                   "@@REGISTRY_REF@@", RegistryReleaseContractRef ]
 
-            let render = fill tokens
+            let render = fill (("@@TEST_STEP@@", libraryTestStep) :: tokens)
 
             Ok(
                 [ "Directory.Build.props", render libraryProps
@@ -744,7 +751,7 @@ jobs:
                   $"src/{ns}/{ns}.fsproj", render (libraryProject manifest)
                   $"src/{ns}/Library.fs", render librarySource
                   $"tests/{ns}.Tests/{ns}.Tests.fsproj", render libraryTestProject
-                  $"tests/{ns}.Tests/Program.fs", render libraryTests
+                  $"tests/{ns}.Tests/LibraryTests.fs", render libraryTests
                   ".echelon/foundations.json", foundationManifest projectName manifest
                   ".github/workflows/build-and-test.yml", render libraryBuildWorkflow
                   ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
