@@ -30,4 +30,4 @@
 | WI-0021 | Install Registry nuget-library releases distributed as GitHub release assets (ordo-core.nupkg, Arca) into a consumer's local NuGet feed: digest-proven vendor/nuget, lock, NuGet.config source mapping; init, verify and upgrade --current opt-in and version change | complete | nuget, feed, arca, registry | high |
 | WI-0022 | An established scaffold's seed files belong to the project: stop comparing or recreating them once the lock records the scaffold, so a project that grew past its scaffold can still plan, repair and upgrade --current; roll back governance when the current-upgrade commit step fails | complete | scaffold, upgrade, current | high |
 | WI-0023 | Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60) | complete |  | medium |
-| WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | ready |  | medium |
+| WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | complete |  | medium |

@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T12:11:11Z",
+  "updatedAt": "2026-10-08T12:11:24Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1134,13 +1134,47 @@
     {
       "id": "WI-0024",
       "type": "feature",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T12:11:11Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
+        }
+      ],
+      "updatedAt": "2026-10-08T12:11:24Z",
       "telemetryExecutionIds": [
         "EXE-20261008T121111943Z-747cc0ed"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "bb7c5bf22f0018f831308405",
+        "recordedAt": "2026-10-08T12:11:23Z",
+        "executionId": "EXE-20261008T121111943Z-747cc0ed",
+        "repository": "conditor",
+        "branch": "release/0.6.0",
+        "commit": "c15413edffac57112d4368cbbb9187ac62b8a0ce",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "release/0.6.0",
+        "remoteCommit": "c15413edffac57112d4368cbbb9187ac62b8a0ce",
+        "summary": "Version 0.6.0 set in Directory.Build.props and requested in release/requested-version.txt (commit c15413e)",
+        "nextAction": "Merge once every check on the PR head is green; release orchestrator tags v0.6.0",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T12:11:24Z"
     }
   ]
 }

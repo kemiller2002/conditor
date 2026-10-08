@@ -609,10 +609,10 @@
       "description": "Conditor main carries the CI smoke fix (#61, INDY-0001), conditor requirements import (#63, INDY-0002), conditor supervise (#64, INDY-0003) and the Indy day-of defaults with per-slice acceptance criteria and a new import digest (#65, INDY-0004), but v0.5.0 predates them (#55-#58 already shipped in 0.5.0). Request 0.6.0 through release/requested-version.txt so release-orchestrator tags and publishes it.",
       "tags": [],
       "priority": "medium",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T12:10:59Z",
-      "updatedAt": "2026-10-08T12:11:11Z",
+      "updatedAt": "2026-10-08T12:11:24Z",
       "createdBy": "anthropic/claude-code",
       "createdByActor": {
         "kind": "agent",
