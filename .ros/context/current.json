@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T11:34:48.000Z",
+  "updatedAt": "2026-10-08T11:35:10.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -950,13 +950,51 @@
     {
       "id": "INDY-0002",
       "type": "feature",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T11:34:48.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/RequirementsImport.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/RequirementsImportRun.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RequirementsImportTests.fs"
+        },
+        {
+          "type": "research-record",
+          "path": "research/decisions/DF-CON-2026-A001--requirements-import-in-conditor.md"
+        }
+      ],
+      "updatedAt": "2026-10-08T11:35:10.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T113449054Z-2ff9c0f5"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "f18734451c46755b1b7af9ec",
+        "recordedAt": "2026-10-08T11:35:09.000Z",
+        "executionId": "EXE-20261008T113449054Z-2ff9c0f5",
+        "repository": "conditor",
+        "branch": "feat/requirements-import",
+        "commit": "fc25756168007b5ac47761d54402f9bef40433b2",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/requirements-import",
+        "remoteCommit": "fc25756168007b5ac47761d54402f9bef40433b2",
+        "summary": "conditor requirements import plans 23 Indy slices with 980 traced IDs, idempotent and fail-closed; tests and real-document run pass",
+        "nextAction": "Merge once Actions runs and passes",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T11:35:10.000Z"
     }
   ]
 }

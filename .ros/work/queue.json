@@ -516,10 +516,10 @@
         "indy-init"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T11:34:48.000Z",
-      "updatedAt": "2026-10-08T11:34:48.000Z",
+      "updatedAt": "2026-10-08T11:35:10.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
