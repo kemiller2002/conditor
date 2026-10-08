@@ -480,9 +480,11 @@ pending (`ECHELON-FND-ROUTING-005`), which is not a failure.
     // ---------------------------------------------------------------------
 
     /// The Praxis commit whose reusable foundations-verify workflow the
-    /// generated CI pins (the same commit sibling package repositories pin).
+    /// generated CI pins: praxis#209 (WI-0077) on main, the first verifier
+    /// that checks the routing foundation (SAF-URL-8/9). A declaration
+    /// without routing verifies exactly as before.
     [<Literal>]
-    let PraxisFoundationsRef = "a95dbf238e561eaac4b38ca7011efc1a496cf1c6"
+    let PraxisFoundationsRef = "b21d70d20aff96c4120b695c143d8d0a5d183bde"
 
     /// The echelon-registry commit whose release-contract action and
     /// release-manifest schema the generated release workflow pins.
