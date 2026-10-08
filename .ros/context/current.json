@@ -4,11 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-<<<<<<< HEAD
   "updatedAt": "2026-10-08T11:35:10.000Z",
-=======
-  "updatedAt": "2026-10-08T11:32:16.000Z",
->>>>>>> origin/main
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -907,47 +903,6 @@
       "completedAt": "2026-10-08T09:43:36.000Z"
     },
     {
-      "id": "INDY-0001",
-      "type": "bugfix",
-      "state": "complete",
-      "semanticState": "complete",
-      "evidence": [
-        {
-          "type": "implementation",
-          "path": ".github/workflows/ci.yml"
-        },
-        {
-          "type": "tests",
-          "path": "scripts/rehearse-clean-room.sh"
-        }
-      ],
-      "updatedAt": "2026-10-08T11:32:16.000Z",
-      "telemetryExecutionIds": [
-        "EXE-20261008T113200887Z-3e360531"
-      ],
-      "latestCheckpoint": {
-        "id": "d0113f3d0df9e575863e9c36",
-        "recordedAt": "2026-10-08T11:32:15.000Z",
-        "executionId": "EXE-20261008T113200887Z-3e360531",
-        "repository": "conditor",
-        "branch": "fix/ci-web-scaffold-layout",
-        "commit": "f2db98b221a0281b215c6adfd3718291f566cdda",
-        "remote": {
-          "name": "origin",
-          "url": "https://github.com/kemiller2002/conditor"
-        },
-        "remoteBranch": "fix/ci-web-scaffold-layout",
-        "remoteCommit": "f2db98b221a0281b215c6adfd3718291f566cdda",
-        "summary": "Push-only smoke checks read the root package.json; verified locally with frozen host tools",
-        "nextAction": "Merge once Actions runs and passes",
-        "verification": {
-          "status": "verified",
-          "mechanism": "git-remote-observation"
-        }
-      },
-      "completedAt": "2026-10-08T11:32:16.000Z"
-    },
-    {
       "id": "WI-0023",
       "type": "feature",
       "state": "complete",
@@ -1040,6 +995,47 @@
         }
       },
       "completedAt": "2026-10-08T11:35:10.000Z"
+    },
+    {
+      "id": "INDY-0001",
+      "type": "bugfix",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "tests",
+          "path": "scripts/rehearse-clean-room.sh"
+        }
+      ],
+      "updatedAt": "2026-10-08T11:32:16.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T113200887Z-3e360531"
+      ],
+      "latestCheckpoint": {
+        "id": "d0113f3d0df9e575863e9c36",
+        "recordedAt": "2026-10-08T11:32:15.000Z",
+        "executionId": "EXE-20261008T113200887Z-3e360531",
+        "repository": "conditor",
+        "branch": "fix/ci-web-scaffold-layout",
+        "commit": "f2db98b221a0281b215c6adfd3718291f566cdda",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/ci-web-scaffold-layout",
+        "remoteCommit": "f2db98b221a0281b215c6adfd3718291f566cdda",
+        "summary": "Push-only smoke checks read the root package.json; verified locally with frozen host tools",
+        "nextAction": "Merge once Actions runs and passes",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T11:32:16.000Z"
     }
   ]
 }
