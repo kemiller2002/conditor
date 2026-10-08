@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 31,
+  "nextSeq": 32,
   "items": [
     {
       "id": "WI-0001",
@@ -756,6 +756,29 @@
       "attachments": [],
       "createdAt": "2026-10-08T22:13:37.333Z",
       "updatedAt": "2026-10-08T22:13:41.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0031",
+      "title": "Release Conditor 0.8.0: Limen 0.9.0 and Limen.Routing web scaffold (#72), indy-init preset on Indy-init deep-linking requirements (#73)",
+      "description": "Minor release: Limen 0.9.0 qualified and default; fsharp-limen-web routes the engine through EchelonFoundry.Limen.Routing when limen-fsharp >= 0.9.0 is declared (WI-0029); the indy-init preset pins Indy-init 2eee2d5 with import counts R 82, P 464, OQ 48 (WI-0026).",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T23:20:27.078Z",
+      "updatedAt": "2026-10-08T23:20:32.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
