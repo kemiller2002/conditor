@@ -70,6 +70,7 @@ let private expectedPaths =
       ".github/workflows/deploy-pages.yml"
       ".github/branch-protection.json"
       "DEPLOYMENT.md"
+      ".claude/settings.json"
       "SDE-MAP.md"
       "context/CURRENT-STATE.md"
       ".gitignore" ]
@@ -248,6 +249,26 @@ let run (check: string -> bool -> unit) =
 
                 check "foundations declare only the capabilities the Praxis schema allows"
                     (keys = set [ "aegis"; "forma"; "folio"; "limen"; "ordo"; "praxis" ])
+
+            match files |> Map.tryFind ".claude/settings.json" with
+            | None -> check "Claude Code settings are scaffolded" false
+            | Some text ->
+                use document = JsonDocument.Parse text
+                let root = document.RootElement
+                let list (element: JsonElement) = element.EnumerateArray() |> Seq.choose (fun item -> item.GetString() |> Option.ofObj) |> List.ofSeq
+                let allow = list (root.GetProperty("permissions").GetProperty("allow"))
+                let deny = list (root.GetProperty("permissions").GetProperty("deny"))
+                let autoMode = list (root.GetProperty("autoMode").GetProperty("allow"))
+
+                check "the agent may run the repository toolchain and pull-request flow unattended"
+                    ([ "Bash(git *)"; "Bash(gh pr *)"; "Bash(dotnet *)"; "Bash(npm *)"; "Bash(npx *)"; "Bash(./praxis *)" ] |> List.forall (fun rule -> List.contains rule allow))
+
+                check "force pushes and repository deletion stay denied"
+                    ([ "Bash(git push --force *)"; "Bash(git push -f *)"; "Bash(gh repo delete *)" ] |> List.forall (fun rule -> List.contains rule deny))
+
+                check "auto mode may merge the agent's own pull requests only once the required checks are green"
+                    (autoMode.Head = "$defaults"
+                     && autoMode |> List.exists (fun rule -> rule.Contains("every required check is green", StringComparison.Ordinal)))
 
             check "the scaffold ignores build, test, package and browser outputs"
                 ([ "bin/"; "obj/"; "dist/"; "TestResults/"; "node_modules/"; "test-results/"; "playwright-report/" ]

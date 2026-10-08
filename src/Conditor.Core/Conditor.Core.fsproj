@@ -34,6 +34,7 @@
     <Compile Include="RequirementsImportRun.fs" />
     <Compile Include="Launcher.fs" />
     <Compile Include="Execution.fs" />
+    <Compile Include="Supervisor.fs" />
     <Compile Include="Workstation/OfflineBundle.fs" />
     <Compile Include="Workstation/Engine.fs" />
     <Compile Include="Workstation/Lifecycle.fs" />

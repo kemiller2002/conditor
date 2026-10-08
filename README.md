@@ -115,10 +115,10 @@ conditor start --preset indy-init
 
 That single `start` command establishes an uninitialized repository when necessary, writes the exact preset to `conditor.json`, installs and verifies the declared Echelon environment, materializes pinned governing artifacts, creates the Ordo baseline and Praxis mission, checks execution readiness, activates the mission, and invokes the configured provider.
 
-The Indy Init preset defaults to Codex. The same initialized repository can be handed to Claude without editing its governing manifest:
+The Indy Init preset launches Claude Code headless (`claude -p`) with the explicit permission mode its manifest declares (`execution.permissionMode`, `auto`). The same initialized repository can be handed to Codex without editing its governing manifest:
 
 ```bash
-conditor start --preset indy-init --launcher claude
+conditor start --preset indy-init --launcher codex
 ```
 
 Use `conditor start --check --preset indy-init` only after initialization when you want a read-only readiness check.
@@ -140,6 +140,23 @@ It refuses, creating nothing, when the target is not on `main`, has uncommitted 
 
 `conditor requirements import --target .` turns the materialized planning documents into ordered Praxis slice work items (`SLICE-*`, 23 for Indy Init). It also traces every source requirement ID (980 for Indy Init) to its item through the `requirements-trace.json` attachment of `COND-MISSION-001`. It is deterministic, idempotent and fails closed; `--check` previews the plan and its digest, and `--authorize sha256:<digest>` applies exactly that plan. See [docs/requirements-import.md](docs/requirements-import.md).
 
+## Keep the agent working
+
+`conditor supervise` is the sustainable launcher for an unattended run. It checks readiness once, activates a ready mission, and runs the agent as one fresh headless session after another until a stop condition holds:
+- the mission completes, is blocked or is abandoned;
+- every imported slice is complete;
+- the deadline passes (`--until`, an ISO-8601 time with an offset);
+- the stop file is touched;
+- the launch budget is spent.
+
+Each session after the first resumes from Praxis and repository state; no conversation carries over. A session shorter than two minutes counts as a crash, an auth refusal or a usage limit, and backs off from 30 s, doubling to a 15-minute ceiling. Otherwise the next session follows after 10 s, and no wait runs past the deadline.
+
+```bash
+conditor supervise --target . --until 2026-11-07T16:40:00-05:00 --dry-run   # prints the exact commands; launches nothing
+conditor supervise --target . --until 2026-11-07T16:40:00-05:00
+```
+
+The instruction tells the agent to work the imported `SLICE-*` queue in order, to publish through pull requests to the protected `main`, to record blocks instead of waiting for a person, and to respect the deadline. The `fsharp-limen-web` scaffold's `.claude/settings.json` pre-approves the repository toolchain and the pull-request flow for `auto` mode, including merging the agent's own pull requests once the required checks are green. It keeps force pushes and repository deletion denied.
 ## CLI
 
 ```bash

@@ -487,18 +487,15 @@
       "sourceReference": null
     },
     {
-      "id": "INDY-0001",
-      "title": "CI smoke checks follow the web scaffold's root package.json",
-      "description": "PR #57 moved the fsharp-limen-web npm project to the repository root. The push-only empty-repository-smoke job and scripts/rehearse-clean-room.sh (factory-rehearsal-smoke) still test src/kernel/package.json, so ci on main failed at f3e08a3. Point them at the root package.json. (INDY-* ids avoid colliding with the concurrent WI-* sequence.)",
-      "tags": [
-        "ci",
-        "scaffold"
-      ],
-      "priority": "high",
+      "id": "WI-0023",
+      "title": "Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60)",
+      "description": "Conditor main carries GitHub-release-asset NuGet local-feed installs (WI-0021, #59) and scaffold ownership/governance rollback (WI-0022, #60), but v0.4.0 predates both. Request 0.5.0 through release/requested-version.txt so release-orchestrator tags and publishes it; Chrona needs it to add Arca 0.2.0.",
+      "tags": [],
+      "priority": "medium",
       "status": "complete",
       "attachments": [],
-      "createdAt": "2026-10-08T11:31:59.000Z",
-      "updatedAt": "2026-10-08T11:32:16.000Z",
+      "createdAt": "2026-10-08T11:15:24Z",
+      "updatedAt": "2026-10-08T11:18:32Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
@@ -511,15 +508,42 @@
       "sourceReference": null
     },
     {
-      "id": "WI-0023",
-      "title": "Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60)",
-      "description": "Conditor main carries GitHub-release-asset NuGet local-feed installs (WI-0021, #59) and scaffold ownership/governance rollback (WI-0022, #60), but v0.4.0 predates both. Request 0.5.0 through release/requested-version.txt so release-orchestrator tags and publishes it; Chrona needs it to add Arca 0.2.0.",
-      "tags": [],
-      "priority": "medium",
+      "id": "INDY-0003",
+      "title": "conditor supervise: sustainable headless Claude launch with explicit permission mode, resume on exit and a deadline",
+      "description": "The Claude launcher ran claude -p with no permission mode, the preset defaulted to Codex (not installed), and nothing relaunched an agent that exited (readiness G1-9). Add execution.permissionMode, an explicit --permission-mode on every Claude launch, conditor supervise with a pure decision core (start once, resume fresh sessions, backoff on fast exits, stop on completion, block, drained queue, deadline, stop file or budget), queue and deadline aware instructions, Claude settings in the web scaffold, and switch the Indy preset to Claude in auto mode.",
+      "tags": [
+        "launcher",
+        "indy-init"
+      ],
+      "priority": "high",
       "status": "complete",
       "attachments": [],
-      "createdAt": "2026-10-08T11:15:24Z",
-      "updatedAt": "2026-10-08T11:18:32Z",
+      "createdAt": "2026-10-08T11:42:09.000Z",
+      "updatedAt": "2026-10-08T11:42:13.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "INDY-0001",
+      "title": "CI smoke checks follow the web scaffold's root package.json",
+      "description": "PR #57 moved the fsharp-limen-web npm project to the repository root. The push-only empty-repository-smoke job and scripts/rehearse-clean-room.sh (factory-rehearsal-smoke) still test src/kernel/package.json, so ci on main failed at f3e08a3. Point them at the root package.json. (INDY-* ids avoid colliding with the concurrent WI-* sequence.)",
+      "tags": [
+        "ci",
+        "scaffold"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T11:31:59.000Z",
+      "updatedAt": "2026-10-08T11:32:16.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

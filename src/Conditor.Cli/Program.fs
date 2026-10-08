@@ -26,6 +26,7 @@ let private usage () =
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
+    Console.WriteLine "  conditor supervise [--launcher claude|codex] [--permission-mode MODE] [--until ISO-8601] [--max-launches N] [--stop-file PATH] [--dry-run] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repo create --repository OWNER/NAME [--target PATH] [--public] [--deploy github-pages] [--dry-run]"
     Console.WriteLine "  conditor requirements import [--target PATH] [--manifest PATH] [--check] [--authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
@@ -296,6 +297,132 @@ let private presetTargetState target (preset: ResolvedPreset) =
             Ok(File.Exists lockPath, targetManifest)
     else
         Ok(false, targetManifest)
+
+let private runSupervise (args: string array) target manifestPath =
+    let permissionOverride = optionValue "--permission-mode" args
+
+    let until =
+        match optionValue "--until" args with
+        | None -> Ok None
+        | Some value ->
+            match DateTimeOffset.TryParse(value, Globalization.CultureInfo.InvariantCulture, Globalization.DateTimeStyles.None) with
+            | true, parsed when value.Contains('T') && (value.EndsWith "Z" || value.LastIndexOfAny([| '+'; '-' |]) > value.IndexOf('T')) -> Ok(Some parsed)
+            | _ -> Error [ $"--until '{value}' must be an ISO-8601 time with an explicit offset, such as 2026-11-07T16:40:00-05:00." ]
+
+    let maxLaunches =
+        match optionValue "--max-launches" args with
+        | None -> Ok None
+        | Some value ->
+            match Int32.TryParse value with
+            | true, number when number > 0 -> Ok(Some number)
+            | _ -> Error [ "--max-launches must be a positive integer." ]
+
+    let manifest =
+        Manifest.load manifestPath
+        |> Result.bind (withLauncherOverride (optionValue "--launcher" args))
+        |> Result.bind (fun manifest ->
+            match permissionOverride, manifest.Execution with
+            | None, _ -> Ok manifest
+            | Some mode, _ when not (List.contains mode [ "acceptEdits"; "auto"; "bypassPermissions"; "dontAsk" ]) ->
+                Error [ $"Unsupported --permission-mode '{mode}'. Supported: acceptEdits, auto, bypassPermissions, dontAsk." ]
+            | Some mode, Some execution -> Ok { manifest with Execution = Some { execution with PermissionMode = Some mode } }
+            | Some _, None -> Error [ "--permission-mode requires an execution section in the Conditor manifest." ])
+
+    match manifest, until, maxLaunches with
+    | Error errors, _, _
+    | _, Error errors, _
+    | _, _, Error errors ->
+        writeErrors errors
+        2
+    | Ok manifest, Ok until, Ok maxLaunches ->
+        match Execution.check target manifestPath manifest with
+        | Error errors ->
+            writeErrors errors
+            10
+        | Ok ready ->
+            let policy =
+                let defaults = Supervisor.defaultPolicy until
+                { defaults with MaxLaunches = maxLaunches |> Option.defaultValue defaults.MaxLaunches }
+
+            let importedQueue = Supervisor.importedTrace target ready.Mission.Id
+
+            let stopFile =
+                optionValue "--stop-file" args
+                |> Option.map Path.GetFullPath
+                |> Option.defaultValue (
+                    let gitDirectory = Path.Combine(target, ".git")
+
+                    if Directory.Exists gitDirectory then
+                        Path.Combine(gitDirectory, "conditor-supervisor.stop")
+                    else
+                        Path.Combine(Path.GetTempPath(), "conditor-supervisor.stop")
+                )
+
+            let commandFor kind attempt =
+                let context: Launcher.InstructionContext =
+                    { Kind = kind
+                      ImportedQueue = importedQueue
+                      Until = until
+                      Attempt = attempt }
+
+                Launcher.command ready (Launcher.instructionFor context ready)
+
+            let describeCommand (executable: string, arguments: string list) =
+                let shown =
+                    arguments
+                    |> List.map (fun argument -> if argument.Contains '\n' || argument.Contains ' ' then "\"" + argument.Replace("\"", "\\\"") + "\"" else argument)
+
+                String.Join(" ", executable :: shown)
+
+            let untilText = until |> Option.map (fun value -> value.ToString("o")) |> Option.defaultValue "none"
+            Console.WriteLine $"Supervising {ready.Mission.Id} ({ready.MissionState}) with {ready.Launcher}, permission mode {ready.PermissionMode}; deadline {untilText}; at most {policy.MaxLaunches} launches."
+            Console.WriteLine $"Stop after the current session with: touch {stopFile}"
+
+            if hasFlag "--dry-run" args then
+                let firstKind = if ready.MissionState = "ready" then Launcher.StartRun else Launcher.ResumeRun
+
+                match commandFor firstKind 1, commandFor Launcher.ResumeRun 2 with
+                | Ok first, Ok resume ->
+                    Console.WriteLine "Dry run: nothing was activated or launched."
+                    Console.WriteLine $"First launch ({firstKind}):"
+                    Console.WriteLine $"  {describeCommand first}"
+                    Console.WriteLine "Every later launch (a fresh session that resumes from Praxis state):"
+                    Console.WriteLine $"  {describeCommand resume}"
+                    Console.WriteLine $"A session shorter than {policy.FastExit.TotalMinutes:F0} min backs off from {policy.BaseBackoff.TotalSeconds:F0}s, doubling to at most {policy.MaxBackoff.TotalMinutes:F0} min; otherwise the next launch follows after {policy.Pause.TotalSeconds:F0}s."
+                    0
+                | Error error, _
+                | _, Error error ->
+                    Console.Error.WriteLine error
+                    10
+            else
+                let effects: SupervisorEffects =
+                    { Now = fun () -> DateTimeOffset.Now
+                      Sleep = fun span -> Threading.Thread.Sleep span
+                      Observe =
+                        fun () ->
+                            Supervisor.observeState target ready.Mission.Id
+                            |> Result.map (fun (missionState, openSlices) ->
+                                { Now = DateTimeOffset.Now
+                                  MissionState = missionState
+                                  OpenSlices = openSlices
+                                  StopRequested = File.Exists stopFile })
+                      Activate = fun () -> Mission.activate target ready.Mission
+                      Run =
+                        fun kind attempt ->
+                            commandFor kind attempt
+                            |> Result.bind (fun (executable, arguments) -> ProcessRunner.runAttached target executable arguments)
+                      Log =
+                        fun line ->
+                            let stamp = DateTimeOffset.Now.ToString("HH:mm:ss")
+                            Console.WriteLine $"[conditor {stamp}] {line}" }
+
+                match Supervisor.run policy effects with
+                | Error errors ->
+                    writeErrors errors
+                    10
+                | Ok reason ->
+                    Console.WriteLine $"Supervisor finished: {reason}"
+                    0
 
 let private runStart checkOnly launcherOverride target selection =
     match selection.Preset with
@@ -1532,6 +1659,7 @@ let private execute (args: string array) =
                         (optionValue "--prompt-file" args)
                         target
                         selection.ManifestPath
+                | "supervise" -> runSupervise args target selection.ManifestPath
                 | "start" ->
                     runStart
                         (hasFlag "--check" args)

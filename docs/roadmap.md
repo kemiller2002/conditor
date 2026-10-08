@@ -104,7 +104,7 @@ Remaining:
 
 Status: governed preset assembled, embedded in release binaries, and execution-enabled after the reusable clean-room gate passed.
 
-The target command is `conditor start --preset indy-init`. The preset defaults to Codex and can be started with Claude through the safe launcher override. It currently pins:
+The target command is `conditor start --preset indy-init`, or `conditor supervise` for an unattended run. The preset launches Claude Code headless in `auto` permission mode and can be started with Codex through the safe launcher override. It currently pins:
 
 - Praxis, Ordo, Percepta, Aegis, Limen, Forma and Folio at their Registry `echelon-current` selections (Praxis 3.7.2, Ordo 1.5.0, Percepta 0.1.0, Aegis 1.0.0, Limen 0.7.1, Forma 0.4.1, Folio 0.3.0). A test binds the preset to the channel; the Registry's frozen `indy-init` 0.1.0 set is a separate, older freeze;
 - the Indy Init kickoff contract, its schema and the 42 planning documents the requirements reference to an exact Indy Init commit; and
