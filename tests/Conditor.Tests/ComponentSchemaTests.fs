@@ -85,6 +85,19 @@ let private schemaAccepts (text: string) =
     validate componentSchema text |> Result.isOk
 
 let run (check: string -> bool -> unit) =
+    // Every committed example manifest, the embedded presets included,
+    // conforms to the manifest schema, requirementsImport sections too.
+    let manifestSchema = loadSchema "conditor.schema.json"
+
+    for path in Directory.GetFiles(Path.Combine(repositoryRoot, "examples"), "*.conditor.json") |> Array.sort do
+        let name = Path.GetFileName path
+
+        match validate manifestSchema (File.ReadAllText path) with
+        | Ok() -> check $"example manifest {name} conforms to conditor.schema.json" true
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"example manifest {name} conforms to conditor.schema.json: {details}" false
+
     let files = descriptorFiles ()
     check "component schema test discovers built-in descriptors" (files.Length = Registry.descriptors.Length)
 

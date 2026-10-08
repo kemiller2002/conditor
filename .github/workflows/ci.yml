@@ -432,12 +432,12 @@ jobs:
           test -f "$RUNNER_TEMP/conditor-empty/.conditor/lock.json"
           test -f "$RUNNER_TEMP/conditor-empty/src/engine/App.Engine.fsproj"
           test -f "$RUNNER_TEMP/conditor-empty/src/engine/Domain.fs"
-          test -f "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
+          test -f "$RUNNER_TEMP/conditor-empty/package.json"
           test -f "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"
-          grep -F '"@echelon-foundry/design-system": "0.4.1"' "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
-          grep -F "@echelon-foundry/print-components" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
-          grep -F '"@echelon-foundry/limen": "0.7.1"' "$RUNNER_TEMP/conditor-empty/src/kernel/package.json"
-          if grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/src/kernel/package.json" "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"; then
+          grep -F '"@echelon-foundry/design-system": "0.4.1"' "$RUNNER_TEMP/conditor-empty/package.json"
+          grep -F "@echelon-foundry/print-components" "$RUNNER_TEMP/conditor-empty/package.json"
+          grep -F '"@echelon-foundry/limen": "0.7.1"' "$RUNNER_TEMP/conditor-empty/package.json"
+          if grep -F "@echelon-foundry/typescript-wasm-kernel" "$RUNNER_TEMP/conditor-empty/package.json" "$RUNNER_TEMP/conditor-empty/src/kernel/bootstrap.ts"; then
             echo "clean-room scaffold still names the deprecated Limen package" >&2
             exit 1
           fi

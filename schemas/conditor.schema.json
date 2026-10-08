@@ -138,6 +138,171 @@
           }
         }
       }
+    },
+    "requirementsImport": {
+      "description": "Turns the materialized planning documents into Praxis slice work items and a trace of every source requirement (conditor requirements import).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workItemPrefix",
+        "source",
+        "kickoff",
+        "traceAttachment",
+        "documents",
+        "kickoffExpected",
+        "additionalSlices",
+        "assignments"
+      ],
+      "properties": {
+        "workItemPrefix": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]*$"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "kickoff": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "traceAttachment": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scheme",
+              "path",
+              "heading",
+              "expected"
+            ],
+            "properties": {
+              "scheme": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "heading": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "expected": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "kickoffExpected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prioritySlices",
+            "successGates",
+            "stopTheLine"
+          ],
+          "properties": {
+            "prioritySlices": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "successGates": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "stopTheLine": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "additionalSlices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "after",
+              "cutPolicy",
+              "goal",
+              "basis"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              "after": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "cutPolicy": {
+                "enum": [
+                  "never-cut",
+                  "cut-last",
+                  "stretch",
+                  "deferred"
+                ]
+              },
+              "goal": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "basis": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            }
+          }
+        },
+        "assignments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "slice",
+              "match"
+            ],
+            "properties": {
+              "slice": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "match": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [

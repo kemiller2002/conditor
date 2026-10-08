@@ -530,6 +530,54 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "INDY-0001",
+      "title": "CI smoke checks follow the web scaffold's root package.json",
+      "description": "PR #57 moved the fsharp-limen-web npm project to the repository root. The push-only empty-repository-smoke job and scripts/rehearse-clean-room.sh (factory-rehearsal-smoke) still test src/kernel/package.json, so ci on main failed at f3e08a3. Point them at the root package.json. (INDY-* ids avoid colliding with the concurrent WI-* sequence.)",
+      "tags": [
+        "ci",
+        "scaffold"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T11:31:59.000Z",
+      "updatedAt": "2026-10-08T11:32:16.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "INDY-0002",
+      "title": "conditor requirements import: pinned planning documents to Praxis slice work items with a full trace",
+      "description": "No command turned the Indy-init requirements into Praxis work (readiness step 2 blocker). Add a declarative requirementsImport section to the manifest (documents with heading patterns and expected counts, added slices, assignment rules), a pure planner (extract, order, assign, items, trace, digest, reconcile), a thin shell over the Praxis CLI and Git, the CLI with --check and --authorize, the Indy mapping (23 slices, 980 source IDs), DF-CON-2026-A001 and docs.",
+      "tags": [
+        "requirements",
+        "indy-init"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T11:34:48.000Z",
+      "updatedAt": "2026-10-08T11:35:10.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

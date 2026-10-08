@@ -28,6 +28,7 @@ let private usage () =
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
     Console.WriteLine "  conditor supervise [--launcher claude|codex] [--permission-mode MODE] [--until ISO-8601] [--max-launches N] [--stop-file PATH] [--dry-run] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repo create --repository OWNER/NAME [--target PATH] [--public] [--deploy github-pages] [--dry-run]"
+    Console.WriteLine "  conditor requirements import [--target PATH] [--manifest PATH] [--check] [--authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
@@ -1499,6 +1500,101 @@ let private runRepository (args: string array) =
         usage ()
         2
 
+let private runRequirements (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "import" ->
+        let target =
+            optionValue "--target" args
+            |> Option.defaultValue (Directory.GetCurrentDirectory())
+            |> Path.GetFullPath
+
+        let manifestPath =
+            optionValue "--manifest" args
+            |> Option.map Path.GetFullPath
+            |> Option.defaultValue (Path.Combine(target, "conditor.json"))
+
+        match RequirementsImportRun.observe target manifestPath with
+        | Error errors ->
+            Console.Error.WriteLine "Conditor will not import the requirements; nothing was changed:"
+            errors |> List.iter (fun error -> Console.Error.WriteLine $"  - {error}")
+            3
+        | Ok observation ->
+            let plan = observation.Plan
+
+            Console.WriteLine
+                $"Requirements import plan sha256:{plan.Digest}: {plan.Items.Length} slice work items, {plan.RequirementCount} source requirements traced to {RequirementsImportRun.Umbrella} ({observation.Spec.TraceAttachment})."
+
+            for item in plan.Items do
+                let dependency = item.DependsOn |> Option.map (fun id -> $" after {id}") |> Option.defaultValue ""
+                Console.WriteLine $"  {item.Order,2}. {item.Id,-30} {item.Priority,-6} {item.Requirements.Length,4} requirements{dependency}"
+
+            let check = hasFlag "--check" args
+            let authorized = optionValue "--authorize" args
+
+            match authorized with
+            | Some digest when digest.Replace("sha256:", "") <> plan.Digest ->
+                Console.Error.WriteLine $"Refusing: --authorize {digest} does not match the plan sha256:{plan.Digest}. Nothing was changed."
+                3
+            | _ when observation.Actions.IsEmpty ->
+                Console.WriteLine "Already imported: every work item and the trace match the plan. Nothing to change."
+                0
+            | _ when check ->
+                Console.WriteLine $"Check only; nothing was changed. The import would apply {observation.Actions.Length} Praxis changes:"
+                observation.Actions |> List.iter (fun action -> Console.WriteLine $"  {RequirementsImportRun.describe action}")
+                Console.WriteLine $"Apply exactly this plan with: conditor requirements import --target \"{target}\" --authorize sha256:{plan.Digest}"
+                0
+            | _ ->
+                let run executable arguments = ProcessRunner.runProcess target executable arguments
+
+                match RequirementsImportRun.commitPreconditions run with
+                | errors when not errors.IsEmpty ->
+                    Console.Error.WriteLine "Conditor will not import the requirements; nothing was changed:"
+                    errors |> List.iter (fun error -> Console.Error.WriteLine $"  - {error}")
+                    3
+                | _ ->
+                    let now () = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+
+                    let withTrace (content: string) (action: string -> ProcessResult) =
+                        let path = Path.Combine(Path.GetTempPath(), $"conditor-trace-{Guid.NewGuid():N}.json")
+
+                        try
+                            File.WriteAllText(path, content)
+                            action path
+                        finally
+                            if File.Exists path then
+                                File.Delete path
+
+                    let report (outcome: RequirementsImportOutcome) =
+                        for action in outcome.Applied do
+                            Console.WriteLine $"  done     {RequirementsImportRun.describe action}"
+
+                        match outcome.Failed with
+                        | Some(action, result) ->
+                            Console.Error.WriteLine $"  FAILED   {RequirementsImportRun.describe action} (exit {result.ExitCode})"
+
+                            [ result.StandardError.Trim(); result.StandardOutput.Trim() ]
+                            |> List.filter (String.IsNullOrWhiteSpace >> not)
+                            |> List.iter (fun line -> Console.Error.WriteLine $"           {line}")
+
+                            for remaining in outcome.Remaining do
+                                Console.Error.WriteLine $"  not run  {RequirementsImportRun.describe remaining}"
+
+                            Console.Error.WriteLine "Re-run the same command after fixing the cause: the import resumes where it stopped."
+                        | None -> ()
+
+                    match RequirementsImportRun.apply run now withTrace true observation with
+                    | Error(error, outcome) ->
+                        report outcome
+                        Console.Error.WriteLine error
+                        1
+                    | Ok outcome ->
+                        report outcome
+                        outcome.Commit |> Option.iter (fun commit -> Console.WriteLine $"Recorded the Praxis state as commit {commit}.")
+                        if outcome.Failed.IsSome then 1 else 0
+    | _ ->
+        usage ()
+        2
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -1534,6 +1630,8 @@ let private execute (args: string array) =
             runAdopt args
         elif command = "repo" then
             runRepository args
+        elif command = "requirements" then
+            runRequirements args
         else
             let target =
                 optionValue "--target" args

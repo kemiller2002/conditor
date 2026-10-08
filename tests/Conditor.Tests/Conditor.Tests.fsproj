@@ -21,6 +21,7 @@
     <Compile Include="BranchProtectionTests.fs" />
     <Compile Include="RepositoryCreationTests.fs" />
     <Compile Include="SupervisorTests.fs" />
+    <Compile Include="RequirementsImportTests.fs" />
     <Compile Include="NugetFeedTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
