@@ -50,7 +50,8 @@ A browser application (an F# engine behind a Limen boundary, with Forma and Foli
 - the npm project at the repository root (`package.json`, `tsconfig.json`, `limen.config.json`), where the foundations verifier reads it, with the pages and Limen kernel in `src/kernel/` and Playwright pinned exactly;
 - a real-browser smoke suite (`playwright.config.js`, `tests/browser/`): every page loads every resource and raises no script error;
 - `.github/workflows/build-and-test.yml`: build, tests, kernel type-check and the browser suite. Chromium is cached under the installed Playwright version and its OS libraries are proved offline, never fetched with `--with-deps` (the apt hang fixed in signal#24); the job has a 20-minute ceiling;
-- `.echelon/foundations.json` (exactly the capabilities the Praxis schema allows) and `.github/workflows/echelon-foundations.yml`;
+- `.echelon/foundations.json` (exactly the capabilities the Praxis schema allows, including `routing`) and `.github/workflows/echelon-foundations.yml`;
+- URL-addressable state (Praxis SAF-URL-1..10, CON-291..294): the route inventory `.echelon/routes.json` (`echelon.routes/v1`, hash mode, so a reloaded deep link never 404s on GitHub Pages), a pure route codec `src/engine/Routes.fs` with round-trip tests as the placeholder for Limen 0.9.0's `Limen.Routing`, and the `requirements/URL-ADDRESSABLE-STATE.md` checklist;
 - `.github/workflows/deploy-pages.yml` and `DEPLOYMENT.md`: a GitHub Pages deployment that stays inert until the repository variable `DEPLOY_TARGET` is `github-pages`, because the target is not decided;
 - `.github/branch-protection.json`: the protection for `main` (pull requests, the three required checks, administrators included), which the repository-creation step applies;
 - the Ordo baseline and a bounded `# conditor:build-outputs` region in `.gitignore` (`bin/`, `obj/`, `dist/`, `TestResults/`, `node_modules/`, `test-results/`, `playwright-report/`).
