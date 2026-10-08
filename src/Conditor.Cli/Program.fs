@@ -414,6 +414,20 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
                 let rendered = String.concat " " arguments
                 Console.WriteLine $"      {directory}: npm {rendered}"
 
+    if not plan.NugetFeedChanges.IsEmpty then
+        Console.WriteLine $"  NuGet release-asset feeds ({NugetFeed.FeedDirectory}):"
+
+        for release, previous in plan.NugetFeedChanges do
+            let change =
+                match previous with
+                | Some fromVersion -> $"{fromVersion} -> {release.Version}"
+                | None -> $"opt in at {release.Version}"
+
+            Console.WriteLine $"    {release.Id}: {change} from {release.Repository}@{release.Tag}"
+
+            for package in release.Packages do
+                Console.WriteLine $"      {package.PackageId} {package.Version} (sha256:{package.Sha256})"
+
     Console.WriteLine "  final verification: complete repository verify, then authority + lock commit"
 
     for refusal in plan.Refusals do

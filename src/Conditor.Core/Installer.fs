@@ -34,6 +34,10 @@ module Installer =
             $"materialize github:{source.Repository}#{source.Commit} -> {relativePath}"
         | EnsurePraxisMission mission ->
             $"praxis mission {mission.Id} -> ready"
+        | EnsureNugetFeed(release, _) ->
+            $"nuget feed {release.Id}@{release.Version} -> {NugetFeed.FeedDirectory}"
+        | VerifyNugetFeed release ->
+            $"verify nuget feed {release.Id}@{release.Version} in {NugetFeed.FeedDirectory}"
 
     let private safePath target relativePath =
         let root = Path.GetFullPath target
@@ -287,6 +291,14 @@ module Installer =
                     match Mission.ensure target mission with
                     | Ok() -> loop signals remaining
                     | Error errors -> stopped action errors
+                | EnsureNugetFeed(release, previousVersion) ->
+                    match NugetFeed.ensure NugetFeed.defaultFetch target previousVersion release with
+                    | Ok() -> loop signals remaining
+                    | Error errors -> stopped action errors
+                | VerifyNugetFeed release ->
+                    match NugetFeed.verify target release with
+                    | [] -> loop signals remaining
+                    | problems -> stopped action problems
                 | ExternalProcess _
                 | GitHubSourceProcess _ ->
                     let result = run target action

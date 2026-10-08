@@ -1,5 +1,27 @@
 namespace Conditor.Core
 
+// A Registry-selected NuGet release installed through a local feed
+// (NugetFeed.fs, docs/nuget-feed-contract.md).
+/// One package of a release: its NuGet id and version, the release asset that
+/// carries it, and that asset's Registry digest.
+type NugetFeedPackage =
+    { PackageId: string
+      Version: string
+      ArtifactName: string
+      Sha256: string
+      DownloadUrl: string }
+
+/// One exact Registry-selected `nuget-library` release distributed as
+/// GitHub release assets.
+type NugetFeedRelease =
+    { Id: string
+      Version: string
+      Repository: string
+      Tag: string
+      ReleaseManifestSha256: string
+      Packages: NugetFeedPackage list }
+
+
 type Distribution =
     | HostTool
     | LifecycleNpm
@@ -138,6 +160,8 @@ type PlanActionKind =
     | RequirementFile
     | MissionWorkItem
     | ManifestFile
+    | NugetFeedInstall
+    | NugetFeedVerify
 
 type ActionExecution =
     | ExternalProcess of executable: string * arguments: string list
@@ -146,6 +170,11 @@ type ActionExecution =
     | EnsureManagedRegion of relativePath: string * regionId: string * content: string
     | MaterializeSourceFile of source: GitHubSource * relativePath: string
     | EnsurePraxisMission of mission: PraxisMission
+    /// Establish the release's local NuGet feed; `previousVersion` is the
+    /// version whose exact pins move to this release.
+    | EnsureNugetFeed of release: NugetFeedRelease * previousVersion: string option
+    /// Prove the release's local NuGet feed is established.
+    | VerifyNugetFeed of release: NugetFeedRelease
 
 type PlanAction =
     { Sequence: int

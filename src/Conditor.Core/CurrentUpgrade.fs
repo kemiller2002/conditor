@@ -46,6 +46,9 @@ type CurrentUpgradePlan =
       EmbeddedTransitions: (CurrentUpgradeTransition * ComponentDefinition * ProfileComponent) list
       PackageLifecycleTransitions: PackageLifecycleTransition list
       WebPackageTransitions: WebPackageTransition list
+      /// NuGet release-asset feeds to establish: an opt-in (no previous
+      /// version) or a version change (previous version's pins move).
+      NugetFeedChanges: (NugetFeedRelease * string option) list
       Refusals: string list
       Digest: string }
 
@@ -316,6 +319,14 @@ module CurrentUpgrade =
             |> Option.map (fun profile -> profile.Components |> List.map (fun release -> release.Id, release) |> Map.ofList)
             |> Option.defaultValue Map.empty
 
+        let feeds =
+            match NugetFeed.loadAll targetSetPath with
+            | Ok values -> values
+            | Error feedErrors ->
+                feedErrors |> List.iter (fun error -> errors.Add $"Target Registry release set: {error}")
+                Map.empty
+
+        let feedChanges = ResizeArray<NugetFeedRelease * string option>()
         let transitions = ResizeArray<CurrentUpgradeTransition>()
         let embeddedTransitions = ResizeArray<CurrentUpgradeTransition * ComponentDefinition * ProfileComponent>()
         let webTransitions = ResizeArray<WebPackageTransition>()
@@ -355,6 +366,9 @@ module CurrentUpgrade =
                             mode <- PackageLifecycleMode
                             packageTransitions.Add packageTransition
                         | Error refusal -> errors.Add refusal
+                    | None when feeds.ContainsKey request.Id ->
+                        mode <- NugetFeed.Mode
+                        feedChanges.Add(feeds[request.Id], Some fromVersion)
                     | None when targetEntry.DistributionClass = WebPackageBinding.DistributionClass ->
                         match WebPackageBinding.plan target manifest request fromVersion targetSetPath with
                         | Ok webTransition ->
@@ -405,6 +419,9 @@ module CurrentUpgrade =
         for request in added do
             match request.Version, entryMap |> Map.tryFind request.Id, profileMap |> Map.tryFind request.Id with
             | Some declared, Some entry, Some release when declared = entry.Version && release.Lifecycle.IsSome -> ()
+            // A NuGet release-asset library is established through its feed.
+            | Some declared, Some entry, None when declared = entry.Version && feeds.ContainsKey request.Id ->
+                feedChanges.Add(feeds[request.Id], None)
             | declared, entry, _ ->
                 let selected =
                     entry |> Option.map (fun value -> $"selects {value.Version}") |> Option.defaultValue "does not select it"
@@ -412,7 +429,7 @@ module CurrentUpgrade =
                 let asked = declared |> Option.defaultValue "no version"
 
                 errors.Add
-                    $"'{request.Id}' ({asked}) was added to conditor.json, but --current can only opt in to a native repository-lifecycle component at exactly the version the target set selects; the target set {selected}."
+                    $"'{request.Id}' ({asked}) was added to conditor.json, but --current can only opt in to a native repository-lifecycle component or a NuGet release-asset library at exactly the version the target set selects; the target set {selected}."
 
         let transitionList : CurrentUpgradeTransition list =
             transitions
@@ -541,6 +558,21 @@ module CurrentUpgrade =
                   |> Seq.map WebPackageTransition.digestMaterial
                   |> String.concat "\n" ]
 
+        // Only a plan that changes a NuGet feed carries these lines, so every
+        // other plan's digest is unchanged.
+        let feedLines =
+            feedChanges
+            |> Seq.sortBy (fun (release, _) -> release.Id)
+            |> Seq.map (fun (release, previous) ->
+                let packages =
+                    release.Packages
+                    |> List.map (fun package -> $"{package.ArtifactName}=sha256:{package.Sha256}")
+                    |> String.concat ","
+
+                let from = previous |> Option.defaultValue "-"
+                $"nuget-feed|{release.Id}|{from}->{release.Version}|manifest=sha256:{release.ReleaseManifestSha256}|{packages}")
+            |> List.ofSeq
+
         // Only a plan that opts in carries these lines, so every other plan's
         // digest -- and any authorization already given for it -- is
         // unchanged.
@@ -554,7 +586,7 @@ module CurrentUpgrade =
                   |> String.concat "\n"
                   genericInitPlan |> Option.map (fun plan -> $"lifecycleInit={plan.Digest}") |> Option.defaultValue "lifecycleInit=-" ]
 
-        let digestMaterial = String.concat "\n" (planLines @ optInLines)
+        let digestMaterial = String.concat "\n" (planLines @ optInLines @ feedLines)
 
         targetProfile
         |> Option.map (fun profile ->
@@ -574,6 +606,7 @@ module CurrentUpgrade =
               EmbeddedTransitions = embeddedTransitions |> Seq.toList
               PackageLifecycleTransitions = packageTransitions |> Seq.toList |> List.sortBy _.Transition.Id
               WebPackageTransitions = webTransitions |> Seq.toList |> List.sortBy _.Id
+              NugetFeedChanges = feedChanges |> Seq.toList |> List.sortBy (fun (release, _) -> release.Id)
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
 
@@ -729,6 +762,18 @@ module CurrentUpgrade =
                     (WebPackageBinding.fetchArtifact ctx)
                     ProcessRunner.runProcess
                     plan.WebPackageTransitions)
+            |> Result.bind (fun () ->
+                // Every package is proven against the Registry digest before
+                // its feed changes; the final repository verification below
+                // proves the feed again.
+                plan.NugetFeedChanges
+                |> List.fold
+                    (fun state (release, previous) ->
+                        state
+                        |> Result.bind (fun () ->
+                            NugetFeed.ensure (NugetFeed.fetchWith ctx.ArtifactMirror ctx.Offline) target previous release
+                            |> Result.mapError (fun errors -> $"NuGet feed {release.Id}@{release.Version} failed:" :: errors)))
+                    (Ok()))
             |> Result.bind (fun () ->
                 match plan.GenericVerifyPlan with
                 | None -> Ok()

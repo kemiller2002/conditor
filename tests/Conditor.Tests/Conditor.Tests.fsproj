@@ -20,6 +20,7 @@
     <Compile Include="WebScaffoldTests.fs" />
     <Compile Include="BranchProtectionTests.fs" />
     <Compile Include="RepositoryCreationTests.fs" />
+    <Compile Include="NugetFeedTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

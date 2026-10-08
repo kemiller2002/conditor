@@ -97,6 +97,8 @@ Application-package bindings such as Forma, Folio, Limen, and Aegis are reported
 
 Once declared, the npm-distributed web packages (Limen, Forma, Folio) follow the Registry current selection through `conditor upgrade --current`: Conditor proves the exact source and target releases and their digests, changes exact pins only through npm, and refuses unpinned, drifted or unlocked bindings. See `docs/web-package-upgrade-contract.md`.
 
+NuGet libraries released as attested GitHub release assets instead of on nuget.org (Ordo's `ordo-core.nupkg`, Arca's packages until their nuget.org publishing exists) are installed into a local feed: Conditor proves every package asset against the Registry SHA-256 before writing anything, keeps the packages in `vendor/nuget` with a lock, and maps exactly those package ids to that feed in `NuGet.config`. `init` establishes the feed, `verify` proves it, and `upgrade --current` opts in to it or moves it (and exact version pins) to the Registry's newer selection. See `docs/nuget-feed-contract.md`.
+
 ## Empty-repository quick start
 
 Built-in presets are embedded in the native Conditor executable, so a target repository does not need a Conditor source checkout or a manually copied manifest.
