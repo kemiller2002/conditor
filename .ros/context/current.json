@@ -1226,7 +1226,27 @@
       "updatedAt": "2026-10-08T14:42:44.589Z",
       "telemetryExecutionIds": [
         "EXE-20261008T144244911Z-90f3a84f"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "d21a5614b6e08b7479f1e3fe",
+        "recordedAt": "2026-10-08T14:43:45.839Z",
+        "executionId": "EXE-20261008T144244911Z-90f3a84f",
+        "repository": "conditor",
+        "branch": "chore/qualify-forma-0.5.0",
+        "commit": "c3172e9f0b0f080bb6a87da77156bd6a781ca601",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "chore/qualify-forma-0.5.0",
+        "remoteCommit": "c3172e9f0b0f080bb6a87da77156bd6a781ca601",
+        "summary": "Conditor 0.6.1 requested (Directory.Build.props and release/requested-version.txt) for the Forma 0.5.0 qualification",
+        "nextAction": "Merge after review and green CI; release-orchestrator then tags v0.6.1 and dispatches release.yml",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
