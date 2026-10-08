@@ -11,4 +11,4 @@
 | WI-0006 | Qualify the echelon-current releases: Praxis 3.7.2 and Visual Engineering 1.0.1, with a planned VE 1.0.0 -> 1.0.1 current-upgrade transition | complete |  | medium |
 | WI-0007 | Move conditor to Praxis 3.7.2 and Ordo 1.4.2 | complete | praxis, ordo, toolchain | medium |
 | WI-0008 | Current upgrade verifies with the tools it installed | complete | lifecycle | high |
-| WI-0009 | Current upgrade opts a project in to an optional native lifecycle tool | ready | lifecycle | high |
+| WI-0009 | Current upgrade opts a project in to an optional native lifecycle tool | complete | lifecycle | high |

@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T03:45:25Z",
+  "updatedAt": "2026-10-08T03:48:34Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -379,13 +379,52 @@
     {
       "id": "WI-0009",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T03:45:25Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/CurrentUpgrade.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Cli/Program.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        },
+        {
+          "type": "documentation",
+          "path": "README.md"
+        }
+      ],
+      "updatedAt": "2026-10-08T03:48:34Z",
       "telemetryExecutionIds": [
         "EXE-20261008T034526166Z-b483d216"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "76f6301da6d4174103bbbf1b",
+        "recordedAt": "2026-10-08T03:48:33Z",
+        "executionId": "EXE-20261008T034526166Z-b483d216",
+        "repository": "conditor",
+        "branch": "feat/current-upgrade-opt-in",
+        "commit": "327bc16ae77629f89215203afd79aa6744f1afae",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "feat/current-upgrade-opt-in",
+        "remoteCommit": "327bc16ae77629f89215203afd79aa6744f1afae",
+        "summary": "upgrade --current opts a project in to an optional native repository-lifecycle tool the target set selects; real HelixNote clone upgrades in one step on a bare PATH; CI green on PR #50.",
+        "nextAction": "Complete WI-0009 and merge PR #50.",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T03:48:34Z",
+      "conclusion": "A project can now adopt an optional native repository-lifecycle component through upgrade --current: declared at exactly the selected version, it is installed, initialised and verified with the installed copy before authority and lock are committed; any other manifest change still refuses."
     }
   ]
 }
