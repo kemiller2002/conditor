@@ -1196,6 +1196,7 @@ RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
 ComponentSchemaTests.run check
 VerificationGateTests.run check
+NugetFeedTests.run check
 LibraryScaffoldTests.run check
 WebScaffoldTests.run check
 BranchProtectionTests.run check

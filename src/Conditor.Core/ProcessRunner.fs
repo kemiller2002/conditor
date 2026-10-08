@@ -143,5 +143,10 @@ module ProcessRunner =
             { ExitCode = -1
               StandardOutput = String.Empty
               StandardError = "EnsurePraxisMission must be executed by the Conditor installer, not the process runner." }
+        | EnsureNugetFeed _
+        | VerifyNugetFeed _ ->
+            { ExitCode = -1
+              StandardOutput = String.Empty
+              StandardError = "NuGet feed actions must be executed by the Conditor installer, not the process runner." }
 
     let run workingDirectory (action: PlanAction) = runIn [] workingDirectory action

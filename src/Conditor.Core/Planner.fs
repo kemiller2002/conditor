@@ -110,7 +110,10 @@ module Planner =
     /// and the full selection set are derived from the same verified bytes.
     type private LoadedAuthority =
         { Profile: WorkstationProfile
-          Selections: RegistryAuthorityBinding.RegistryAuthoritySet }
+          Selections: RegistryAuthorityBinding.RegistryAuthoritySet
+          /// Selected `nuget-library` releases distributed as GitHub release
+          /// assets, installed through the local NuGet feed.
+          NugetFeeds: Map<string, NugetFeedRelease> }
 
     let private loadRegistryAuthority target (manifest: ProjectManifest) : Result<LoadedAuthority option, string> =
         match manifest.RegistryAuthority with
@@ -127,10 +130,15 @@ module Planner =
                 ResolvedReleaseSets.parseVerified (Platform.runtimeIdentifier ()) authority.Sha256 bytes
                 |> Result.bind (fun profile ->
                     RegistryAuthorityBinding.parseSelections authority.Path authority.Sha256 bytes
-                    |> Result.map (fun selections ->
-                        Some
-                            { Profile = profile
-                              Selections = selections }))
+                    |> Result.bind (fun selections ->
+                        // The bytes just proven against the authority digest.
+                        NugetFeed.loadAll path
+                        |> Result.mapError (String.concat "; ")
+                        |> Result.map (fun feeds ->
+                            Some
+                                { Profile = profile
+                                  Selections = selections
+                                  NugetFeeds = feeds })))
 
     let private registryLifecycleComponents (profile: WorkstationProfile option) =
         profile
@@ -188,7 +196,12 @@ module Planner =
                 Components = binding.Requests }
 
         let registryLifecycle = registryLifecycleComponents authorityProfile
-        let externalIds = registryLifecycle |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+
+        let nugetFeeds =
+            loadedAuthority |> Option.map _.NugetFeeds |> Option.defaultValue Map.empty
+
+        let externalIds =
+            Seq.append (registryLifecycle |> Map.keys) (nugetFeeds |> Map.keys) |> Set.ofSeq
         Compatibility.validateWithExternalIds externalIds manifest |> List.iter errors.Add
 
         for requirement in manifest.Requirements do
@@ -316,8 +329,37 @@ module Planner =
 
                         addRegistryLifecycleActions request release
                 | _ ->
-                    if request.Required then
-                        errors.Add $"Unknown required component '{request.Id}'."
+                    match nugetFeeds |> Map.tryFind request.Id with
+                    | Some release ->
+                        // Version agreement with the authority was enforced by
+                        // RegistryAuthorityBinding before this lookup.
+                        resolved.Add
+                            { Id = release.Id
+                              Version = release.Version
+                              Distribution = NugetPackage
+                              Package = release.Packages |> List.map _.PackageId |> String.concat ","
+                              SourceReference = Some $"nuget-feed:{release.Repository}@{release.Tag}#sha256:{release.ReleaseManifestSha256}" }
+
+                        let feedAction kind execution =
+                            actions.Add
+                                { Sequence = sequence
+                                  ComponentId = release.Id
+                                  ComponentVersion = release.Version
+                                  Kind = kind
+                                  Execution = execution }
+
+                            sequence <- sequence + 1
+
+                        match operation with
+                        | Init
+                        | Upgrade ->
+                            feedAction NugetFeedInstall (EnsureNugetFeed(release, None))
+                            feedAction NugetFeedVerify (VerifyNugetFeed release)
+                        | Verify
+                        | Doctor -> feedAction NugetFeedVerify (VerifyNugetFeed release)
+                    | None ->
+                        if request.Required then
+                            errors.Add $"Unknown required component '{request.Id}'."
             | Some definition ->
                 let version = request.Version |> Option.defaultValue definition.DefaultVersion
 

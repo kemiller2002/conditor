@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 17,
+  "nextSeq": 22,
   "items": [
     {
       "id": "WI-0001",
@@ -424,6 +424,32 @@
       "attachments": [],
       "createdAt": "2026-10-08T09:20:30.000Z",
       "updatedAt": "2026-10-08T09:20:36.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0021",
+      "title": "Install Registry nuget-library releases distributed as GitHub release assets (ordo-core.nupkg, Arca) into a consumer's local NuGet feed: digest-proven vendor/nuget, lock, NuGet.config source mapping; init, verify and upgrade --current opt-in and version change",
+      "description": "Found while releasing Arca 0.1.0 (arca DF-ARCA-2026-0006): Conditor did not consume ordo-core.nupkg at all; Praxis vendors it by hand. Conditor now installs such releases generally (docs/nuget-feed-contract.md).",
+      "tags": [
+        "nuget",
+        "feed",
+        "arca",
+        "registry"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T09:34:10.000Z",
+      "updatedAt": "2026-10-08T09:34:28.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

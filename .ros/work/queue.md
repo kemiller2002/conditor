@@ -23,3 +23,4 @@
 | WI-0018 | Indy preset follows echelon-current: Praxis 3.7.2, Ordo 1.5.0, Limen 0.7.1, Forma 0.4.1 | complete | preset, indy-init | high |
 | WI-0019 | fsharp-limen-web scaffold: engine tests, browser suite, build-and-test CI with cached Playwright, foundations, inert Pages deploy, branch protection | complete | scaffold, indy-init | high |
 | WI-0020 | conditor repo create: publish an initialized target as a protected GitHub repository | complete | github, indy-init | high |
+| WI-0021 | Install Registry nuget-library releases distributed as GitHub release assets (ordo-core.nupkg, Arca) into a consumer's local NuGet feed: digest-proven vendor/nuget, lock, NuGet.config source mapping; init, verify and upgrade --current opt-in and version change | complete | nuget, feed, arca, registry | high |
