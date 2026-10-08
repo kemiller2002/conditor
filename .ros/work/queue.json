@@ -800,10 +800,10 @@
         "qualification"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-08T23:31:57.065Z",
-      "updatedAt": "2026-10-08T23:31:57.333Z",
+      "updatedAt": "2026-10-08T23:37:57.700Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
