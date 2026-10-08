@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 22,
+  "nextSeq": 23,
   "items": [
     {
       "id": "WI-0001",
@@ -450,6 +450,31 @@
       "attachments": [],
       "createdAt": "2026-10-08T09:34:10.000Z",
       "updatedAt": "2026-10-08T09:34:28.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0022",
+      "title": "An established scaffold's seed files belong to the project: stop comparing or recreating them once the lock records the scaffold, so a project that grew past its scaffold can still plan, repair and upgrade --current; roll back governance when the current-upgrade commit step fails",
+      "description": "Found aligning kemiller2002/arca to echelon-current 1.3.0: upgrade --current wrote the new authority and conditor.json, then failed building the lock plan on scaffold drift, leaving them with a stale lock.",
+      "tags": [
+        "scaffold",
+        "upgrade",
+        "current"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-08T09:43:18.000Z",
+      "updatedAt": "2026-10-08T09:43:31.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

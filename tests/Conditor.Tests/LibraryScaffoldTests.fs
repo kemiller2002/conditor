@@ -235,3 +235,56 @@ let run (check: string -> bool -> unit) =
             match Installer.execute target "test-manifest.json" (plan "bin/\nobj/\n") with
             | Error errors -> check $".gitignore region is idempotent: {joined errors}" false
             | Ok _ -> check ".gitignore region is idempotent" (File.ReadAllText ignorePath = first))
+
+    // A scaffold is a seed. Once the lock records it as established, the
+    // project owns its files: growing past the scaffold (more projects, a
+    // renamed library, customised workflows) must not block later planning,
+    // repair or upgrade, and Conditor must not recreate a file the project
+    // removed. Found aligning kemiller2002/arca to echelon-current 1.3.0.
+    withTarget (fun target ->
+        let manifestPath = Path.Combine(target, "conditor.json")
+        File.WriteAllText(manifestPath, libraryManifest "")
+
+        let planInit () =
+            Manifest.load manifestPath |> Result.bind (Planner.create target Init)
+
+        let seedActions (plan: InstallationPlan) =
+            plan.Actions
+            |> List.choose (fun action ->
+                match action.Kind, action.Execution with
+                | ScaffoldFile, EnsureFile(path, _) -> Some path
+                | _ -> None)
+
+        let managedRegions (plan: InstallationPlan) =
+            plan.Actions
+            |> List.choose (fun action ->
+                match action.Execution with
+                | EnsureManagedRegion(path, _, _) -> Some path
+                | _ -> None)
+            |> Set.ofList
+
+        match planInit () |> Result.bind (fun plan -> Installer.execute target manifestPath plan) with
+        | Error errors -> check $"library scaffold is established by init: {joined errors}" false
+        | Ok _ ->
+            check "init records the scaffold in the lock" (Scaffolding.establishedScaffold target = Some { Kind = "fsharp-nuget-library"; Name = Some "Arca" })
+
+            // The project grows: the test project changes, the library is renamed.
+            File.AppendAllText(Path.Combine(target, "tests", "Arca.Tests", "Arca.Tests.fsproj"), "<!-- grown -->\n")
+            Directory.Delete(Path.Combine(target, "src", "Arca"), true)
+            Directory.CreateDirectory(Path.Combine(target, "src", "Arca.Core")) |> ignore
+
+            match planInit () with
+            | Error errors -> check $"an established scaffold that grew still plans: {joined errors}" false
+            | Ok plan ->
+                check "no seed file is compared or recreated once established" (seedActions plan).IsEmpty
+                check "managed regions are still ensured" (managedRegions plan |> Set.contains ".gitignore")
+
+        // Without an established lock, a differing file is still refused rather than overwritten.
+        File.Delete(Path.Combine(target, ".conditor", "lock.json"))
+
+        match planInit () with
+        | Error errors ->
+            check
+                "before establishment a differing scaffold file is refused, not overwritten"
+                (errors |> List.exists (fun error -> error.Contains "already exists with different content"))
+        | Ok _ -> check "before establishment a differing scaffold file must be refused" false)

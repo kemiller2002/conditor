@@ -97,7 +97,7 @@ module Upgrade =
                 let materialChanges =
                     changes
                     |> List.filter (fun (path, _) ->
-                        path <> "AGENTS.md" && path <> "context/CURRENT-STATE.md")
+                        path <> "AGENTS.md" && path <> "context/CURRENT-STATE.md" && path <> ".gitignore")
 
                 if materialChanges.IsEmpty then
                     Ok()

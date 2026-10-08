@@ -880,4 +880,17 @@ module CurrentUpgrade =
                                     Error [ $"Unable to commit current-upgrade governance atomically: {ex.Message}" ]
 
                             if File.Exists pendingPath then File.Delete pendingPath
-                            commitResult)
+
+                            // A refusal after the new authority and manifest were
+                            // written (for example when the lock plan cannot be
+                            // built) must not leave them behind with a stale lock.
+                            match commitResult with
+                            | Error errors ->
+                                writeAtomically manifestPath oldManifest
+
+                                match oldAuthority with
+                                | Some bytes -> writeAtomically finalAuthorityPath bytes
+                                | None -> if File.Exists finalAuthorityPath then File.Delete finalAuthorityPath
+
+                                Error("Committing the current upgrade failed; the previous authority and conditor.json were restored." :: errors)
+                            | Ok _ -> commitResult)

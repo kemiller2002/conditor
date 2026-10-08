@@ -38,6 +38,8 @@ A new project-bound F# library (for example a shared data layer published to NuG
 - the Ordo baseline (`SDE-MAP.md`, `context/CURRENT-STATE.md`) routed to the library.
 - a bounded `# conditor:build-outputs` region in `.gitignore` (`bin/`, `obj/`, `dist/`, `TestResults/`, `*.nupkg`), leaving the rest of the file to the lifecycle components and the user.
 
+The scaffold is a seed. Once the Conditor lock records it as established, its files belong to the project, which may grow, rename or remove them (more projects, a renamed library, customised workflows). Later `plan`, `init`, `repair`, `upgrade` and `upgrade --current` neither compare nor recreate them; they keep ensuring only Conditor's bounded managed regions.
+
 NuGet components such as Aegis are bound into the library project. npm packages are refused because a library has no browser kernel to bind them to.
 
 ## New browser application repository
