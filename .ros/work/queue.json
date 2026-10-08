@@ -487,6 +487,30 @@
       "sourceReference": null
     },
     {
+      "id": "INDY-0001",
+      "title": "CI smoke checks follow the web scaffold's root package.json",
+      "description": "PR #57 moved the fsharp-limen-web npm project to the repository root. The push-only empty-repository-smoke job and scripts/rehearse-clean-room.sh (factory-rehearsal-smoke) still test src/kernel/package.json, so ci on main failed at f3e08a3. Point them at the root package.json. (INDY-* ids avoid colliding with the concurrent WI-* sequence.)",
+      "tags": [
+        "ci",
+        "scaffold"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T11:31:59.000Z",
+      "updatedAt": "2026-10-08T11:32:16.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
       "id": "WI-0023",
       "title": "Release Conditor 0.5.0 so consumers get local-feed NuGet installs (#59) and scaffold ownership (#60)",
       "description": "Conditor main carries GitHub-release-asset NuGet local-feed installs (WI-0021, #59) and scaffold ownership/governance rollback (WI-0022, #60), but v0.4.0 predates both. Request 0.5.0 through release/requested-version.txt so release-orchestrator tags and publishes it; Chrona needs it to add Arca 0.2.0.",
