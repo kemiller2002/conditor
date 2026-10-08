@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T12:02:53.000Z",
+  "updatedAt": "2026-10-08T12:03:12.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1085,13 +1085,51 @@
     {
       "id": "INDY-0004",
       "type": "feature",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-08T12:02:53.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "examples/indy-init.conditor.json"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/RequirementsImport.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RequirementsImportTests.fs"
+        },
+        {
+          "type": "research-record",
+          "path": "research/decisions/DF-CON-2026-A002--indy-day-of-defaults.md"
+        }
+      ],
+      "updatedAt": "2026-10-08T12:03:12.000Z",
       "telemetryExecutionIds": [
         "EXE-20261008T120253862Z-ae6f0581"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "493474b0e91116e20f9b9de8",
+        "recordedAt": "2026-10-08T12:03:11.000Z",
+        "executionId": "EXE-20261008T120253862Z-ae6f0581",
+        "repository": "conditor",
+        "branch": "feat/indy-day-of-decisions",
+        "commit": "3a75eb05aab6a54be2f93d1c250e749180bc2454",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/indy-day-of-decisions",
+        "remoteCommit": "3a75eb05aab6a54be2f93d1c250e749180bc2454",
+        "summary": "Indy day-of defaults recorded (DF-CON-2026-A002) and carried as slice acceptance criteria; new digest 668b64b7 proven by local dry run",
+        "nextAction": "Merge once every check passes",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T12:03:12.000Z"
     }
   ]
 }
