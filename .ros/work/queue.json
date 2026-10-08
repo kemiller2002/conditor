@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 27,
+  "nextSeq": 28,
   "items": [
     {
       "id": "WI-0001",
@@ -661,6 +661,29 @@
       "attachments": [],
       "createdAt": "2026-10-08T19:43:01.928Z",
       "updatedAt": "2026-10-08T19:43:01.928Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0027",
+      "title": "Release Conditor 0.7.0: URL-addressable state in the web scaffold (#68)",
+      "description": "Minor release: fsharp-limen-web scaffolds the route inventory, the routing foundation, a pure route codec placeholder for Limen.Routing and the SAF-URL-1..10 checklist (WI-0025, PR #68).",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T20:52:39.995Z",
+      "updatedAt": "2026-10-08T20:53:09.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

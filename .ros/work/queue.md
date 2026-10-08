@@ -33,3 +33,4 @@
 | WI-0024 | Release Conditor 0.6.0 so consumers get requirements import, supervise and the Indy day-of defaults | complete |  | medium |
 | WI-0025 | URL-addressable state by default: fsharp-limen-web scaffolds the route inventory, the routing foundation and a pure route codec placeholder until Limen 0.9.0; SAF-URL-1..10 in the web requirement checklist | complete | scaffold, deep-linking | high |
 | WI-0026 | When the indy-init preset pin moves past Indy-init 2eee2d52 (PR #7, URL-addressable state), update requirementsImport expected counts: R 77->82, P 458->464, OQ 47->48 | captured | indy, requirements-import | medium |
+| WI-0027 | Release Conditor 0.7.0: URL-addressable state in the web scaffold (#68) | complete | release | high |
