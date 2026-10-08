@@ -154,7 +154,7 @@ withTarget
                         check $"scaffold plan succeeds: {details}" false
                     | Ok plan ->
                         check "scaffold application bindings resolve" (plan.Components.Length = 4)
-                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 24)
+                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 28)
                         check "scaffold does not execute a package-manager Limen lifecycle" (plan.Actions |> List.exists (fun action -> action.ComponentId = "limen" && action.Kind = VerifyLifecycle) |> not)
 
                         let packageJson =
@@ -235,6 +235,10 @@ withTarget
                                  && text.Contains("\"forma\"")
                                  && text.Contains("\"folio\"")
                                  && text.Contains("echelon-foundry-print-components-0.3.0.tgz")))
+
+                        check
+                            "scaffold declares the routing foundation for its URL-addressable state (SAF-URL-8)"
+                            (foundations |> Option.exists (fun text -> text.Contains("\"routing\"") && text.Contains("\"inventory\": \".echelon/routes.json\"")))
 
                         check
                             "scaffold configures Aegis"

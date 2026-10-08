@@ -52,11 +52,15 @@ let private expectedPaths =
       "App.slnx"
       "src/engine/App.Engine.fsproj"
       "src/engine/Operational.fs"
+      "src/engine/Routes.fs"
       "src/engine/Domain.fs"
       "tests/App.Engine.Tests/App.Engine.Tests.fsproj"
       "tests/App.Engine.Tests/EngineTests.fs"
+      "tests/App.Engine.Tests/RouteTests.fs"
       ".echelon/foundations.json"
       "aegis-boundaries.json"
+      ".echelon/routes.json"
+      "requirements/URL-ADDRESSABLE-STATE.md"
       "package.json"
       "tsconfig.json"
       "limen.config.json"
@@ -247,8 +251,45 @@ let run (check: string -> bool -> unit) =
                     |> Seq.map _.Name
                     |> Set.ofSeq
 
-                check "foundations declare only the capabilities the Praxis schema allows"
-                    (keys = set [ "aegis"; "forma"; "folio"; "limen"; "ordo"; "praxis" ])
+                check "foundations declare only the capabilities the Praxis schema allows, routing included for a web application"
+                    (keys = set [ "aegis"; "forma"; "folio"; "limen"; "ordo"; "praxis"; "routing" ])
+
+                let routing = document.RootElement.GetProperty("capabilities").GetProperty("routing")
+
+                check "a web application requires the routing foundation on static hosting, against the scaffolded inventory (SAF-URL-6, SAF-URL-8)"
+                    (routing.GetProperty("required").GetBoolean()
+                     && routing.GetProperty("hosting").GetString() = "static"
+                     && routing.GetProperty("inventory").GetString() = Scaffolding.RouteInventoryPath)
+
+            // URL-addressable state (SAF-URL-1..10).
+            match files |> Map.tryFind Scaffolding.RouteInventoryPath with
+            | None -> check "the route inventory is scaffolded" false
+            | Some text ->
+                use document = JsonDocument.Parse text
+                let root = document.RootElement
+                let names = root.GetProperty("routes").EnumerateArray() |> Seq.map (fun route -> route.GetProperty("name").GetString()) |> List.ofSeq
+
+                check "the route inventory is echelon.routes/v1 in hash mode with home and not-found routes (DF-LIMEN-2026-0006)"
+                    (root.GetProperty("schema").GetString() = "echelon.routes/v1"
+                     && root.GetProperty("mode").GetString() = "hash"
+                     && root.GetProperty("home").GetString() = "home"
+                     && root.GetProperty("notFound").GetString() = "notFound"
+                     && names = [ "home"; "notFound" ])
+
+                let keys = root.EnumerateObject() |> Seq.map _.Name |> List.ofSeq
+                check "the route inventory is written as Limen renders it: sorted keys, final newline"
+                    (keys = List.sort keys && text.EndsWith("}\n", StringComparison.Ordinal))
+
+            check "the engine owns a pure route codec, placeholder for Limen.Routing, compiled and round-trip tested (SAF-URL-9)"
+                (has "let parse (location: string) : Route" "src/engine/Routes.fs"
+                 && has "let format (route: Route) : string" "src/engine/Routes.fs"
+                 && has "PLACEHOLDER until the application installs Limen 0.9.0" "src/engine/Routes.fs"
+                 && has "<Compile Include=\"Routes.fs\" />" "src/engine/App.Engine.fsproj"
+                 && has "<Compile Include=\"RouteTests.fs\" />" "tests/App.Engine.Tests/App.Engine.Tests.fsproj"
+                 && has "format (parse url) is the canonical url" "tests/App.Engine.Tests/RouteTests.fs")
+
+            check "the web application's requirements include every deep-linking requirement"
+                ([ 1..10 ] |> List.forall (fun number -> has $"**SAF-URL-{number}**" "requirements/URL-ADDRESSABLE-STATE.md"))
 
             match files |> Map.tryFind ".claude/settings.json" with
             | None -> check "Claude Code settings are scaffolded" false
