@@ -17,8 +17,8 @@
 | WI-0012 | Scaffold for a new NuGet library package repository: foundations manifest, build-and-test and foundations CI, and the Registry release workflow pattern | complete |  | medium |
 | WI-0013 | AdoptionTests 'Registry-authorized adoption succeeds' discovers real praxis/ordo/percepta on PATH (e.g. after conditor workstation apply puts them in ~/.local/bin) and fails; the fixture should isolate PATH | captured |  | medium |
 | WI-0014 | fsharp-nuget-library scaffold must ignore bin/, obj/, dist/ and packages: build output would otherwise be committed | complete | scaffold | high |
-| WI-0015 | fsharp-limen-web scaffold has the same .gitignore gap (engine bin/obj): add the build-outputs region there too | ready |  | medium |
+| WI-0015 | fsharp-limen-web scaffold has the same .gitignore gap (engine bin/obj): add the build-outputs region there too | complete |  | medium |
 | WI-0016 | fsharp-nuget-library scaffold: make the test project a real dotnet test project (xUnit) so Dokimos and other TRX consumers get test evidence | complete | scaffold, dokimos | high |
 | WI-0017 | Indy preset: materialize every Indy-init doc the requirements reference, pinned at the corrected kickoff-path commit | complete | preset, indy-init | high |
 | WI-0018 | Indy preset follows echelon-current: Praxis 3.7.2, Ordo 1.5.0, Limen 0.7.1, Forma 0.4.1 | complete | preset, indy-init | high |
-| WI-0019 | fsharp-limen-web scaffold: engine tests, browser suite, build-and-test CI with cached Playwright, foundations, inert Pages deploy, branch protection | ready | scaffold, indy-init | high |
+| WI-0019 | fsharp-limen-web scaffold: engine tests, browser suite, build-and-test CI with cached Playwright, foundations, inert Pages deploy, branch protection | complete | scaffold, indy-init | high |
