@@ -183,7 +183,7 @@ let run (check: string -> bool -> unit) =
         let ecirRoot = ecirDoc.RootElement
         let ecir = ecirRoot.GetProperty("requirements").EnumerateArray() |> List.ofSeq
         let stringValue (value: JsonElement) = value.GetString() |> Option.ofObj |> Option.defaultValue ""
-        let sourceText (row: JsonElement) field = stringValue (row.GetProperty field)
+        let sourceText (row: JsonElement) (field: string) = stringValue (row.GetProperty field)
         let digest = stringValue (ecirRoot.GetProperty "digest")
 
         check "the ECIR manifest accounts for every original source requirement"
