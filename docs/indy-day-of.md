@@ -8,7 +8,7 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
 
 - Install the Conditor release that contains `conditor requirements import`
   and `conditor supervise` (0.6.0 or later).
-- Install Praxis 3.7.2, Ordo 1.5.0 and percepta-repo 0.1.0, the
+- Install Praxis 3.11.0, Ordo 1.5.0 and percepta-repo 0.1.0, the
   echelon-current selection the preset pins, on the day-of host.
 - Authenticate `gh` with the rights to create repositories, and Claude Code
   (`claude auth status`).

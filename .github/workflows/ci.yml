@@ -334,6 +334,55 @@ jobs:
           PY
           conditor upgrade --current --check "${current[@]}" | grep -F "version transitions: none"
           conditor status --target "$repo"
+      - name: Sweep to echelon-current 1.16.0 and 1.17.0 - upgrade --current moves only Praxis 3.7.2 -> 3.10.0 -> 3.11.0
+        shell: bash
+        env:
+          # echelon-registry main at echelon-current 1.16.0 (Praxis 3.10.0, merge 616d10e)
+          # and 1.17.0 (Praxis 3.11.0, merge 50c6c96). Praxis releases declare no
+          # echelon.repository-lifecycle contract, so each exact version must be
+          # qualified by components/praxis.component.json; Arca, Strata and the other
+          # systems these sets select are not declared here, so --current must not add them.
+          SET_116_COMMIT: 616d10e5ba6d568632b7662194fac1c99c0e2880
+          SET_116_SHA256: ddcaad58026f370f99703515a5ac497ed1683b7d593efacead4bec3f244aad44
+          SET_117_COMMIT: 50c6c96e6a1af6febb67beec8edd52b95927501e
+          SET_117_SHA256: 94b37048d25a7c8ef67b9470f8ab66d529d52a5152baeeae6d6e1ca72df95ec4
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          export PATH="$RUNNER_TEMP/ve-1.0.1/node_modules/.bin:$PATH"
+          repo="$RUNNER_TEMP/sweep"
+          home="$RUNNER_TEMP/sweep-next-home"
+          sweep() {
+            local profile="$1" commit="$2" sha="$3" from="$4" to="$5"
+            local set="$RUNNER_TEMP/set-$profile.json" plan="$RUNNER_TEMP/sweep-$profile.txt"
+            curl -fsSL "https://raw.githubusercontent.com/kemiller2002/echelon-registry/$commit/channels/echelon-current/linux-x64.json" -o "$set"
+            echo "$sha  $set" | sha256sum -c -
+            local args=(--home "$home" --target "$repo" --resolved-set "$set" --resolved-set-sha256 "$sha")
+            conditor upgrade --current --check "${args[@]}" | tee "$plan"
+            grep -F "Current upgrade plan: echelon-current@$profile" "$plan"
+            grep -F "praxis: $from -> $to [embedded-qualified-lifecycle]" "$plan"
+            test "$(grep -c -- ' -> ' "$plan")" -eq 2   # the transition and its lifecycle line
+            if grep -E "REFUSED|arca|strata" "$plan"; then exit 1; fi
+            local authorization
+            authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$plan" | cut -d' ' -f2)
+            conditor upgrade --current "${args[@]}" --authorize "$authorization"
+            python3 - "$repo" "$sha" "$to" <<'PY'
+          import json, sys, pathlib
+          repo, sha, praxis = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+          manifest = json.loads((repo / "conditor.json").read_text())
+          versions = {c["id"]: c["version"] for c in manifest["components"]}
+          assert versions == {"ordo": "1.5.0", "praxis": praxis, "visual-engineering": "1.0.1"}, versions
+          assert manifest["registryAuthority"]["sha256"] == sha, manifest
+          assert json.loads((repo / ".echelon/toolchain.json").read_text())["praxis"] == praxis
+          PY
+            conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+            "$home/.local/bin/praxis" --version | grep -Fx "praxis $to"
+            PATH="$home/.local/bin:$PATH" conditor status --target "$repo"
+            git -C "$repo" add -A
+            git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current $profile"
+          }
+          sweep 1.16.0 "$SET_116_COMMIT" "$SET_116_SHA256" 3.7.2 3.10.0
+          sweep 1.17.0 "$SET_117_COMMIT" "$SET_117_SHA256" 3.10.0 3.11.0
 
   host-tool-upgrade-boundary:
     if: github.event_name == 'push'
