@@ -178,6 +178,40 @@ let run (check: string -> bool -> unit) =
              && root.GetProperty("planDigest").GetString() = $"sha256:{plan.Digest}"
              && root.GetProperty("documents").GetArrayLength() = 3)
 
+        // Source identity remains distinct even with matching local IDs.
+        use ecirDoc = JsonDocument.Parse plan.EcirManifest
+        let ecirRoot = ecirDoc.RootElement
+        let ecir = ecirRoot.GetProperty("requirements").EnumerateArray() |> List.ofSeq
+        let stringValue (value: JsonElement) = value.GetString() |> Option.ofObj |> Option.defaultValue ""
+        let sourceText (row: JsonElement) (field: string) = stringValue (row.GetProperty field)
+        let digest = stringValue (ecirRoot.GetProperty "digest")
+
+        check "the ECIR manifest accounts for every original source requirement"
+            (ecir.Length = plan.RequirementCount
+             && (ecir |> List.map (fun row -> sourceText row "originalId") |> List.sort)
+                = (traced |> List.map (fun row -> sourceText row "id") |> List.sort))
+
+        check "ECIR uses qualified IDs, revision hashes and source content hashes"
+            (ecir
+             |> List.forall (fun row ->
+                 sourceText row "key" = sourceText row "document" + "#" + sourceText row "originalId"
+                 && (sourceText row "revision").StartsWith("sha256:")
+                 && (sourceText row "contentDigest").StartsWith("sha256:")))
+
+        check "JSON kickoff obligations retain distinct source locations and content identities"
+            (let kickoff = ecir |> List.filter (fun entry -> (sourceText entry "originalId").StartsWith("K-"))
+             kickoff.Length = 4
+             && (kickoff |> List.forall (fun entry -> (sourceText entry "location").StartsWith("$.")))
+             && (kickoff |> List.map (fun entry -> sourceText entry "contentDigest") |> List.distinct).Length = kickoff.Length)
+
+        check "ECIR produces a SHA-256 manifest identity, separately from the import plan"
+            (digest.StartsWith("sha256:") && digest.Length = 71)
+
+        check "changed requirements invalidate the ECIR source identity"
+            (match planWith spec (sources |> Map.add "docs/REQ.md" (requirementsDoc.Replace("Observation", "Changed Observation"))) with
+             | Ok changed -> changed.EcirManifest <> plan.EcirManifest
+             | Error _ -> false)
+
         check "planning is deterministic" (planWith spec sources = Ok plan)
 
         check "a changed source changes the digest"
@@ -195,20 +229,21 @@ let run (check: string -> bool -> unit) =
                 [ for item in plan.Items do
                       yield CaptureItem item
                       yield MarkReady item.Id
-                  yield AttachTrace(umbrella.Id, "requirements-trace.json", plan.Trace) ]
+                  yield AttachTrace(umbrella.Id, "requirements-trace.json", plan.Trace)
+                  yield AttachTrace(umbrella.Id, "ecir-source-manifest.json", plan.EcirManifest) ]
 
             check "a fresh queue captures and readies every item, then attaches the trace" (actions = expected)
 
         check "a re-run against the imported queue changes nothing"
-            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "ready") [ "requirements-trace.json", plan.Trace ] = Ok [])
+            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "ready") [ "requirements-trace.json", plan.Trace; "ecir-source-manifest.json", plan.EcirManifest ] = Ok [])
 
         check "an item someone already started or completed is left alone"
-            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "complete") [ "requirements-trace.json", plan.Trace ] = Ok [])
+            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "complete") [ "requirements-trace.json", plan.Trace; "ecir-source-manifest.json", plan.EcirManifest ] = Ok [])
 
         let readied = plan.Items |> List.map (fun item -> MarkReady item.Id)
 
         check "an item captured but not yet ready is only marked ready"
-            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "captured") [ "requirements-trace.json", plan.Trace ] = Ok readied)
+            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "captured") [ "requirements-trace.json", plan.Trace; "ecir-source-manifest.json", plan.EcirManifest ] = Ok readied)
 
         let edited =
             recorded plan "ready"
@@ -369,7 +404,7 @@ let run (check: string -> bool -> unit) =
         | Error errors -> check $"the shell observes a prepared target: {joined errors}" false
         | Ok observation ->
             check "the shell plans the whole import against the queue on disk"
-                (observation.Plan.Items.Length = 3 && observation.Actions.Length = 7)
+                (observation.Plan.Items.Length = 3 && observation.Actions.Length = 8)
 
             let calls = ResizeArray<string * string list>()
             let traces = ResizeArray<string>()
@@ -393,7 +428,7 @@ let run (check: string -> bool -> unit) =
                 let gitCalls = calls |> Seq.filter (fun (executable, _) -> executable = "git") |> Seq.map snd |> List.ofSeq
 
                 check "every action runs once, in order, through Praxis"
-                    (outcome.Applied = observation.Actions && outcome.Failed.IsNone && praxisCalls.Length = 7)
+                    (outcome.Applied = observation.Actions && outcome.Failed.IsNone && praxisCalls.Length = 8)
 
                 let expectedCapture =
                        [ "work"; "capture"; "--id"; "SLICE-CORE"; "--title"; "Slice 01 core: typed kernel"
@@ -409,7 +444,9 @@ let run (check: string -> bool -> unit) =
                     [ "work"; "attach"; "--id"; "COND-MISSION-001"; "--file"; "/tmp/trace.json=requirements-trace.json"; "--occurred-at"; "2026-11-07T14:45:00.000Z" ]
 
                 check "the trace is attached to the umbrella from a file"
-                    (List.last praxisCalls = expectedAttach && List.ofSeq traces = [ observation.Plan.Trace ])
+                    (praxisCalls[praxisCalls.Length - 2] = expectedAttach
+                     && List.last praxisCalls = [ "work"; "attach"; "--id"; "COND-MISSION-001"; "--file"; "/tmp/trace.json=ecir-source-manifest.json"; "--occurred-at"; "2026-11-07T14:45:00.000Z" ]
+                     && List.ofSeq traces = [ observation.Plan.Trace; observation.Plan.EcirManifest ])
 
                 check "the result is committed as Praxis state only"
                     (gitCalls.Length = 3
@@ -433,7 +470,7 @@ let run (check: string -> bool -> unit) =
                 check "a failing step stops the run and reports what remains"
                     (outcome.Applied.Length = 2
                      && outcome.Failed |> Option.exists (fun (action, _) -> action = CaptureItem observation.Plan.Items[1])
-                     && outcome.Remaining.Length = 4
+                     && outcome.Remaining.Length = 5
                      && calls |> Seq.filter (fun (executable, _) -> executable = "praxis") |> Seq.length = 3)
 
                 check "what was applied before the failure is still committed, so a re-run resumes"

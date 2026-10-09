@@ -83,6 +83,8 @@ type PlannedWorkItem =
 type RequirementsImportPlan =
     { Items: PlannedWorkItem list
       Trace: string
+      /// Independent ECIR source authority, attached beside the legacy trace.
+      EcirManifest: string
       Digest: string
       RequirementCount: int }
 
@@ -806,6 +808,104 @@ module RequirementsImport =
         root["requirements"] <- requirements
         serialize root
 
+    /// Builds a content-addressed, source-authoritative ECIR manifest.
+    /// Requirement sections are captured from the original text. A document
+    /// revision hash invalidates all its requirements when the source changes.
+    /// Uses the ECIR/1 byte-framed digest algorithm, not JSON formatting.
+    let private ecirManifest
+        (sources: Map<string, string>)
+        (requirements: SourceRequirement list)
+        =
+        let sorted = requirements |> List.sortBy (fun req -> req.Document, req.Line, req.Id)
+
+        // Kickoff requirements live in named JSON entries. Their original
+        // trace uses Line=0; hashing the whole JSON file for each one would
+        // collapse distinct obligations into the same content identity.
+        let kickoffEntry (content: string) (req: SourceRequirement) =
+            use document = JsonDocument.Parse content
+            let root = document.RootElement
+
+            let locate (name: string) (predicate: JsonElement -> bool) =
+                root.GetProperty(name).EnumerateArray()
+                |> Seq.mapi (fun index (item: JsonElement) -> index, item)
+                |> Seq.find (fun (_, item) -> predicate item)
+                |> fun (index, item) -> "$." + name + "[" + string index + "]", item.GetRawText()
+
+            if req.Id.StartsWith("K-SLICE-", StringComparison.Ordinal) then
+                let id = req.Id.Substring("K-SLICE-".Length)
+                locate "prioritySlices" (fun item -> item.GetProperty("id").GetString() = id)
+            elif req.Id.StartsWith("K-GATE-", StringComparison.Ordinal) then
+                let id = req.Id.Substring("K-GATE-".Length)
+                locate "successGates" (fun item -> item.GetProperty("id").GetString() = id)
+            elif req.Id.StartsWith("K-STOP-", StringComparison.Ordinal) then
+                let ordinal = int (req.Id.Substring("K-STOP-".Length))
+                let item = root.GetProperty("stopTheLine")[ordinal - 1]
+                "$.stopTheLine[" + string (ordinal - 1) + "]", item.GetRawText()
+            else
+                invalidOp ("Unrecognized imported kickoff obligation: " + req.Id)
+
+        let records =
+            sorted
+            |> List.map (fun req ->
+                let content = sources[req.Document]
+
+                let location, section =
+                    if req.Scheme = "K" then
+                        kickoffEntry content req
+                    else
+                        let allLines = content.Replace("\r\n", "\n").Split('\n')
+                        let nextLine =
+                            sorted
+                            |> List.filter (fun later -> later.Document = req.Document && later.Line > req.Line)
+                            |> List.map _.Line
+                            |> List.tryHead
+                            |> Option.defaultValue (allLines.Length + 1)
+
+                        let section =
+                            allLines
+                            |> Array.skip (req.Line - 1)
+                            |> Array.truncate (max 0 (nextLine - req.Line))
+                            |> String.concat "\n"
+
+                        "L" + string req.Line, section
+
+                // A stable qualified key keeps duplicate local IDs from
+                // different documents distinct.
+                let key = req.Document + "#" + req.Id
+                let documentDigest = "sha256:" + sha256 content
+
+                [ key
+                  req.Id
+                  req.Document
+                  location
+                  documentDigest
+                  "sha256:" + sha256 section ])
+
+        let builder = StringBuilder("ecir-source-manifest/1\n")
+
+        let frame (value: string) =
+            builder.Append(Encoding.UTF8.GetByteCount value).Append(':').Append(value) |> ignore
+
+        // Sort by qualified key so an unrelated assignment/order change
+        // cannot alter the source-manifest fingerprint.
+        for fields in records |> List.sortBy List.head do
+            fields |> List.iter frame
+
+        let digest = "sha256:" + sha256 (builder.ToString())
+        let root = JsonObject()
+        root["digest"] <- JsonValue.Create digest
+        let nodes = JsonArray()
+
+        for fields in records do
+            let node = JsonObject()
+            let names = [ "key"; "originalId"; "document"; "location"; "revision"; "contentDigest" ]
+            List.zip names fields
+            |> List.iter (fun (name, value) -> node[name] <- JsonValue.Create value)
+            nodes.Add node
+
+        root["requirements"] <- nodes
+        serialize root
+
     /// Builds the whole import from the specification and the text of every
     /// source it names (`sources` maps a repository-relative path to its
     /// content). Deterministic: the same inputs give byte-identical items,
@@ -930,6 +1030,7 @@ module RequirementsImport =
                             Ok
                                 { Items = items
                                   Trace = renderTrace spec umbrella hashed items traced (Some digest)
+                                  EcirManifest = ecirManifest sources requirements
                                   Digest = digest
                                   RequirementCount = requirements.Length }))
         | documents, kickoff -> Error(errorsOf documents @ errorsOf kickoff)
@@ -989,10 +1090,20 @@ module RequirementsImport =
             | Some _ ->
                 Error [ $"{umbrella} already carries a different {spec.TraceAttachment}; the pinned requirements or the import specification changed. Nothing was changed." ]
 
-        let errors = umbrellaErrors @ (itemResults |> List.collect errorsOf) @ errorsOf traceResult
+        let ecirName = "ecir-source-manifest.json"
+
+        let manifestResult =
+            match attachments |> List.filter (fun (name, _) -> name = ecirName) |> List.tryLast with
+            | None -> Ok [ AttachTrace(umbrella, ecirName, plan.EcirManifest) ]
+            | Some(_, content) when content = plan.EcirManifest -> Ok []
+            | Some _ ->
+                Error [ $"{umbrella} already carries a different {ecirName}; source requirements changed. Nothing was changed." ]
+
+        let errors = umbrellaErrors @ (itemResults |> List.collect errorsOf) @ errorsOf traceResult @ errorsOf manifestResult
 
         if errors.IsEmpty then
             Ok((itemResults |> List.collect (fun result -> match result with Ok actions -> actions | Error _ -> []))
-               @ (match traceResult with Ok actions -> actions | Error _ -> []))
+               @ (match traceResult with Ok actions -> actions | Error _ -> [])
+               @ (match manifestResult with Ok actions -> actions | Error _ -> []))
         else
             Error errors
