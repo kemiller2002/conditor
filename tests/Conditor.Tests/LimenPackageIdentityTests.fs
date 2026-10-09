@@ -162,19 +162,19 @@ let run (check: string -> bool -> unit) =
                      |> Option.exists (fun item -> item.Version = "0.7.1" && item.Package = CurrentLimen))
 
                 check
-                    "clean-room preset installs Forma 0.4.1 as @echelon-foundry/design-system"
+                    "clean-room preset installs Forma 0.5.0 as @echelon-foundry/design-system"
                     (plan.Components
                      |> List.exists (fun item ->
                          item.Id = "forma"
-                         && item.Version = "0.4.1"
+                         && item.Version = "0.5.0"
                          && item.Package = "@echelon-foundry/design-system"))
 
                 check
-                    "clean-room scaffold binds Limen 0.7.1 and Forma 0.4.1 and never the deprecated Limen package"
+                    "clean-room scaffold binds Limen 0.7.1 and Forma 0.5.0 and never the deprecated Limen package"
                     (scaffoldFile "package.json" plan
                      |> Option.exists (fun text ->
                          text.Contains($"\"{CurrentLimen}\": \"0.7.1\"", StringComparison.Ordinal)
-                         && text.Contains("\"@echelon-foundry/design-system\": \"0.4.1\"", StringComparison.Ordinal)
+                         && text.Contains("\"@echelon-foundry/design-system\": \"0.5.0\"", StringComparison.Ordinal)
                          && not (text.Contains(LegacyLimen, StringComparison.Ordinal)))))
 
     // --- historicalPackages descriptor validation ----------------------------------
