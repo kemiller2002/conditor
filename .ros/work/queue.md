@@ -41,3 +41,4 @@
 | WI-0032 | Qualify Forma 0.5.0 and move Conditor's echelon-current pins to 1.13.0 | complete | forma, registry, qualification | high |
 | WI-0033 | Release Conditor 0.8.1: Forma 0.5.0 qualification and echelon-current 1.13.0 pins (#67) | complete | release | high |
 | WI-0034 | Qualify Praxis 3.10.0 and 3.11.0 for upgrade --current and follow echelon-current 1.17.0 | complete |  | high |
+| WI-0035 | Release Conditor 0.8.2: Praxis 3.10.0 and 3.11.0 qualified for upgrade --current on echelon-current 1.17.0 | complete |  | high |

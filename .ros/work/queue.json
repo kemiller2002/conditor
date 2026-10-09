@@ -858,6 +858,27 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0035",
+      "title": "Release Conditor 0.8.2: Praxis 3.10.0 and 3.11.0 qualified for upgrade --current on echelon-current 1.17.0",
+      "description": null,
+      "tags": [],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-09T03:10:50.000Z",
+      "updatedAt": "2026-10-09T03:11:04.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }
