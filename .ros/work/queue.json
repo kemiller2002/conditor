@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 33,
+  "nextSeq": 34,
   "items": [
     {
       "id": "WI-0001",
@@ -804,6 +804,29 @@
       "attachments": [],
       "createdAt": "2026-10-08T23:31:57.065Z",
       "updatedAt": "2026-10-08T23:37:57.700Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0033",
+      "title": "Release Conditor 0.8.1: Forma 0.5.0 qualification and echelon-current 1.13.0 pins (#67)",
+      "description": "Patch release: Forma 0.5.0 qualified and default; EchelonCurrent.selections and the indy-init preset at echelon-current 1.13.0 (Limen 0.9.0, Forma 0.5.0); clean-room pins Forma 0.5.0 (WI-0032). Without it the released 0.8.0 refuses conditor upgrade --current from forma 0.4.1 to 0.5.0.",
+      "tags": [
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-08T23:38:20.537Z",
+      "updatedAt": "2026-10-08T23:39:05.522Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

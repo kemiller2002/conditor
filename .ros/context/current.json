@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-08T23:37:57.700Z",
+  "updatedAt": "2026-10-08T23:39:05.522Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1523,6 +1523,51 @@
         }
       },
       "completedAt": "2026-10-08T23:37:57.700Z"
+    },
+    {
+      "id": "WI-0033",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "Directory.Build.props"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Conditor.Tests.fsproj"
+        }
+      ],
+      "updatedAt": "2026-10-08T23:39:05.522Z",
+      "telemetryExecutionIds": [
+        "EXE-20261008T233821340Z-6bc9a025"
+      ],
+      "latestCheckpoint": {
+        "id": "22fa6616d62135cf6adf8343",
+        "recordedAt": "2026-10-08T23:39:04.308Z",
+        "executionId": "EXE-20261008T233821340Z-6bc9a025",
+        "repository": "conditor",
+        "branch": "release/0.8.1",
+        "commit": "bd7ecb302bc3cacee36fac4383d93562bb60144e",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "release/0.8.1",
+        "remoteCommit": "bd7ecb302bc3cacee36fac4383d93562bb60144e",
+        "summary": "Conditor 0.8.1 requested on top of #67",
+        "nextAction": "Merge #67 first, then this PR after green CI; release-orchestrator tags v0.8.1",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-08T23:39:05.522Z"
     }
   ]
 }

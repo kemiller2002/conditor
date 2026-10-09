@@ -39,3 +39,4 @@
 | WI-0030 | Release Conditor 0.7.1: scaffold route inventory in Limen 0.9.0's exact shape (#70) | complete | release | high |
 | WI-0031 | Release Conditor 0.8.0: Limen 0.9.0 and Limen.Routing web scaffold (#72), indy-init preset on Indy-init deep-linking requirements (#73) | complete | release | high |
 | WI-0032 | Qualify Forma 0.5.0 and move Conditor's echelon-current pins to 1.13.0 | complete | forma, registry, qualification | high |
+| WI-0033 | Release Conditor 0.8.1: Forma 0.5.0 qualification and echelon-current 1.13.0 pins (#67) | complete | release | high |
