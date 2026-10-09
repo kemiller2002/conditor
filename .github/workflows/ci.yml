@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
 
+# Every job runs on pull requests as well as on main, so each check a merge
+# gate reads on a PR head has run and concluded (WI-0036); no job is push-only.
 concurrency:
   group: conditor-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -385,7 +387,6 @@ jobs:
           sweep 1.17.0 "$SET_117_COMMIT" "$SET_117_SHA256" 3.10.0 3.11.0
 
   host-tool-upgrade-boundary:
-    if: github.event_name == 'push'
     needs: build-test
     runs-on: ubuntu-latest
     steps:
@@ -421,7 +422,6 @@ jobs:
           grep -F "native host tool" "$RUNNER_TEMP/host-upgrade.txt"
 
   current-lifecycle-qualification:
-    if: github.event_name == 'push'
     needs: build-test
     runs-on: ubuntu-latest
     steps:
@@ -452,7 +452,6 @@ jobs:
           grep -F '"healthy": true' "$RUNNER_TEMP/current-lifecycle-doctor.json"
 
   empty-repository-smoke:
-    if: github.event_name == 'push'
     needs: build-test
     runs-on: ubuntu-latest
     steps:
@@ -821,7 +820,6 @@ jobs:
 
 
   factory-rehearsal-smoke:
-    if: github.event_name == 'push'
     needs: build-test
     runs-on: ubuntu-latest
     steps:

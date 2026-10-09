@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-09T03:11:04.000Z",
+  "updatedAt": "2026-10-09T03:29:08.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1658,6 +1658,47 @@
         }
       },
       "completedAt": "2026-10-09T03:11:04.000Z"
+    },
+    {
+      "id": "WI-0036",
+      "type": "chore",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "tests",
+          "path": ".github/workflows/ci.yml"
+        }
+      ],
+      "updatedAt": "2026-10-09T03:29:08.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261009T032905158Z-671b8b84"
+      ],
+      "latestCheckpoint": {
+        "id": "d64d554bf5a24387750c4eae",
+        "recordedAt": "2026-10-09T03:29:07.000Z",
+        "executionId": "EXE-20261009T032905158Z-671b8b84",
+        "repository": "conditor",
+        "branch": "ci/every-job-on-prs",
+        "commit": "e315cbabed8ad9d4dc97edc5c03dae2d8ad4fd61",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "ci/every-job-on-prs",
+        "remoteCommit": "e315cbabed8ad9d4dc97edc5c03dae2d8ad4fd61",
+        "summary": "Push-only CI jobs now run on PRs",
+        "nextAction": "Merge when every check, including the newly running jobs, succeeds",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-09T03:29:08.000Z"
     }
   ]
 }
