@@ -198,6 +198,12 @@ let run (check: string -> bool -> unit) =
                  && (sourceText row "revision").StartsWith("sha256:")
                  && (sourceText row "contentDigest").StartsWith("sha256:")))
 
+        check "JSON kickoff obligations retain distinct source locations and content identities"
+            (let kickoff = ecir |> List.filter (fun entry -> (sourceText entry "originalId").StartsWith("K-"))
+             kickoff.Length = 4
+             && (kickoff |> List.forall (fun entry -> (sourceText entry "location").StartsWith("$.")))
+             && (kickoff |> List.map (fun entry -> sourceText entry "contentDigest") |> List.distinct).Length = kickoff.Length)
+
         check "ECIR produces a SHA-256 manifest identity, separately from the import plan"
             (digest.StartsWith("sha256:") && digest.Length = 71)
 
