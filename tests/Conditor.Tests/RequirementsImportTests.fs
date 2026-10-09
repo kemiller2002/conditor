@@ -398,7 +398,7 @@ let run (check: string -> bool -> unit) =
         | Error errors -> check $"the shell observes a prepared target: {joined errors}" false
         | Ok observation ->
             check "the shell plans the whole import against the queue on disk"
-                (observation.Plan.Items.Length = 3 && observation.Actions.Length = 7)
+                (observation.Plan.Items.Length = 3 && observation.Actions.Length = 8)
 
             let calls = ResizeArray<string * string list>()
             let traces = ResizeArray<string>()
@@ -422,7 +422,7 @@ let run (check: string -> bool -> unit) =
                 let gitCalls = calls |> Seq.filter (fun (executable, _) -> executable = "git") |> Seq.map snd |> List.ofSeq
 
                 check "every action runs once, in order, through Praxis"
-                    (outcome.Applied = observation.Actions && outcome.Failed.IsNone && praxisCalls.Length = 7)
+                    (outcome.Applied = observation.Actions && outcome.Failed.IsNone && praxisCalls.Length = 8)
 
                 let expectedCapture =
                        [ "work"; "capture"; "--id"; "SLICE-CORE"; "--title"; "Slice 01 core: typed kernel"
@@ -438,7 +438,9 @@ let run (check: string -> bool -> unit) =
                     [ "work"; "attach"; "--id"; "COND-MISSION-001"; "--file"; "/tmp/trace.json=requirements-trace.json"; "--occurred-at"; "2026-11-07T14:45:00.000Z" ]
 
                 check "the trace is attached to the umbrella from a file"
-                    (List.last praxisCalls = expectedAttach && List.ofSeq traces = [ observation.Plan.Trace ])
+                    (praxisCalls[praxisCalls.Length - 2] = expectedAttach
+                     && List.last praxisCalls = [ "work"; "attach"; "--id"; "COND-MISSION-001"; "--file"; "/tmp/trace.json=ecir-source-manifest.json"; "--occurred-at"; "2026-11-07T14:45:00.000Z" ]
+                     && List.ofSeq traces = [ observation.Plan.Trace; observation.Plan.EcirManifest ])
 
                 check "the result is committed as Praxis state only"
                     (gitCalls.Length = 3
@@ -462,7 +464,7 @@ let run (check: string -> bool -> unit) =
                 check "a failing step stops the run and reports what remains"
                     (outcome.Applied.Length = 2
                      && outcome.Failed |> Option.exists (fun (action, _) -> action = CaptureItem observation.Plan.Items[1])
-                     && outcome.Remaining.Length = 4
+                     && outcome.Remaining.Length = 5
                      && calls |> Seq.filter (fun (executable, _) -> executable = "praxis") |> Seq.length = 3)
 
                 check "what was applied before the failure is still committed, so a re-run resumes"
