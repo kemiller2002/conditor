@@ -825,9 +825,9 @@ module RequirementsImport =
             use document = JsonDocument.Parse content
             let root = document.RootElement
 
-            let locate name predicate =
+            let locate (name: string) (predicate: JsonElement -> bool) =
                 root.GetProperty(name).EnumerateArray()
-                |> Seq.mapi (fun index item -> index, item)
+                |> Seq.mapi (fun index (item: JsonElement) -> index, item)
                 |> Seq.find (fun (_, item) -> predicate item)
                 |> fun (index, item) -> "$." + name + "[" + string index + "]", item.GetRawText()
 
