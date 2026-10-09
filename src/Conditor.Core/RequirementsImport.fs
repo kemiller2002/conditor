@@ -818,36 +818,68 @@ module RequirementsImport =
         =
         let sorted = requirements |> List.sortBy (fun req -> req.Document, req.Line, req.Id)
 
+        // Kickoff requirements live in named JSON entries. Their original
+        // trace uses Line=0; hashing the whole JSON file for each one would
+        // collapse distinct obligations into the same content identity.
+        let kickoffEntry (content: string) (req: SourceRequirement) =
+            use document = JsonDocument.Parse content
+            let root = document.RootElement
+
+            let locate name predicate =
+                root.GetProperty(name).EnumerateArray()
+                |> Seq.mapi (fun index item -> index, item)
+                |> Seq.find (fun (_, item) -> predicate item)
+                |> fun (index, item) -> "$." + name + "[" + string index + "]", item.GetRawText()
+
+            if req.Id.StartsWith("K-SLICE-", StringComparison.Ordinal) then
+                let id = req.Id.Substring("K-SLICE-".Length)
+                locate "prioritySlices" (fun item -> item.GetProperty("id").GetString() = id)
+            elif req.Id.StartsWith("K-GATE-", StringComparison.Ordinal) then
+                let id = req.Id.Substring("K-GATE-".Length)
+                locate "successGates" (fun item -> item.GetProperty("id").GetString() = id)
+            elif req.Id.StartsWith("K-STOP-", StringComparison.Ordinal) then
+                let ordinal = int (req.Id.Substring("K-STOP-".Length))
+                let item = root.GetProperty("stopTheLine")[ordinal - 1]
+                "$.stopTheLine[" + string (ordinal - 1) + "]", item.GetRawText()
+            else
+                invalidOp ("Unrecognized imported kickoff obligation: " + req.Id)
+
         let records =
             sorted
             |> List.map (fun req ->
                 let content = sources[req.Document]
-                let allLines = content.Replace("\r\n", "\n").Split('\n')
-                let nextLine =
-                    sorted
-                    |> List.filter (fun later -> later.Document = req.Document && later.Line > req.Line)
-                    |> List.map _.Line
-                    |> List.tryHead
-                    |> Option.defaultValue (allLines.Length + 1)
 
-                let section =
-                    allLines
-                    |> Array.skip (max 0 (req.Line - 1))
-                    |> Array.truncate (max 0 (nextLine - req.Line))
-                    |> String.concat "\n"
+                let location, section =
+                    if req.Scheme = "K" then
+                        kickoffEntry content req
+                    else
+                        let allLines = content.Replace("\r\n", "\n").Split('\n')
+                        let nextLine =
+                            sorted
+                            |> List.filter (fun later -> later.Document = req.Document && later.Line > req.Line)
+                            |> List.map _.Line
+                            |> List.tryHead
+                            |> Option.defaultValue (allLines.Length + 1)
+
+                        let section =
+                            allLines
+                            |> Array.skip (req.Line - 1)
+                            |> Array.truncate (max 0 (nextLine - req.Line))
+                            |> String.concat "\n"
+
+                        "L" + string req.Line, section
 
                 // A stable qualified key keeps duplicate local IDs from
                 // different documents distinct.
                 let key = req.Document + "#" + req.Id
                 let documentDigest = "sha256:" + sha256 content
-                let record =
-                    [ key
-                      req.Id
-                      req.Document
-                      "L" + string req.Line
-                      documentDigest
-                      "sha256:" + sha256 section ]
-                record)
+
+                [ key
+                  req.Id
+                  req.Document
+                  location
+                  documentDigest
+                  "sha256:" + sha256 section ])
 
         let builder = StringBuilder("ecir-source-manifest/1\n")
 
