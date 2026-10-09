@@ -37,6 +37,17 @@ let private fileSha256 path =
     use stream = File.OpenRead path
     Convert.ToHexString(SHA256.HashData stream).ToLowerInvariant()
 
+/// The Registry-authority adoption fixture runs only its own executables
+/// (absolute paths under the target) and git. A bare tool name that a
+/// developer workstation resolves on PATH (praxis, ordo, percepta-repo in
+/// ~/.local/bin) is "not found" here, exactly as on a clean CI host, so adoption
+/// observes only the fixture and the test passes the same way everywhere.
+let private fixtureOnlyRunner workingDirectory (executable: string) arguments =
+    if Path.IsPathRooted executable || executable = "git" then
+        ProcessRunner.runProcess workingDirectory executable arguments
+    else
+        result -1 "" $"Unable to execute '{executable}': not found on PATH."
+
 let private registryAuthorityFixture target =
     let rid = Platform.runtimeIdentifier ()
     let systemId = "registry-adopt-fixture"
@@ -397,7 +408,7 @@ let run check =
                 | Ok authority ->
                     let plan =
                         Adoption.planWithAuthority
-                            ProcessRunner.runProcess
+                            fixtureOnlyRunner
                             target
                             None
                             (Some authority)
@@ -428,7 +439,7 @@ let run check =
 
                     match
                         Adoption.applyWithAuthority
-                            ProcessRunner.runProcess
+                            fixtureOnlyRunner
                             target
                             None
                             (Some authority)
@@ -502,7 +513,7 @@ let run check =
                                 """{"SystemId":"registry-adopt-fixture","Repository":"example/registry-adopt-fixture","Executable":"WRONG","ReleaseVersion":"9.4.2","SourceCommit":"cccccccccccccccccccccccccccccccccccccccc"}"""
                                 ""
                         else
-                            ProcessRunner.runProcess workingDirectory command arguments
+                            fixtureOnlyRunner workingDirectory command arguments
 
                     let mismatch =
                         Adoption.planWithAuthority
