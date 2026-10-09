@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-09T03:29:08.000Z",
+  "updatedAt": "2026-10-09T03:35:59.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1699,6 +1699,47 @@
         }
       },
       "completedAt": "2026-10-09T03:29:08.000Z"
+    },
+    {
+      "id": "WI-0037",
+      "type": "chore",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/AdoptionTests.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "tests/Conditor.Tests/AdoptionTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-09T03:35:59.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261009T033555887Z-22a67af9"
+      ],
+      "latestCheckpoint": {
+        "id": "0b65fb425c5576cb24916729",
+        "recordedAt": "2026-10-09T03:35:58.000Z",
+        "executionId": "EXE-20261009T033555887Z-22a67af9",
+        "repository": "conditor",
+        "branch": "test/adoption-isolated-runner",
+        "commit": "5b63154affd756066909d6408766ea0d1ad81970",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "test/adoption-isolated-runner",
+        "remoteCommit": "5b63154affd756066909d6408766ea0d1ad81970",
+        "summary": "Adoption fixture runs only its own executables and git",
+        "nextAction": "Merge on green",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-09T03:35:59.000Z"
     }
   ]
 }
