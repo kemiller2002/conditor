@@ -48,6 +48,24 @@ The trace (`conditor.requirements-trace/v1`) records:
 - the SHA-256 of every source document;
 - the plan digest.
 
+## ECIR source authority (new)
+
+In addition to the existing `conditor.requirements-trace/v1` attachment, import now attaches `ecir-source-manifest.json` to `COND-MISSION-001`.
+
+This is the independent source authority for Echelon Construction IR (`ecir/1`), **not** an AI-authored blueprint. It includes exactly one entry per imported requirement, with qualified key `document#originalId`, original ID, document path, location `L<line>`, full-document revision SHA-256 and source-section SHA-256. The outer manifest digest is the Ordo ECIR/1 canonical byte-framed SHA-256 over sorted qualified identities and their fields; it does not depend on pretty-print whitespace or the order the planner assigns slices.
+
+The older trace and plan digest are retained unchanged. Both attachments are idempotently reconciled; a different existing manifest is an explicit conflict, not silently overwritten. The requirement set includes kickoff gates, slices and stop-the-line entries.
+
+Ordo checks the blueprint against this independently derived manifest; Praxis must not permit ECIR-declared cohort execution on an unchecked or unapproved blueprint. Dokimos independently checks source conservation. **Represented** requirements are not automatically implemented or independently verified. A valid source manifest is not permission for an agent to invent decisions.
+
+Read the new manifest through Praxis attachment storage after import, using the same umbrella attachment directory as the legacy trace. To check a candidate blueprint after the qualified Ordo CLI is installed:
+
+```bash
+sde ecir validate --manifest PATH_TO_SOURCE_MANIFEST --blueprint PATH_TO_BLUEPRINT --json
+```
+
+Validation returns a digest but **never** grants execution authority.
+
 ## Guarantees
 
 - **Deterministic.** The same pinned inputs give the same items, trace and
