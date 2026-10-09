@@ -1196,6 +1196,7 @@ RepositoryLifecycleTests.run check
 AdoptionTests.run check
 CurrentUpgradeTests.run check
 CurrentUpgradeTests.runOptIn check
+CurrentUpgradeTests.runPraxisQualification check
 WebPackageUpgradeTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check

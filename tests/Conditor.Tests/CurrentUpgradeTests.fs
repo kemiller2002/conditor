@@ -824,3 +824,87 @@ let runOptIn (check: string -> bool -> unit) =
                         check $"second opt-in preview succeeds: {details}" false
         finally
             Environment.SetEnvironmentVariable("PATH", priorPath)
+
+/// Praxis releases declare no echelon.repository-lifecycle contract, so
+/// `upgrade --current` moves Praxis only between versions this Conditor build
+/// qualifies (components/praxis.component.json). echelon-current 1.16.0
+/// selects 3.10.0 and 1.17.0 selects 3.11.0: both are planned as
+/// embedded-qualified-lifecycle transitions from the 3.7.2 that 1.13.0
+/// selected and from each other, through the real planner over a resolved
+/// set shaped like the Registry's praxis entry. A version Conditor has not
+/// qualified is still refused with the native-change reason.
+let runPraxisQualification (check: string -> bool -> unit) =
+    if OperatingSystem.IsWindows() then
+        check "praxis qualification fixture is skipped on Windows" true
+    else
+        let rid = Platform.runtimeIdentifier ()
+
+        let preview fromVersion toVersion =
+            let target = temp "praxis-target"
+            let home = temp "praxis-home"
+            let mirror = temp "praxis-mirror"
+            let commit = String.replicate 40 "e"
+            let assetName, assetSha = lifecycleBundle mirror "praxis" toVersion "kemiller2002/praxis" commit rid
+            let resolvedPath = Path.Combine(mirror, "praxis.resolved.json")
+
+            let set =
+                $$"""{
+  "schema": "echelon.resolved-release-set/v1",
+  "profile": { "id": "echelon-current", "version": "1.17.0", "sha256": "{{String.replicate 64 "a"}}" },
+  "platform": "{{rid}}",
+  "resolver": { "name": "test", "version": "1.0.0" },
+  "catalogSnapshot": { "sha256": "{{String.replicate 64 "b"}}" },
+  "components": [
+    {
+      "systemId": "praxis",
+      "role": "host-tool",
+      "required": true,
+      "version": "{{toVersion}}",
+      "repository": "kemiller2002/praxis",
+      "tag": "v{{toVersion}}",
+      "commit": "{{commit}}",
+      "releaseStage": "stable",
+      "lifecycleState": "active",
+      "distributionClass": "self-contained-native-cli",
+      "executable": "praxis",
+      "releaseManifest": { "schema": "echelon.release/v2", "sha256": "{{String.replicate 64 "c"}}" },
+      "distribution": { "mechanism": "github-release", "package": null, "url": "https://github.com/kemiller2002/praxis/releases/tag/v{{toVersion}}" },
+      "artifacts": [ { "name": "{{assetName}}", "purpose": "executable", "platform": "{{rid}}", "sha256": "{{assetSha}}" } ]
+    }
+  ]
+}
+"""
+
+            File.WriteAllText(resolvedPath, set)
+            let manifestPath = Path.Combine(target, "conditor.json")
+
+            File.WriteAllText(
+                manifestPath,
+                $$"""{ "schemaVersion": 1, "name": "praxis-qualification", "components": [ { "id": "praxis", "version": "{{fromVersion}}", "required": true } ], "requirements": [], "execution": { "enabled": false } }"""
+            )
+
+            establishLock target manifestPath "praxis" fromVersion
+            let probe executable arguments = ProcessRunner.runProcess target executable arguments
+
+            match Manifest.load manifestPath with
+            | Error errors -> Error errors
+            | Ok manifest -> CurrentUpgrade.preview target manifestPath manifest resolvedPath (sha256File resolvedPath) (context home mirror) probe
+
+        for fromVersion, toVersion in [ "3.7.2", "3.10.0"; "3.10.0", "3.11.0"; "3.7.2", "3.11.0" ] do
+            match preview fromVersion toVersion with
+            | Error errors ->
+                let details = String.concat "; " errors
+                check $"--current plans praxis {fromVersion} -> {toVersion}: {details}" false
+            | Ok plan ->
+                check
+                    $"--current plans praxis {fromVersion} -> {toVersion} as an embedded qualified lifecycle transition, with no refusal: %A{plan.Refusals}"
+                    (plan.Refusals.IsEmpty
+                     && plan.Transitions
+                     |> List.map (fun item -> item.Id, item.FromVersion, item.ToVersion, item.Mode) = [ "praxis", fromVersion, toVersion, "embedded-qualified-lifecycle" ])
+
+        let refused = preview "3.11.0" "3.12.0"
+
+        check
+            "--current still refuses a Praxis version this Conditor build has not qualified"
+            (let refusals = match refused with | Error errors -> errors | Ok plan -> plan.Refusals
+             refusals |> List.exists (fun error -> error.Contains "'praxis' 3.11.0 -> 3.12.0 is a native change" && error.Contains "has not qualified that exact lifecycle version"))
