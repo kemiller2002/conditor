@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 # Every job runs on pull requests as well as on main, so each check a merge
-# gate reads on a PR head has run and concluded (WI-0034); no job is push-only.
+# gate reads on a PR head has run and concluded (WI-0036); no job is push-only.
 concurrency:
   group: conditor-ci-${{ github.ref }}
   cancel-in-progress: true
