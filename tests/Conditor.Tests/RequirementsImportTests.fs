@@ -178,28 +178,28 @@ let run (check: string -> bool -> unit) =
              && root.GetProperty("planDigest").GetString() = $"sha256:{plan.Digest}"
              && root.GetProperty("documents").GetArrayLength() = 3)
 
-        // ECIR intake is separate from the old trace and preserves even
-        // same-named requirement IDs under qualified document identities.
+        // Source identity remains distinct even with matching local IDs.
         use ecirDoc = JsonDocument.Parse plan.EcirManifest
         let ecirRoot = ecirDoc.RootElement
         let ecir = ecirRoot.GetProperty("requirements").EnumerateArray() |> List.ofSeq
+        let stringValue (value: JsonElement) = value.GetString() |> Option.ofObj |> Option.defaultValue ""
+        let sourceText (row: JsonElement) field = stringValue (row.GetProperty field)
+        let digest = stringValue (ecirRoot.GetProperty "digest")
 
         check "the ECIR manifest accounts for every original source requirement"
             (ecir.Length = plan.RequirementCount
-             && (ecir |> List.map (fun row -> row.GetProperty("originalId").GetString()) |> List.sort)
-                = (traced |> List.map (fun row -> row.GetProperty("id").GetString()) |> List.sort))
+             && (ecir |> List.map (fun row -> sourceText row "originalId") |> List.sort)
+                = (traced |> List.map (fun row -> sourceText row "id") |> List.sort))
 
         check "ECIR uses qualified IDs, revision hashes and source content hashes"
             (ecir
              |> List.forall (fun row ->
-                 row.GetProperty("key").GetString() =
-                     row.GetProperty("document").GetString() + "#" + row.GetProperty("originalId").GetString()
-                 && row.GetProperty("revision").GetString().StartsWith("sha256:")
-                 && row.GetProperty("contentDigest").GetString().StartsWith("sha256:")))
+                 sourceText row "key" = sourceText row "document" + "#" + sourceText row "originalId"
+                 && (sourceText row "revision").StartsWith("sha256:")
+                 && (sourceText row "contentDigest").StartsWith("sha256:")))
 
         check "ECIR produces a SHA-256 manifest identity, separately from the import plan"
-            (ecirRoot.GetProperty("digest").GetString().StartsWith("sha256:")
-             && ecirRoot.GetProperty("digest").GetString().Length = 71)
+            (digest.StartsWith("sha256:") && digest.Length = 71)
 
         check "changed requirements invalidate the ECIR source identity"
             (match planWith spec (sources |> Map.add "docs/REQ.md" (requirementsDoc.Replace("Observation", "Changed Observation"))) with
