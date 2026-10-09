@@ -178,6 +178,34 @@ let run (check: string -> bool -> unit) =
              && root.GetProperty("planDigest").GetString() = $"sha256:{plan.Digest}"
              && root.GetProperty("documents").GetArrayLength() = 3)
 
+        // ECIR intake is separate from the old trace and preserves even
+        // same-named requirement IDs under qualified document identities.
+        use ecirDoc = JsonDocument.Parse plan.EcirManifest
+        let ecirRoot = ecirDoc.RootElement
+        let ecir = ecirRoot.GetProperty("requirements").EnumerateArray() |> List.ofSeq
+
+        check "the ECIR manifest accounts for every original source requirement"
+            (ecir.Length = plan.RequirementCount
+             && (ecir |> List.map (fun row -> row.GetProperty("originalId").GetString()) |> List.sort)
+                = (traced |> List.map (fun row -> row.GetProperty("id").GetString()) |> List.sort))
+
+        check "ECIR uses qualified IDs, revision hashes and source content hashes"
+            (ecir
+             |> List.forall (fun row ->
+                 row.GetProperty("key").GetString() =
+                     row.GetProperty("document").GetString() + "#" + row.GetProperty("originalId").GetString()
+                 && row.GetProperty("revision").GetString().StartsWith("sha256:")
+                 && row.GetProperty("contentDigest").GetString().StartsWith("sha256:")))
+
+        check "ECIR produces a SHA-256 manifest identity, separately from the import plan"
+            (ecirRoot.GetProperty("digest").GetString().StartsWith("sha256:")
+             && ecirRoot.GetProperty("digest").GetString().Length = 71)
+
+        check "changed requirements invalidate the ECIR source identity"
+            (match planWith spec (sources |> Map.add "docs/REQ.md" (requirementsDoc.Replace("Observation", "Changed Observation"))) with
+             | Ok changed -> changed.EcirManifest <> plan.EcirManifest
+             | Error _ -> false)
+
         check "planning is deterministic" (planWith spec sources = Ok plan)
 
         check "a changed source changes the digest"
@@ -195,20 +223,21 @@ let run (check: string -> bool -> unit) =
                 [ for item in plan.Items do
                       yield CaptureItem item
                       yield MarkReady item.Id
-                  yield AttachTrace(umbrella.Id, "requirements-trace.json", plan.Trace) ]
+                  yield AttachTrace(umbrella.Id, "requirements-trace.json", plan.Trace)
+                  yield AttachTrace(umbrella.Id, "ecir-source-manifest.json", plan.EcirManifest) ]
 
             check "a fresh queue captures and readies every item, then attaches the trace" (actions = expected)
 
         check "a re-run against the imported queue changes nothing"
-            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "ready") [ "requirements-trace.json", plan.Trace ] = Ok [])
+            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "ready") [ "requirements-trace.json", plan.Trace; "ecir-source-manifest.json", plan.EcirManifest ] = Ok [])
 
         check "an item someone already started or completed is left alone"
-            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "complete") [ "requirements-trace.json", plan.Trace ] = Ok [])
+            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "complete") [ "requirements-trace.json", plan.Trace; "ecir-source-manifest.json", plan.EcirManifest ] = Ok [])
 
         let readied = plan.Items |> List.map (fun item -> MarkReady item.Id)
 
         check "an item captured but not yet ready is only marked ready"
-            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "captured") [ "requirements-trace.json", plan.Trace ] = Ok readied)
+            (RequirementsImport.reconcile spec plan umbrella.Id (recorded plan "captured") [ "requirements-trace.json", plan.Trace; "ecir-source-manifest.json", plan.EcirManifest ] = Ok readied)
 
         let edited =
             recorded plan "ready"
