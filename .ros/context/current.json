@@ -1896,7 +1896,27 @@
       "updatedAt": "2026-10-13T17:49:52.000Z",
       "telemetryExecutionIds": [
         "EXE-20261013T174953100Z-477629ba"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "b688d30a01b3e85117f8d1d3",
+        "recordedAt": "2026-10-13T17:54:58.000Z",
+        "executionId": "EXE-20261013T174953100Z-477629ba",
+        "repository": "conditor",
+        "branch": "fix/workstation-registry-selection",
+        "commit": "8a710d278302e93167b2c9e9479052bec556040b",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/workstation-registry-selection",
+        "remoteCommit": "8a710d278302e93167b2c9e9479052bec556040b",
+        "summary": "Workstation selection from a Registry set, downgrade refusal and DF-CON-2026-A005 pushed with tests",
+        "nextAction": "Gate-merge the PR, request Conditor 0.10.2, complete WI-0040",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
