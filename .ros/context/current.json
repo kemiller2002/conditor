@@ -1827,7 +1827,27 @@
       "updatedAt": "2026-10-13T16:31:45.000Z",
       "telemetryExecutionIds": [
         "EXE-20261013T163145636Z-72e9d991"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "b077e4618d8a8cdb230a9589",
+        "recordedAt": "2026-10-13T16:39:19.000Z",
+        "executionId": "EXE-20261013T163145636Z-72e9d991",
+        "repository": "conditor",
+        "branch": "fix/lifecycle-foundations-consistency",
+        "commit": "da1f5a842e880a0e24dff7b94c09db5c7f344e35",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/lifecycle-foundations-consistency",
+        "remoteCommit": "da1f5a842e880a0e24dff7b94c09db5c7f344e35",
+        "summary": "Foundations move with every transition, pin consistency invariant, pin repair and stepwise repair-first pushed with tests; verified on Summa's real half-applied state",
+        "nextAction": "Gate-merge the fix PR, request Conditor 0.10.1, complete WI-0039",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
