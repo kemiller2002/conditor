@@ -42,6 +42,10 @@ conditor workstation plan --profile echelon-engineering \
     - the Echelon native installer's `~/.echelon/bin`.
   - **Real home only:** the executable that `PATH` resolves is included too.
     A sacrificial `--home` is never influenced by the host's `PATH`.
+  - **Reading a version:** a JSON identity (the repository-lifecycle
+    `version` contract) is read through `ReleaseVersion` only. Its contract
+    and schema versions never count. A tool already at the target version is
+    a zero-effect no-op.
 
 ## Profiles (CON-160..166, CON-250..254)
 

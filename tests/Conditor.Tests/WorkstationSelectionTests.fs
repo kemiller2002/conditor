@@ -30,12 +30,22 @@ let private executableScript (path: string) (id: string) (version: string) =
     File.WriteAllText(path, $"#!/bin/sh\necho \"{id} {version}\"\n")
     File.SetUnixFileMode(path, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
 
+/// An executable whose version probe prints a JSON identity, like the
+/// repository-lifecycle `version` contract (Dokimos): contract and schema
+/// versions above the release version, and `ReleaseVersion` itself.
+let private identityScript (path: string) (id: string) (version: string) =
+    let identity =
+        $$"""{"Contract":"{{id}}.version","Contracts":{"Policy":["1.0.0","9.1.0"]},"SchemaVersion":"9.9.9","ReleaseVersion":"{{version}}","SystemId":"{{id}}"}"""
+
+    File.WriteAllText(path, $"#!/bin/sh\necho '{identity}'\n")
+    File.SetUnixFileMode(path, UnixFileMode.UserRead ||| UnixFileMode.UserWrite ||| UnixFileMode.UserExecute)
+
 /// A release bundle `<id>-<rid>.tar.gz` whose executable reports `version`.
-let private bundle (mirror: string) (id: string) (version: string) (rid: string) =
+let private bundleWith script (mirror: string) (id: string) (version: string) (rid: string) =
     let staging = temp "bundle"
     let root = Path.Combine(staging, $"{id}-{rid}")
     Directory.CreateDirectory root |> ignore
-    executableScript (Path.Combine(root, id)) id version
+    script (Path.Combine(root, id)) id version
     let name = $"{id}-{version}-{rid}.tar.gz"
     let archive = Path.Combine(mirror, name)
 
@@ -48,13 +58,13 @@ let private bundle (mirror: string) (id: string) (version: string) (rid: string)
 
 /// A Registry-shaped resolved set selecting each (id, version) as a native
 /// host tool, bundled into `mirror`.
-let private hostSet (mirror: string) (tools: (string * string) list) =
+let private hostSetWith script (mirror: string) (tools: (string * string) list) =
     let rid = Platform.runtimeIdentifier ()
 
     let entries =
         tools
         |> List.map (fun (id, version) ->
-            let name, sha = bundle mirror id version rid
+            let name, sha = bundleWith script mirror id version rid
 
             $$"""
     {
@@ -94,6 +104,8 @@ let private hostSet (mirror: string) (tools: (string * string) list) =
     match ResolvedReleaseSets.loadFile rid path (sha256File path) with
     | Ok set -> set
     | Error error -> failwith $"fixture set does not load: {error}"
+
+let private hostSet mirror tools = hostSetWith executableScript mirror tools
 
 let private context home mirror : WorkstationContext =
     { Home = home; ArtifactMirror = Some mirror; Offline = true; Praxis = None; TargetId = Some "ws-selection-test" }
@@ -275,9 +287,58 @@ let private downgrades check =
         (Downgrade.find nativeCtx probe (planFor nativeCtx stale).Profile
          |> List.exists (fun (id, _, installed, where) -> id = "ordo" && installed = "1.5.0" && where.Contains ".echelon/bin"))
 
+/// The clean-host proof's second application (conditor#93): a tool already
+/// installed at exactly the target version, whose identity JSON carries
+/// higher contract versions, plans as a zero-effect no-op; only a strictly
+/// older target is refused.
+let private equalVersionIsNoOp check =
+    check
+        "a JSON identity reports its ReleaseVersion, not a higher contract or schema version"
+        (Downgrade.releaseVersionIn """{"Contracts":{"Policy":["1.0.0"]},"ReleaseVersion":"0.2.0","SchemaVersion":"1.1.0"}""" = SemanticVersion.tryParse "0.2.0")
+
+    check
+        "a JSON identity without a ReleaseVersion is unknown, never guessed"
+        (Downgrade.releaseVersionIn """{"Contracts":{"Policy":["1.0.0"]}}""" = None)
+
+    check "a plain version line reports its version" (Downgrade.releaseVersionIn "praxis 3.11.0+abcdef" = SemanticVersion.tryParse "3.11.0")
+
+    do
+        let mirror = temp "mirror-equal"
+        let rid = Platform.runtimeIdentifier ()
+        let set = hostSetWith identityScript mirror [ "dokimos", "0.2.0" ]
+        let home = temp "home-equal"
+        let ctx = context home mirror
+        let first = Engine.plan ctx set rid [] []
+
+        match Engine.apply ctx probe first first.Digest true with
+        | Ok installed when installed.Failed.IsNone ->
+            let second, found = Downgrade.guard false ctx probe (Engine.plan ctx set rid [] [])
+
+            check
+                $"an installed tool at exactly the target version is not a downgrade: {joined second.Refusals}"
+                (found.IsEmpty && second.Refusals.IsEmpty && second.Digest = first.Digest)
+
+            match Engine.apply ctx probe second second.Digest true with
+            | Ok again ->
+                check
+                    "re-applying the same set is a zero-effect no-op (every step reused, none completed)"
+                    (again.Failed.IsNone && again.Completed.IsEmpty && not again.Reused.IsEmpty)
+            | Error error -> check $"re-applying the same set succeeds: {error}" false
+
+            // A strictly older target is still refused.
+            let older = hostSetWith identityScript mirror [ "dokimos", "0.1.0" ]
+            let refused, olderFound = Downgrade.guard false ctx probe (Engine.plan ctx older rid [] [])
+
+            check
+                "a strictly older target is refused even when the identity carries higher contract versions"
+                (olderFound |> List.map (fun (id, planned, installed, _) -> id, planned, installed) = [ "dokimos", "0.1.0", "0.2.0" ]
+                 && not refused.Refusals.IsEmpty)
+        | _ -> check "the equal-version fixture installs through Conditor" false
+
 let run (check: string -> bool -> unit) =
     if OperatingSystem.IsWindows() then
         check "workstation selection fixture is skipped on Windows" true
     else
         selection check
         downgrades check
+        equalVersionIsNoOp check

@@ -718,5 +718,11 @@ the host tools.
   - **Real home:** for the real home only, it also includes the executable
     that `PATH` resolves. This keeps an isolated home independent of the
     host.
+  - **Reading a version:** a JSON identity, such as the repository-lifecycle
+    `version` contract, is read through its `ReleaseVersion`. Its contract
+    and schema versions are never read as the release version. A JSON
+    identity without `ReleaseVersion` is unknown.
+  - **Equal versions:** a tool installed at exactly the target version is
+    not a downgrade, and re-applying the same set is a zero-effect no-op.
 - **CON-363** `--resolved-set` given alone (no `--profile`) keeps its existing
   meaning: the whole set's native environment. It is already Registry-bound.

@@ -994,15 +994,38 @@ module Downgrade =
     let private versionPattern =
         Regex(@"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", RegexOptions.CultureInvariant)
 
+    /// The release version an executable's version probe reports. A JSON
+    /// identity (the repository-lifecycle `version` contract) reports it as
+    /// `ReleaseVersion` and also carries contract and schema versions, so only
+    /// that member is read; a JSON identity without it is unknown, never
+    /// guessed. Plain text reports its first semantic version.
+    let releaseVersionIn (output: string) : SemanticVersion option =
+        let trimmed = output.Trim()
+
+        if trimmed.StartsWith("{", StringComparison.Ordinal) then
+            try
+                match JsonNode.Parse trimmed with
+                | :? JsonObject as identity ->
+                    identity
+                    |> Seq.tryFind (fun pair -> String.Equals(pair.Key, "ReleaseVersion", StringComparison.OrdinalIgnoreCase))
+                    |> Option.bind (fun pair ->
+                        match pair.Value with
+                        | :? JsonValue as value ->
+                            match value.TryGetValue<string>() with
+                            | true, text -> text |> Option.ofObj |> Option.bind SemanticVersion.tryParse
+                            | _ -> None
+                        | _ -> None)
+                | _ -> None
+            with :? JsonException ->
+                None
+        else
+            let matched = versionPattern.Match trimmed
+            if matched.Success then SemanticVersion.tryParse matched.Value else None
+
     let private reported (probe: string -> string list -> ProcessResult) (executable: string) (arguments: string list) =
         if File.Exists executable then
             let result = probe executable arguments
-
-            if result.ExitCode = 0 then
-                let matched = versionPattern.Match result.StandardOutput
-                if matched.Success then SemanticVersion.tryParse matched.Value else None
-            else
-                None
+            if result.ExitCode = 0 then releaseVersionIn result.StandardOutput else None
         else
             None
 
