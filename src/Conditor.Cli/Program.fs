@@ -23,6 +23,8 @@ let private usage () =
     Console.WriteLine "  conditor repair [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade [--check] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor upgrade --current --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--check | --authorize PLAN-DIGEST]"
+    Console.WriteLine "  conditor upgrade --current --check --stepwise --registry DIR [--channel NAME] --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR]"
+    Console.WriteLine "  conditor drift --registry DIR [--channel NAME] [--platform RID] [--target PATH] [--json] [--fail-on never|warn|fail]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
@@ -576,6 +578,90 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
 
     Console.WriteLine $"Plan digest: {plan.Digest}"
 
+/// `upgrade --current --check --stepwise` (CON-310..315): one Registry
+/// set per registered minor line; step 1 checked in full.
+let private runStepwiseUpgrade (args: string array) checkOnly target manifestPath =
+    match optionValue "--registry" args, optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
+    | _ when not checkOnly ->
+        writeErrors [ "--stepwise plans only (--check); authorize each step with conditor upgrade --current --resolved-set <step set> --resolved-set-sha256 <sha> --authorize <digest>." ]
+        2
+    | _ when (optionValue "--authorize" args).IsSome ->
+        writeErrors [ "--stepwise never authorizes; authorize step 1 with the direct command it prints." ]
+        2
+    | None, _, _ ->
+        writeErrors [ "--stepwise requires --registry DIR (an echelon-registry checkout with its Git history)." ]
+        2
+    | _, None, _
+    | _, _, None ->
+        writeErrors [ "--current requires --resolved-set PATH --resolved-set-sha256 SHA256 from the Registry current selection." ]
+        2
+    | Some registry, Some resolvedSet, Some resolvedSetDigest ->
+        match Manifest.load manifestPath with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok manifest ->
+            let ctx = currentUpgradeContext args
+            let channel = optionValue "--channel" args |> Option.defaultValue "echelon-current"
+
+            match
+                StepwiseUpgrade.preview
+                    ProcessRunner.runProcess
+                    target
+                    manifestPath
+                    manifest
+                    (Path.GetFullPath resolvedSet)
+                    resolvedSetDigest
+                    (Path.GetFullPath registry)
+                    channel
+                    ctx
+                    currentUpgradeProbe
+            with
+            | Error errors ->
+                writeErrors errors
+                2
+            | Ok plan when plan.Steps.IsEmpty ->
+                Console.WriteLine "Stepwise current upgrade: no declared component is behind the target set."
+                0
+            | Ok plan ->
+                Console.WriteLine $"Stepwise current upgrade: {plan.Steps.Length} step(s) to sha256:{resolvedSetDigest}"
+
+                for step in plan.Steps do
+                    Console.WriteLine ""
+                    Console.WriteLine $"Step {step.Index}: {step.Candidate.Label}"
+                    Console.WriteLine $"  set: {step.Candidate.Path}"
+                    Console.WriteLine $"  sha256: {step.Candidate.Sha256}"
+
+                    for move in step.Moves do
+                        Console.WriteLine $"  {move.Id}: {move.FromVersion} -> {move.ToVersion}"
+
+                        for crossed in move.Crosses do
+                            Console.WriteLine $"    crosses {crossed.Version}: {crossed.MigrationNotes}"
+
+                    for gap in step.Gaps do
+                        let lines = String.concat ", " gap.SkippedLines
+                        Console.WriteLine $"  GAP {gap.Id}: no Registry-produced set selects the registered line(s) {lines}; this step jumps over them."
+
+                    let check =
+                        $"conditor upgrade --current --check --target \"{target}\" --resolved-set \"{step.Candidate.Path}\" --resolved-set-sha256 {step.Candidate.Sha256}"
+
+                    if step.Index = 1 then
+                        match plan.FirstStepPlan with
+                        | Some first ->
+                            Console.WriteLine "  checked against the repository now:"
+                            printCurrentUpgradePlan first
+
+                            if first.Refusals.IsEmpty then
+                                Console.WriteLine
+                                    $"  authorize: conditor upgrade --current --target \"{target}\" --resolved-set \"{step.Candidate.Path}\" --resolved-set-sha256 {step.Candidate.Sha256} --authorize {first.Digest}"
+                        | None -> ()
+                    else
+                        Console.WriteLine $"  after step {step.Index - 1} is applied, check it with: {check}"
+
+                match plan.FirstStepPlan with
+                | Some first when not first.Refusals.IsEmpty -> 9
+                | _ -> 0
+
 let private runCurrentUpgrade (args: string array) checkOnly target manifestPath =
     match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
     | None, _ ->
@@ -656,7 +742,9 @@ let private runCurrentUpgrade (args: string array) checkOnly target manifestPath
                             if result.NoRemainingVersionChanges then 0 else 9
 
 let private runUpgrade (args: string array) checkOnly target manifestPath =
-    if hasFlag "--current" args then
+    if hasFlag "--current" args && hasFlag "--stepwise" args then
+        runStepwiseUpgrade args checkOnly target manifestPath
+    elif hasFlag "--current" args then
         runCurrentUpgrade args checkOnly target manifestPath
     else
         match Manifest.load manifestPath with
@@ -1608,6 +1696,42 @@ let private runRequirements (args: string array) =
         usage ()
         2
 
+/// The read-only rolling-upgrade advisory (CON-300..308). Exit 0 whatever it
+/// finds unless --fail-on asks otherwise (3); 2 when it cannot run.
+let private runDrift (args: string array) =
+    let failOn = optionValue "--fail-on" args |> Option.defaultValue "never"
+
+    match optionValue "--registry" args, failOn with
+    | None, _ ->
+        writeErrors [ "drift requires --registry DIR (an echelon-registry checkout)." ]
+        2
+    | _, value when not (List.contains value [ "never"; "warn"; "fail" ]) ->
+        writeErrors [ $"--fail-on must be never, warn or fail, not '{value}'." ]
+        2
+    | Some registryRoot, _ ->
+        let target =
+            optionValue "--target" args
+            |> Option.defaultValue (Directory.GetCurrentDirectory())
+            |> Path.GetFullPath
+
+        let channel = optionValue "--channel" args |> Option.defaultValue "echelon-current"
+        let platform = optionValue "--platform" args |> Option.defaultValue (Platform.runtimeIdentifier ())
+
+        match
+            Drift.loadRegistry ProcessRunner.runProcess registryRoot channel platform
+            |> Result.bind (fun registry -> Drift.report ProcessRunner.runProcess DateTimeOffset.UtcNow registry target)
+        with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok report ->
+            if hasFlag "--json" args then
+                Console.Write(Drift.toJson report)
+            else
+                Console.Write(Drift.toText report)
+
+            Drift.exitCodeFor failOn report.Level
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -1645,6 +1769,8 @@ let private execute (args: string array) =
             runRepository args
         elif command = "requirements" then
             runRequirements args
+        elif command = "drift" then
+            runDrift args
         else
             let target =
                 optionValue "--target" args

@@ -69,15 +69,15 @@ let private formaEntry version =
       ]
     }"""
 
-let private limenEntry =
+let private limenEntryAt (limenVersion: string) =
     $$"""
     {
       "systemId": "limen",
       "role": "project-binding",
       "required": true,
-      "version": "0.9.0",
+      "version": "{{limenVersion}}",
       "repository": "kemiller2002/limen",
-      "tag": "v0.9.0",
+      "tag": "v{{limenVersion}}",
       "commit": "{{String.replicate 40 "1"}}",
       "releaseStage": "stable",
       "lifecycleState": "active",
@@ -87,12 +87,14 @@ let private limenEntry =
       "distribution": {
         "mechanism": "npm",
         "package": "{{LimenPackage}}",
-        "url": "https://registry.npmjs.org/@echelon-foundry/limen/-/limen-0.9.0.tgz"
+        "url": "https://registry.npmjs.org/@echelon-foundry/limen/-/limen-{{limenVersion}}.tgz"
       },
       "artifacts": [
-        { "name": "echelon-foundry-limen-0.9.0.tgz", "purpose": "package", "platform": null, "sha256": "{{sha256Bytes limenBytes}}" }
+        { "name": "echelon-foundry-limen-{{limenVersion}}.tgz", "purpose": "package", "platform": null, "sha256": "{{sha256Bytes limenBytes}}" }
       ]
     }"""
+
+let private limenEntry = limenEntryAt "0.9.0"
 
 /// A resolved set always carries native host tools; one the manifest does not
 /// declare keeps the fixture realistic without adding workstation effects.
@@ -118,7 +120,7 @@ let private hostTool (rid: string) =
     }"""
 
 /// A Registry-shaped resolved set selecting Limen 0.9.0 and `forma`.
-let private resolvedSet (profileVersion: string) (forma: string) =
+let private resolvedSetWith (profileVersion: string) (limen: string) (forma: string) =
     let rid = Platform.runtimeIdentifier ()
 
     $$"""{
@@ -127,10 +129,12 @@ let private resolvedSet (profileVersion: string) (forma: string) =
   "platform": "{{rid}}",
   "resolver": { "name": "test", "version": "1.0.0" },
   "catalogSnapshot": { "sha256": "{{String.replicate 64 "b"}}" },
-  "components": [{{hostTool rid}},{{limenEntry}},{{formaEntry forma}}
+  "components": [{{hostTool rid}},{{limenEntryAt limen}},{{formaEntry forma}}
   ]
 }
 """
+
+let private resolvedSet (profileVersion: string) (forma: string) = resolvedSetWith profileVersion "0.9.0" forma
 
 let private manifestText (authoritySha: string) (forma: string option) =
     let formaLine =
@@ -525,6 +529,269 @@ let private requiredWithoutScaffold check =
              | Error errors -> errors |> List.exists (fun error -> error.Contains "existing package.json binding is required")
              | Ok _ -> false)
 
+// ---- Stepwise current upgrade (CON-310..315) --------------------------------
+// A Registry checkout whose echelon-current channel moved one release at a
+// time, recorded in Git: each channel index commit binds that day's platform
+// set by SHA-256. Stepwise planning targets only those Registry-produced sets.
+
+let private gitAt (directory: string) (arguments: string list) =
+    let info = Diagnostics.ProcessStartInfo("git")
+    info.WorkingDirectory <- directory
+    info.UseShellExecute <- false
+    info.RedirectStandardOutput <- true
+    info.RedirectStandardError <- true
+
+    for argument in arguments do
+        info.ArgumentList.Add argument
+
+    for name, value in
+        [ "GIT_AUTHOR_NAME", "Fixture"
+          "GIT_AUTHOR_EMAIL", "fixture@example.invalid"
+          "GIT_COMMITTER_NAME", "Fixture"
+          "GIT_COMMITTER_EMAIL", "fixture@example.invalid" ] do
+        info.Environment[name] <- value
+
+    use proc = Diagnostics.Process.Start info |> nonNull
+    proc.StandardOutput.ReadToEnd() |> ignore
+    proc.StandardError.ReadToEnd() |> ignore
+    proc.WaitForExit()
+
+    if proc.ExitCode <> 0 then
+        failwith $"""git {String.concat " " arguments} failed in {directory}"""
+
+let private writeText (root: string) (relative: string) (text: string) =
+    let path = Path.Combine(root, relative)
+    Directory.CreateDirectory(Path.GetDirectoryName path |> nonNull) |> ignore
+    File.WriteAllText(path, text)
+    sha256Bytes (File.ReadAllBytes path)
+
+let private releaseManifest (system: string) (version: string) (mechanism: string) (package: string) (artifact: string) =
+    $$"""{
+  "schema": "echelon.release/v2",
+  "systemId": "{{system}}",
+  "version": "{{version}}",
+  "repository": "kemiller2002/{{system}}",
+  "tag": "v{{version}}",
+  "commit": "{{String.replicate 40 "2"}}",
+  "releaseStage": "stable",
+  "lifecycleState": "active",
+  "distributionClass": "web-package",
+  "executable": null,
+  "distributions": [ { "mechanism": "{{mechanism}}", "package": "{{package}}", "url": "https://github.com/kemiller2002/{{system}}/releases/tag/v{{version}}" } ],
+  "artifacts": [ { "name": "{{artifact}}", "purpose": "package", "platform": null, "sha256": "{{String.replicate 64 "e"}}" } ]
+}
+"""
+
+/// A Registry checkout whose channel history is `history`, oldest first:
+/// (profile version, Limen, Forma) per channel bump. With `tamperAt`, the
+/// channel index at that profile version records a wrong set digest.
+let private stepRegistry (history: (string * string * string) list) (tamperAt: string option) =
+    let root = temp "step-registry"
+    let rid = Platform.runtimeIdentifier ()
+    gitAt root [ "init"; "-q" ]
+
+    let releases =
+        [ for version in [ "0.4.1"; "0.5.0"; "0.6.1" ] ->
+              "forma", version, releaseManifest "forma" version "github-release" FormaPackage $"echelon-foundry-design-system-{version}.tgz"
+          for version in [ "0.8.0"; "0.9.0" ] ->
+              "limen", version, releaseManifest "limen" version "npm" LimenPackage $"echelon-foundry-limen-{version}.tgz" ]
+        |> List.map (fun (system, version, text) ->
+            let relative = $"releases/{system}/{version}.release.json"
+            system, version, relative, writeText root relative text)
+
+    let profiles =
+        history
+        |> List.map (fun (profileVersion, _, _) ->
+            let relative = $"profiles/echelon-current-{profileVersion}.profile.json"
+
+            let sha =
+                writeText
+                    root
+                    relative
+                    $$"""{
+  "schema": "echelon.profile/v1",
+  "id": "echelon-current",
+  "version": "{{profileVersion}}",
+  "allowedReleaseStages": [ "stable" ],
+  "components": [
+    { "systemId": "limen", "role": "project-binding", "required": true, "version": { "range": ">=0.6.0 <1.0.0" } },
+    { "systemId": "forma", "role": "project-binding", "required": true, "version": { "range": ">=0.3.0 <1.0.0" } }
+  ]
+}
+"""
+
+            profileVersion, (relative, sha))
+        |> Map.ofList
+
+    let releaseRows =
+        releases
+        |> List.map (fun (system, version, relative, sha) ->
+            $"    {{ \"systemId\": \"{system}\", \"version\": \"{version}\", \"manifest\": \"{relative}\", \"sha256\": \"{sha}\" }}")
+        |> String.concat ",\n"
+
+    let profileRows =
+        profiles
+        |> Map.toList
+        |> List.map (fun (version, (relative, sha)) ->
+            $"    {{ \"id\": \"echelon-current\", \"version\": \"{version}\", \"manifest\": \"{relative}\", \"sha256\": \"{sha}\" }}")
+        |> String.concat ",\n"
+
+    let snapshotSha =
+        writeText
+            root
+            "snapshots/echelon-current.catalog.json"
+            $"{{\n  \"schema\": \"echelon.catalog-snapshot/v1\",\n  \"systems\": [],\n  \"releases\": [\n{releaseRows}\n  ],\n  \"profiles\": [\n{profileRows}\n  ]\n}}\n"
+
+    for profileVersion, limen, forma in history do
+        let setRelative = $"channels/echelon-current/{rid}.json"
+        let setSha = writeText root setRelative (resolvedSetWith profileVersion limen forma)
+        let recorded = if tamperAt = Some profileVersion then String.replicate 64 "0" else setSha
+        let _, profileSha = profiles[profileVersion]
+
+        writeText
+            root
+            "channels/echelon-current/channel.json"
+            $$"""{
+  "schema": "echelon.current-channel/v1",
+  "id": "echelon-current",
+  "profile": { "id": "echelon-current", "version": "{{profileVersion}}", "sha256": "{{profileSha}}" },
+  "catalogSnapshot": { "path": "snapshots/echelon-current.catalog.json", "sha256": "{{snapshotSha}}" },
+  "platforms": [ { "platform": "{{rid}}", "path": "{{setRelative}}", "sha256": "{{recorded}}" } ]
+}
+"""
+        |> ignore
+
+        gitAt root [ "add"; "-A" ]
+        gitAt root [ "commit"; "-q"; "--no-gpg-sign"; "-m"; $"echelon-current {profileVersion}" ]
+
+    root
+
+let private stepwisePreview (repo: Repo) (registry: string) =
+    let finalPath = Path.Combine(registry, "channels", "echelon-current", $"{Platform.runtimeIdentifier ()}.json")
+    let finalSha = sha256Bytes (File.ReadAllBytes finalPath)
+
+    match Manifest.load repo.ManifestPath with
+    | Error errors -> Error errors
+    | Ok manifest ->
+        let probe executable arguments = ProcessRunner.runProcess repo.Target executable arguments
+        StepwiseUpgrade.preview ProcessRunner.runProcess repo.Target repo.ManifestPath manifest finalPath finalSha registry "echelon-current" repo.Context probe
+
+let private movesOf (step: UpgradeStep) =
+    step.Moves |> List.map (fun move -> move.Id, move.FromVersion, move.ToVersion)
+
+let private stepwise check =
+    let registry = stepRegistry [ "1.18.0", "0.9.0", "0.4.1"; "1.19.0", "0.9.0", "0.5.0"; "1.20.0", "0.9.0", "0.6.1" ] None
+    let repo = chronaShaped "stepwise-plan" "0.4.1" "0.4.1" "0.5.0"
+    declare repo "0.4.1"
+    npmProduces repo "0.5.0"
+    let manifestBefore = File.ReadAllText repo.ManifestPath
+    let packageBefore = File.ReadAllText(Path.Combine(repo.Target, "package.json"))
+
+    withPath repo.Bin (fun () ->
+        match stepwisePreview repo registry with
+        | Error errors -> check $"stepwise plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                "stepwise plans one registered minor line per step: 0.4.1 -> 0.5.0 -> 0.6.1"
+                (plan.Steps |> List.map movesOf = [ [ "forma", "0.4.1", "0.5.0" ]; [ "forma", "0.5.0", "0.6.1" ] ])
+
+            check
+                "every step targets a Registry-produced set: the historical 1.19.0 set, then the supplied target"
+                (match plan.Steps with
+                 | [ first; second ] ->
+                     first.Candidate.ProfileVersion = SemanticVersion.tryParse "1.19.0"
+                     && not first.Candidate.IsFinal
+                     && second.Candidate.IsFinal
+                 | _ -> false)
+
+            check "no step reports a gap when the Registry moved one line at a time" (plan.Steps |> List.forall (fun step -> step.Gaps.IsEmpty))
+
+            check
+                "each step links the releases it crosses"
+                (plan.Steps
+                 |> List.collect (fun step -> step.Moves |> List.collect (fun move -> move.Crosses))
+                 |> List.map (fun crossed -> crossed.Version, crossed.MigrationNotes) = [ "0.5.0", "https://github.com/kemiller2002/forma/releases/tag/v0.5.0"
+                                                                                          "0.6.1", "https://github.com/kemiller2002/forma/releases/tag/v0.6.1" ])
+
+            let first = plan.Steps.Head
+
+            check
+                "the historical set is materialized content-addressed in the workstation cache with its Registry digest"
+                (first.Candidate.Path = StepwiseUpgrade.cachePath repo.Context first.Candidate.Sha256
+                 && sha256Bytes (File.ReadAllBytes first.Candidate.Path) = first.Candidate.Sha256)
+
+            check
+                "stepwise planning is read-only for the repository"
+                (File.ReadAllText repo.ManifestPath = manifestBefore
+                 && File.ReadAllText(Path.Combine(repo.Target, "package.json")) = packageBefore
+                 && not (File.Exists repo.Log))
+
+            match plan.FirstStepPlan with
+            | None -> check "step 1 is checked against the repository" false
+            | Some firstPlan ->
+                check
+                    $"step 1 is the ordinary current-upgrade plan with no refusals: {joined firstPlan.Refusals}"
+                    (firstPlan.Refusals.IsEmpty
+                     && firstPlan.TargetSetSha256 = first.Candidate.Sha256
+                     && firstPlan.OptIns |> List.map _.Id = [ "forma" ])
+
+                // Step 1 is authorized exactly as direct mode authorizes it.
+                match apply repo (first.Candidate.Path, first.Candidate.Sha256) firstPlan.Digest with
+                | Error errors -> check $"step 1 is authorized through the direct current upgrade: {joined errors}" false
+                | Ok result ->
+                    check "step 1 lands on Forma 0.5.0 with no drift against its set" (result.NoRemainingVersionChanges && declaredForma repo = Some "0.5.0")
+
+                    npmProduces repo "0.6.1"
+
+                    match stepwisePreview repo registry with
+                    | Error errors -> check $"the remaining stepwise plan is produced: {joined errors}" false
+                    | Ok rest ->
+                        check
+                            "after step 1 the plan has one step left, to the supplied target"
+                            (rest.Steps |> List.map movesOf = [ [ "forma", "0.5.0", "0.6.1" ] ]
+                             && rest.Steps.Head.Candidate.IsFinal
+                             && rest.FirstStepPlan |> Option.exists (fun next -> next.Refusals.IsEmpty && next.OptIns.IsEmpty)))
+
+    // CON-312: the Registry recorded 0.5.0 and 0.6.1 in one bump, so no
+    // Registry set selects 0.5.0. The plan discloses the gap and takes the
+    // smallest Registry step instead of composing a set.
+    let gapRegistry = stepRegistry [ "1.18.0", "0.9.0", "0.4.1"; "1.20.0", "0.9.0", "0.6.1" ] None
+    let gapRepo = chronaShaped "stepwise-gap" "0.4.1" "0.4.1" "0.5.0"
+    declare gapRepo "0.4.1"
+
+    match stepwisePreview gapRepo gapRegistry with
+    | Error errors -> check $"stepwise gap plan is produced: {joined errors}" false
+    | Ok plan ->
+        check
+            "a release line no Registry set selects is reported as a gap, never composed"
+            (plan.Steps |> List.map movesOf = [ [ "forma", "0.4.1", "0.6.1" ] ]
+             && plan.Steps.Head.Gaps = [ { Id = "forma"; SkippedLines = [ "0.5" ] } ]
+             && plan.Steps.Head.Candidate.IsFinal)
+
+    // CON-312: a historical set that would downgrade a declared component is
+    // never a step.
+    let downgradeRegistry = stepRegistry [ "1.18.0", "0.9.0", "0.4.1"; "1.19.0", "0.8.0", "0.5.0"; "1.20.0", "0.9.0", "0.6.1" ] None
+    let downgradeRepo = chronaShaped "stepwise-downgrade" "0.4.1" "0.4.1" "0.5.0"
+    declare downgradeRepo "0.4.1"
+
+    match stepwisePreview downgradeRepo downgradeRegistry with
+    | Error errors -> check $"stepwise downgrade plan is produced: {joined errors}" false
+    | Ok plan ->
+        check
+            "a historical set that would downgrade Limen is not a step"
+            (plan.Steps |> List.map movesOf = [ [ "forma", "0.4.1", "0.6.1" ] ] && not plan.Steps.Head.Gaps.IsEmpty)
+
+    // CON-311: a historical set whose bytes do not match the digest its channel
+    // index recorded is not a Registry-produced set.
+    let tamperedRegistry = stepRegistry [ "1.18.0", "0.9.0", "0.4.1"; "1.19.0", "0.9.0", "0.5.0"; "1.20.0", "0.9.0", "0.6.1" ] (Some "1.19.0")
+
+    check
+        "a historical set that does not match its channel index digest is excluded"
+        (StepwiseUpgrade.historicalSets ProcessRunner.runProcess tamperedRegistry "echelon-current" (Platform.runtimeIdentifier ())
+         |> List.choose _.ProfileVersion
+         |> List.map string
+         |> List.sort = [ "1.18.0"; "1.20.0" ])
+
 let run (check: string -> bool -> unit) =
     requiredWithoutScaffold check
 
@@ -533,3 +800,4 @@ let run (check: string -> bool -> unit) =
     else
         stepwiseAdoption check
         refusals check
+        stepwise check

@@ -1202,6 +1202,8 @@ DeclaredWebBindingTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
 ComponentSchemaTests.run check
+ComponentSchemaTests.runStalenessPolicy check
+DriftTests.run check ComponentSchemaTests.validateDriftReport
 VerificationGateTests.run check
 NugetFeedTests.run check
 LibraryScaffoldTests.run check

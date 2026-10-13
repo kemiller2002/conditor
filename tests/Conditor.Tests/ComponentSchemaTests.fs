@@ -28,6 +28,8 @@ let private loadSchema (fileName: string) =
 let private componentSchema = loadSchema "conditor-component.schema.json"
 let private inventorySchema = loadSchema "conditor-components.schema.json"
 
+let private manifestSchema = lazy (loadSchema "conditor.schema.json")
+
 let private evaluationOptions =
     EvaluationOptions(OutputFormat = OutputFormat.List)
 
@@ -87,7 +89,7 @@ let private schemaAccepts (text: string) =
 let run (check: string -> bool -> unit) =
     // Every committed example manifest, the embedded presets included,
     // conforms to the manifest schema, requirementsImport sections too.
-    let manifestSchema = loadSchema "conditor.schema.json"
+    let manifestSchema = manifestSchema.Value
 
     for path in Directory.GetFiles(Path.Combine(repositoryRoot, "examples"), "*.conditor.json") |> Array.sort do
         let name = Path.GetFileName path
@@ -279,3 +281,25 @@ let run (check: string -> bool -> unit) =
 
     check "loader accepts an npm descriptor with empty versionArguments" (loaderAccepts acceptedCase)
     check "component schema accepts an npm descriptor with empty versionArguments" (schemaAccepts acceptedCase)
+
+/// Validates a `conditor drift --json` document against
+/// `schemas/conditor-drift-report.schema.json` (CON-306).
+let private driftReportSchema = lazy (loadSchema "conditor-drift-report.schema.json")
+
+let validateDriftReport (text: string) = validate driftReportSchema.Value text
+
+/// A manifest declaring a staleness policy conforms to the manifest schema,
+/// and a misspelt policy field does not (CON-316..317).
+let runStalenessPolicy (check: string -> bool -> unit) =
+    let manifestSchema = manifestSchema.Value
+
+    let manifest policy =
+        $$"""{"schemaVersion":1,"name":"policy","components":[{"id":"praxis","version":"3.11.0"}],"stalenessPolicy":{{policy}}}"""
+
+    check
+        "a manifest stalenessPolicy conforms to conditor.schema.json"
+        (validate manifestSchema (manifest """{"warnAfterMinorsBehind":2,"warnAfterPinAgeDays":null,"failBelowSupportedRange":true}""") = Ok())
+
+    check
+        "a misspelt stalenessPolicy field is rejected by conditor.schema.json"
+        (validate manifestSchema (manifest """{"warnAfterMinors":2}""") |> Result.isError)
