@@ -1192,6 +1192,7 @@ withTarget
             (Mission.launchState target mission = Ok "active"))
 
 WorkstationTests.run check
+WorkstationSelectionTests.run check
 RepositoryLifecycleTests.run check
 AdoptionTests.run check
 CurrentUpgradeTests.run check

@@ -114,7 +114,12 @@ jobs:
           dotnet restore Conditor.slnx
           dotnet build Conditor.slnx --configuration Release --no-restore
           dotnet run --project tests/Conditor.Tests --configuration Release --no-build
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/plan-home"
+          # DF-CON-2026-A005: a profile that names host tools is refused without a
+          # Registry set; embedded pins never select a version.
+          if dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/plan-home" > "$RUNNER_TEMP/workstation-plan-refusal.txt" 2>&1; then
+            echo "::error::workstation plan selected host-tool versions without a Registry set"; exit 1
+          fi
+          grep -F -- "--resolved-set" "$RUNNER_TEMP/workstation-plan-refusal.txt"
       - name: Commit and tag
         if: steps.version.outputs.rerun == 'false' && (github.event_name == 'push' || !inputs.dry_run)
         run: |

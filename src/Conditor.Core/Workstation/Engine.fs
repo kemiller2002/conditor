@@ -948,3 +948,128 @@ module Engine =
                     | _ -> None)
 
             Ok(results, registrations)
+
+/// Which host tools, at which versions (CON-360, CON-361, CON-363,
+/// DF-CON-2026-A005).
+module Selection =
+    /// The workstation profile to plan. A profile contributes the host-tool
+    /// list, prerequisites and optional capabilities. Versions, sources and
+    /// artifact digests come only from the digest-verified Registry set. A
+    /// profile that names host tools without a set is refused, so stale
+    /// embedded pins can never select a version. A set alone is its whole
+    /// native environment.
+    let select (profile: WorkstationProfile option) (set: WorkstationProfile option) : Result<WorkstationProfile, string> =
+        match profile, set with
+        | None, Some registrySet -> Ok registrySet
+        | None, None -> Error "Name a workstation profile or a Registry resolved set."
+        | Some named, None when named.Components.IsEmpty -> Ok named
+        | Some named, None ->
+            let tools = named.Components |> List.map _.Id |> String.concat ", "
+
+            Error
+                $"Profile {named.Id}@{named.Version} names host tools ({tools}) but no Registry selection. Pass --resolved-set PATH --resolved-set-sha256 SHA from the Registry channel so their versions come from the Registry, not from embedded pins (DF-CON-2026-A005)."
+        | Some named, Some registrySet ->
+            let selected =
+                named.Components
+                |> List.map (fun tool ->
+                    match registrySet.Components |> List.tryFind (fun item -> item.Id = tool.Id) with
+                    | Some chosen -> Ok chosen
+                    | None -> Error tool.Id)
+
+            match selected |> List.choose (function Error id -> Some id | Ok _ -> None) with
+            | [] ->
+                Ok
+                    { named with
+                        Components = selected |> List.choose (function Ok item -> Some item | Error _ -> None)
+                        SourceIdentity = registrySet.SourceIdentity }
+            | missing ->
+                let names = String.concat ", " missing
+                let identity = registrySet.SourceIdentity |> Option.defaultValue $"{registrySet.Id}@{registrySet.Version}"
+                Error $"Profile {named.Id} needs {names}, which the Registry set {identity} does not select."
+
+/// Refusing to lower an installed host tool (CON-362).
+module Downgrade =
+    open System.Text.RegularExpressions
+
+    let private versionPattern =
+        Regex(@"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", RegexOptions.CultureInvariant)
+
+    let private reported (probe: string -> string list -> ProcessResult) (executable: string) (arguments: string list) =
+        if File.Exists executable then
+            let result = probe executable arguments
+
+            if result.ExitCode = 0 then
+                let matched = versionPattern.Match result.StandardOutput
+                if matched.Success then SemanticVersion.tryParse matched.Value else None
+            else
+                None
+        else
+            None
+
+    /// True when `ctx.Home` is the user's real home directory.
+    let isRealHome (ctx: WorkstationContext) =
+        let real = Environment.GetFolderPath Environment.SpecialFolder.UserProfile
+
+        not (String.IsNullOrEmpty real)
+        && String.Equals(Path.GetFullPath(ctx.Home).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(real).TrimEnd(Path.DirectorySeparatorChar), StringComparison.Ordinal)
+
+    /// The highest version of `tool` installed for this workstation home,
+    /// with where it was seen. The candidates are:
+    /// - the Conditor install directories;
+    /// - the `~/.local/bin` shim;
+    /// - the Echelon native-installer copy in `~/.echelon/bin`;
+    /// - for the real home only, the executable `PATH` resolves.
+    let installed (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (tool: ProfileComponent) : (SemanticVersion * string) option =
+        let display = WorkstationPaths.display ctx
+        let toolRoot = Path.Combine(WorkstationPaths.installRoot ctx, tool.Id)
+
+        let directories =
+            if Directory.Exists toolRoot then
+                Directory.EnumerateDirectories toolRoot
+                |> Seq.filter (fun directory -> File.Exists(Path.Combine(directory, tool.Executable)))
+                |> Seq.choose (fun directory ->
+                    Path.GetFileName directory
+                    |> Option.ofObj
+                    |> Option.bind SemanticVersion.tryParse
+                    |> Option.map (fun version -> version, display directory))
+                |> Seq.toList
+            else
+                []
+
+        let probed (executable: string) =
+            reported probe executable tool.VersionProbe |> Option.map (fun version -> version, display executable)
+
+        let shim = probed (Path.Combine(WorkstationPaths.binDir ctx, tool.Executable))
+        let nativeInstaller = probed (Path.Combine(ctx.Home, ".echelon", "bin", tool.Executable))
+
+        let onPath =
+            if isRealHome ctx then
+                ProcessRunner.resolveExecutable tool.Executable |> Option.bind probed
+            else
+                None
+
+        directories @ List.choose id [ shim; nativeInstaller; onPath ]
+        |> List.sortByDescending fst
+        |> List.tryHead
+
+    /// Each host tool the profile would install below its installed version,
+    /// as (tool, planned, installed, where).
+    let find (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (profile: WorkstationProfile) =
+        profile.Components
+        |> List.choose (fun tool ->
+            match SemanticVersion.tryParse tool.Version, installed ctx probe tool with
+            | Some planned, Some(current, where) when current > planned -> Some(tool.Id, tool.Version, string current, where)
+            | _ -> None)
+
+    let describe (id: string, planned: string, current: string, where: string) =
+        $"{id} {planned} would downgrade the installed {id} {current} ({where}); pass --allow-downgrade to authorize it explicitly"
+
+    /// The plan with every downgrade refused, unless `allowDowngrade` lifts
+    /// the refusal explicitly; the downgrades are returned for disclosure.
+    let guard (allowDowngrade: bool) (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (plan: WorkstationPlan) =
+        let downgrades = find ctx probe plan.Profile
+
+        if allowDowngrade || downgrades.IsEmpty then
+            plan, downgrades
+        else
+            { plan with Refusals = plan.Refusals @ (downgrades |> List.map describe) }, downgrades

@@ -5,13 +5,43 @@ uninstalls; Praxis stays the runtime authority for work after handoff, and
 Project Administration records what is installed where.
 
 ```
-conditor workstation plan      [--profile echelon-engineering|minimal|FILE] [--with OPTIONAL]* [--home DIR] [--json]
-conditor workstation apply     --authorize PLAN-DIGEST [--profile ...] [--praxis PATH] [--target-id ID] [--no-rollback]
+conditor workstation plan      [--profile echelon-engineering|minimal|FILE] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--with OPTIONAL]* [--home DIR] [--json]
+conditor workstation apply     --authorize PLAN-DIGEST [--profile ...] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--praxis PATH] [--target-id ID] [--no-rollback]
 conditor workstation status    [--home DIR]
 conditor workstation reconcile --step ID [--profile ...]
 conditor uninstall --plan
 conditor uninstall --authorize PLAN-DIGEST [--praxis PATH] [--target-id ID]
 ```
+
+## Host-tool versions come from the Registry (CON-360..363, DF-CON-2026-A005)
+
+A profile supplies *which* host tools, prerequisites and optional
+capabilities; a digest-verified Registry resolved set supplies *which
+versions*. For the shared workstation, for example:
+
+```
+conditor workstation plan --profile echelon-engineering \
+  --resolved-set echelon-registry/channels/echelon-current/linux-x64.json \
+  --resolved-set-sha256 <that platform's sha256 from channel.json>
+```
+
+- **No set:** a profile that names host tools is refused without a set. A
+  profile without host tools (`minimal`) still plans.
+- **Tool missing from the set:** the plan is refused, naming the tool. The
+  plan digest binds the set's identity.
+- **Set alone:** `--resolved-set` alone, with no `--profile`, installs the
+  set's whole native environment, as before.
+- **Downgrades:** a plan that would install a host tool *below* the version
+  already installed is refused. The refusal names the tool and both
+  versions. `--allow-downgrade` lifts the refusal explicitly, and the plan
+  then prints each `DOWNGRADE (explicitly allowed)`.
+  - **Installed version (any home):** the highest of these, all under the
+    workstation home:
+    - the Conditor install directories (`~/.local/share/echelon/<tool>/<version>`);
+    - the `~/.local/bin` shim;
+    - the Echelon native installer's `~/.echelon/bin`.
+  - **Real home only:** the executable that `PATH` resolves is included too.
+    A sacrificial `--home` is never influenced by the host's `PATH`.
 
 ## Profiles (CON-160..166, CON-250..254)
 
@@ -19,8 +49,11 @@ Versioned, declarative, composable JSON (`profiles/*.profile.json`, schema
 `conditor.workstation-profile/v1`), embedded in the binary:
 
 - **`minimal`**: host readiness only (Git ≥ 2.30 required, GitHub CLI optional). Installs nothing.
-- **`echelon-engineering`**: extends `minimal`. Installs Praxis 3.6.0 and Ordo 1.4.0
-  from their GitHub native releases, pinned per runtime identifier by sha256.
+- **`echelon-engineering`**: extends `minimal`. Its host tools are Praxis
+  and Ordo. **Their versions come from the Registry set given with
+  `--resolved-set`/`--resolved-set-sha256`, never from the profile.** The
+  file still carries the Indy Init freeze pins (Praxis 3.6.0, Ordo 1.4.0),
+  but Conditor does not use them to select anything (DF-CON-2026-A005).
   Optional capabilities are listed (Praxis control plane, Forma, Limen,
   Tutela). They are installed only when selected with `--with`, and this
   profile version refuses them explicitly rather than half-installing them.

@@ -687,3 +687,36 @@ recommended 1.5.0 → 1.6.0.
   forward. Outside a Git work tree, signals are recorded unchanged. The
   scanner-side defect is kemiller2002/ordo#75: Ordo's structural review
   scans gitignored build output, for example `bin/`.
+
+### Workstation host-tool selection (WI-0040, `DF-CON-2026-A005`)
+
+Conditor 0.10.1's `workstation plan --profile echelon-engineering` planned
+Praxis 3.6.0 and Ordo 1.4.0. Those were the embedded profile's frozen pins.
+The shared workstation ran Praxis 3.11.0 and Ordo 1.5.0, and the apps were on
+echelon-current 1.22.0 (Ordo 1.7.0). Applying the plan would have downgraded
+the host tools.
+
+- **CON-360** `workstation plan`, `apply` and `reconcile` SHALL accept a
+  profile together with `--resolved-set PATH --resolved-set-sha256 SHA`
+  (digest-verified). The profile contributes the host-tool list,
+  prerequisites and optional capabilities. Every host tool's version, source
+  and artifact digests SHALL come from the resolved set. A profile tool that
+  the set does not select SHALL be refused. The plan digest SHALL bind the
+  set's identity.
+- **CON-361** Without `--resolved-set`, a profile that names host tools SHALL
+  be refused. The refusal names the missing input. A profile without host
+  tools (`minimal`) still plans. Embedded profile pins are never used to
+  select a version (DF-CON-2026-A005).
+- **CON-362** A workstation plan SHALL be refused when it would install a host
+  tool at a lower version than the one currently installed. The refusal names
+  the tool and both versions. `--allow-downgrade` SHALL lift the refusal
+  explicitly, and the plan SHALL then disclose each downgrade.
+  - **Isolated home:** the installed version is the highest of the
+    Conditor-managed install directories, the `~/.local/bin` shim and the
+    Echelon native-installer copy in `~/.echelon/bin`, all under the
+    workstation home.
+  - **Real home:** for the real home only, it also includes the executable
+    that `PATH` resolves. This keeps an isolated home independent of the
+    host.
+- **CON-363** `--resolved-set` given alone (no `--profile`) keeps its existing
+  meaning: the whole set's native environment. It is already Registry-bound.

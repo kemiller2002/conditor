@@ -58,7 +58,12 @@ jobs:
           grep -F '"schemaVersion": 1' "$RUNNER_TEMP/conditor-compatibility.json"
           grep -F '"id": "praxis"' "$RUNNER_TEMP/conditor-compatibility.json"
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- plan --preset clean-room --target "$RUNNER_TEMP/conditor-plan"
-          dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/workstation-plan-home"
+          # DF-CON-2026-A005: a profile that names host tools is refused without a
+          # Registry set; embedded pins never select a version.
+          if dotnet run --project src/Conditor.Cli --configuration Release --no-build -- workstation plan --profile echelon-engineering --home "$RUNNER_TEMP/workstation-plan-home" > "$RUNNER_TEMP/workstation-plan-refusal.txt" 2>&1; then
+            echo "::error::workstation plan selected host-tool versions without a Registry set"; exit 1
+          fi
+          grep -F -- "--resolved-set" "$RUNNER_TEMP/workstation-plan-refusal.txt"
           test -z "$(ls -A "$RUNNER_TEMP/workstation-plan-home" 2>/dev/null)"
       - name: Component schema conformance (independent validator)
         shell: bash
