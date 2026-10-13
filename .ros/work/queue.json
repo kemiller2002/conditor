@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 42,
+  "nextSeq": 43,
   "items": [
     {
       "id": "WI-0001",
@@ -995,6 +995,27 @@
       "attachments": [],
       "createdAt": "2026-10-13T22:03:17.956Z",
       "updatedAt": "2026-10-13T22:16:32Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0042",
+      "title": "Qualify Praxis 3.12.0 for upgrade --current (echelon-current 1.23.0) and release Conditor 0.10.4",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-13T22:35:32.158Z",
+      "updatedAt": "2026-10-13T22:35:35Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
