@@ -1012,10 +1012,10 @@
       "description": null,
       "tags": [],
       "priority": "medium",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-13T22:35:32.158Z",
-      "updatedAt": "2026-10-13T22:35:35Z",
+      "updatedAt": "2026-10-13T22:54:32Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
