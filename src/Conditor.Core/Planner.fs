@@ -166,6 +166,38 @@ module Planner =
 
         List.ofSeq errors
 
+    let private ignoredBindingDirectories = set [ "node_modules"; ".git"; "bin"; "obj"; ".conditor" ]
+
+    /// True when some package.json below `root` declares `package` in a
+    /// dependency section: an explicit, observed binding target (CON-333).
+    let private declaresNpmPackage (root: string) (package: string) =
+        let declares (path: string) =
+            try
+                use document = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes path)
+
+                [ "dependencies"; "devDependencies"; "optionalDependencies"; "peerDependencies" ]
+                |> List.exists (fun section ->
+                    let mutable values = Unchecked.defaultof<System.Text.Json.JsonElement>
+                    let mutable entry = Unchecked.defaultof<System.Text.Json.JsonElement>
+
+                    document.RootElement.ValueKind = System.Text.Json.JsonValueKind.Object
+                    && document.RootElement.TryGetProperty(section, &values)
+                    && values.ValueKind = System.Text.Json.JsonValueKind.Object
+                    && values.TryGetProperty(package, &entry))
+            with _ ->
+                false
+
+        let rec walk (directory: string) =
+            let here = Path.Combine(directory, "package.json")
+
+            (File.Exists here && declares here)
+            || (Directory.EnumerateDirectories directory
+                |> Seq.filter (fun child -> not (ignoredBindingDirectories.Contains(Path.GetFileName child |> Option.ofObj |> Option.defaultValue child)))
+                |> Seq.filter (fun child -> not (File.GetAttributes(child).HasFlag FileAttributes.ReparsePoint))
+                |> Seq.exists walk)
+
+        Directory.Exists root && walk root
+
     let create target operation (declaredManifest: ProjectManifest) : Result<InstallationPlan, string list> =
         let errors = ResizeArray<string>()
         let resolved = ResizeArray<ResolvedComponent>()
@@ -433,9 +465,13 @@ module Planner =
                           Package = ComponentDefinition.packageFor version definition
                           SourceReference = bindingReference version definition }
 
-                    if request.Required && manifest.Scaffold.IsNone then
+                    let observedBinding =
+                        definition.Distribution = NpmPackage
+                        && declaresNpmPackage (Path.GetFullPath target) (ComponentDefinition.packageFor version definition)
+
+                    if request.Required && manifest.Scaffold.IsNone && not observedBinding then
                         errors.Add
-                            $"Component '{request.Id}' is an application dependency. A scaffold is required so Conditor knows exactly where to bind it."
+                            $"Component '{request.Id}' is an application dependency. A scaffold or an existing package.json binding is required so Conditor knows exactly where to bind it."
 
         if errors.Count = 0 && operation = Init then
             match Scaffolding.plan target manifest with

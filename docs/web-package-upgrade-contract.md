@@ -56,11 +56,67 @@ declaration of the source or target package in `dependencies`,
     field naming anything but npm;
   * the lockfile locks the source package at the source version (and, for a
     tarball pin, resolves to that tarball).
-* A component the manifest marks `required` without a scaffold is refused, as
-  the planner would refuse to verify it.
+* A component the manifest marks `required` without a scaffold is refused
+  when no `package.json` binds it (CON-333).
 
 The SHA-256 of every observed `package.json` and lockfile is part of the plan
 digest, so editing a binding after `--check` invalidates the authorization.
+
+## Declaring a consumed web package (opt-in, CON-330..333)
+
+A repository that already consumes a registered web package but has not
+declared it is not governed by `upgrade --current` (CON-279). Chrona, Summa
+and Signal pin Forma and Folio by tarball in `package.json` and
+`.echelon/foundations.json`. Pins are never hand-edited. Instead the
+repository declares the package once, and Conditor owns its pins from then
+on:
+
+1. Add `{ "id": "forma", "version": "<the version the pins name>", "required": true }`
+   to `conditor.json`. Adding the declaration is the only change allowed
+   since the lock.
+2. Run `conditor upgrade --current --check --resolved-set ... --resolved-set-sha256 ... --home <isolated dir>`.
+   The plan lists the declaration under "declarations added to conditor.json".
+3. Authorize the printed digest.
+
+Proof of the opt-in source:
+
+* **Pins, not authority.** The source is never governed by a recorded Registry
+  authority, so the authority is not consulted. Every `package.json` binding
+  must be the exact source pin: the exact version, or the release-asset
+  tarball of exactly that version. The npm lockfile must lock it at that
+  version, as for any binding.
+* **Package.json required unless declaring at target.** At least one
+  `package.json` must bind the package. A declaration that no pin proves is
+  refused unless it is at exactly the target version.
+* **Declaration at the target version.** The pins must already name that
+  release exactly, locked, and the foundations capability (if any) must agree.
+  Nothing else changes.
+
+The declaration and the move to the target selection are one plan with one
+authorization digest. An `opt-in` line and the foundations line are added to
+the digest material, so the digest of a plan that has neither is unchanged.
+
+## Foundations capability (CON-331)
+
+When `.echelon/foundations.json` declares the component's capability:
+
+* At the source version, the transition also moves it to the target version.
+* At the target version, the capability is left alone.
+* At any other version, the transition is refused.
+
+The edit is surgical: exactly the capability's plain `version` value changes,
+and the plan proves that the edited document differs only there. A capability
+carrying a release-specific key other than `required`, `version` and
+`boundaryManifest` (for example `sourceCommit`) is refused, because Conditor
+cannot prove its new value. The file's SHA-256 is bound into the digest. It is
+backed up with the `package.json` and lockfiles, restored with them, and its
+post-condition is checked after npm runs.
+
+## Required web packages without a scaffold (CON-333)
+
+A `required` web package in a manifest without a scaffold is planned when an
+existing `package.json` binds it, because that file is an explicit target. It
+is still refused when nothing binds it (CON-023).
 
 ## Execution
 
@@ -79,8 +135,11 @@ digest, so editing a binding after `--check` invalidates the authorization.
    retired package name is gone, and the lockfile locks the target version with
    `integrity` equal to the SHA-512 of the digest-verified Registry artifact
    (and, for GitHub release assets, `resolved` equal to the asset URL).
-5. Any npm failure or failed post-condition restores every backed-up file
-   byte-for-byte and stops the upgrade before Conditor governance changes.
+5. Each planned foundations capability version moves, and its post-condition
+   is checked.
+6. Any npm failure or failed post-condition restores every backed-up file
+   (`package.json`, lockfiles, `foundations.json`) byte-for-byte and stops the
+   upgrade before Conditor governance changes.
    `node_modules` is not restored; run `npm ci`.
 
 The rest of the current upgrade is unchanged: full repository verification

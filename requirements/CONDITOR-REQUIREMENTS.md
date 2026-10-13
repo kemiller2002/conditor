@@ -544,7 +544,7 @@ Registry-produced steps, one release line at a time. Decision:
   point for Praxis `work start` and for a CI job. Changes to Praxis itself
   belong to Praxis (`docs/requirements/rolling-upgrade-notes.md`).
 
-### Declared web-package bindings (proposed; `DF-CON-2026-A004`)
+### Declared web-package bindings (accepted 2026-10-13; `DF-CON-2026-A004` decision 1)
 
 Chrona, Summa and Signal declare Forma and Folio only in `package.json` (as a
 tarball URL) and in `.echelon/foundations.json`. `upgrade --current`
@@ -583,7 +583,7 @@ CON-300 reports.
   undeclared pin of a registered web package, naming the exact `conditor.json`
   entry to add.
 
-### Qualification without a Conditor build per library release (proposed; `DF-CON-2026-A004`)
+### Qualification without a Conditor build per library release (accepted 2026-10-13, conditional on signed Registry release records; `DF-CON-2026-A004` decision 2)
 
 - **CON-340** A Registry-selected release of a `project-binding` component
   SHALL become upgradable without a new Conditor build. This SHALL hold when
@@ -616,3 +616,12 @@ CON-300 reports.
 - **CON-345** A descriptor MAY deny specific versions (`deniedVersions`). A
   denied version SHALL be refused even when it is in range and the Registry
   claims the contract.
+- **CON-346** Contract qualification (CON-340) SHALL activate only for a
+  Registry release record whose signature verifies against a Registry
+  signing key that Conditor trusts and that has not been revoked
+  (REG-SIG-001..008).
+
+  If the signature is absent or invalid, or the key is unknown or revoked,
+  the release SHALL fall under exact per-version qualification. Conditor
+  SHALL NOT fall back to an unsigned contract claim, and the plan SHALL
+  disclose which rule qualified each project-binding transition.

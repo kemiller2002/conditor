@@ -478,6 +478,14 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
             Console.WriteLine
                 $"    {transition.Id}: {transition.FromVersion} -> {transition.ToVersion} [{transition.Mode}]"
 
+    if not plan.OptIns.IsEmpty then
+        let declared =
+            plan.OptIns
+            |> List.map (fun request -> $"{request.Id}@{request.Version |> Option.defaultValue String.Empty}")
+            |> String.concat ", "
+
+        Console.WriteLine $"  declarations added to conditor.json: {declared}"
+
     match plan.WorkstationPlan with
     | Some workstation ->
         Console.WriteLine $"  workstation effects: {workstation.Steps.Length} (nested plan {workstation.Digest})"
@@ -541,6 +549,11 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
             for directory, arguments in WebPackageTransition.steps transition do
                 let rendered = String.concat " " arguments
                 Console.WriteLine $"      {directory}: npm {rendered}"
+
+            transition.Foundations
+            |> Option.iter (fun edit ->
+                Console.WriteLine
+                    $"      {WebPackageBinding.FoundationsPath}: capability {edit.Capability} {edit.FromVersion} -> {edit.ToVersion} (sha256:{edit.Sha256})")
 
     if not plan.NugetFeedChanges.IsEmpty then
         Console.WriteLine $"  NuGet release-asset feeds ({NugetFeed.FeedDirectory}):"

@@ -1,8 +1,8 @@
 ---
 id: DF-CON-2026-A004
-title: Declared web-package bindings and contract-and-line qualification of project bindings (proposed)
-status: review
-version: 0.1.0
+title: Declared web-package bindings and contract-and-line qualification of project bindings, gated on signed Registry release records
+status: accepted
+version: 1.0.0
 owners:
   - conditor
 created: 2026-10-13
@@ -19,8 +19,9 @@ confidence: medium
 provenance:
   contributions:
     EXE-20261013T150353451Z-40bfcd6e:
-      operations: [created]
+      operations: [created, modified]
       at: 2026-10-13T15:09:00.516Z
+      last: 2026-10-13T15:22:22.286Z
       actor:
         kind: agent
         id: anthropic/claude-code
@@ -32,9 +33,16 @@ provenance:
 
 # Status
 
-**In review. It awaits the program lead's decision.** Decision 2 changes
-Conditor's trust model for project bindings. Per the lead's instruction,
-nothing in this record is implemented until it is accepted.
+**Accepted on 2026-10-13 by the user, relayed by the program lead.**
+
+- **Decision 1 (declared web bindings and the opt-in migration):** accepted
+  as written. It ships with the exact-qualification patch, so that the apps
+  can move stepwise without hand-editing pins.
+- **Decision 2 (option D):** accepted, on the condition that Registry
+  release records are signed first. Contract-and-line qualification
+  activates only for a release record whose signature verifies. Until the
+  Registry signs, Conditor keeps exact per-version qualification, and it
+  never falls back to an unsigned contract claim (CON-346).
 
 # Context
 
@@ -128,6 +136,22 @@ The recommendation has three parts:
   releases keep exact embedded qualification (CON-343), because they execute
   with repository or host authority.
 
+## Accepted condition: signed release records
+
+The user accepted D only behind release-record signatures. Conditor's side
+(CON-340..346) is built gated:
+
+- A contract claim qualifies a release only when the release record's
+  signature verifies against a Registry signing key that Conditor trusts,
+  and the key is not revoked.
+- An unsigned claim, an unverifiable claim, or a claim under a revoked key
+  leaves the release under exact qualification.
+- Conditor never falls back to an unsigned contract claim.
+
+The Registry-side requirements (key, signing workflow, signed content,
+verification, rotation and revocation) are REG-SIG-001..008 in
+`docs/requirements/rolling-upgrade-notes.md`.
+
 ## Trust-model change
 
 This changes what a Conditor build vouches for. Today, a project-binding
@@ -144,9 +168,8 @@ Accepting it means accepting these terms:
   functional gate (as it already is in fact).
 
 Without release signing, the claim is integrity-bound (digest chain, Git
-history, PR review), not authenticated. If the lead wants authenticity, the
-Registry must sign release records (a separate Registry requirement) before
-D is enabled.
+history, PR review), not authenticated. The user therefore made signing a
+precondition of D (see "Accepted condition" above).
 
 # Consequences if accepted
 
@@ -159,9 +182,14 @@ D is enabled.
   `qualifiedRange` and an optional `deniedVersions`. `qualifiedVersions`
   remains for lifecycle tools.
 
-# Consequences if rejected
+# Sequencing (as directed by the lead)
 
-Option A stays. The drift advisory (DF-CON-2026-A003) still makes the gap
-visible: it reports each unqualified registered release as a step that
-`upgrade --current` will refuse. The process cost remains one Conditor
-qualification release per library release.
+1. Ship an exact-qualification patch with Decision 1 and a release:
+   - Forma 0.5.0 and 0.6.1, Folio 0.4.0, and Ordo 1.6.0 and 1.7.0;
+   - the declared-binding opt-in;
+   - foundations.json ownership;
+   - the CON-333 scaffold fix.
+2. Build `conditor drift` and `--stepwise` (CON-300..320).
+3. Build option D's Conditor side, gated on signature verification.
+4. The Registry implements REG-SIG-001..008. Until it does, step 3 stays
+   inert, and exact qualification remains the only path.

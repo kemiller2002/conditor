@@ -153,8 +153,10 @@
             "runtime": "claude-code"
           },
           "at": "2026-10-13T15:09:00.516Z",
+          "last": "2026-10-13T15:22:22.286Z",
           "operations": [
-            "created"
+            "created",
+            "modified"
           ],
           "reason": "Propose declared web bindings and contract-and-line qualification after echelon-registry#65 evidence"
         }
@@ -167,7 +169,7 @@
       "docs/decisions/0001-registry-version-authority.md"
     ],
     "research_area": "repository-lifecycle",
-    "status": "review",
+    "status": "accepted",
     "tags": [
       "decision",
       "upgrade",
@@ -175,8 +177,8 @@
       "web-package",
       "trust"
     ],
-    "title": "Declared web-package bindings and contract-and-line qualification of project bindings (proposed)",
+    "title": "Declared web-package bindings and contract-and-line qualification of project bindings, gated on signed Registry release records",
     "updated": "2026-10-13",
-    "version": "0.1.0"
+    "version": "1.0.0"
   }
 ]
