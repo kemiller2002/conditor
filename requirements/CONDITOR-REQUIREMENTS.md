@@ -543,3 +543,76 @@ Registry-produced steps, one release line at a time. Decision:
   report (CON-306). `docs/drift-advisory.md` SHALL document the integration
   point for Praxis `work start` and for a CI job. Changes to Praxis itself
   belong to Praxis (`docs/requirements/rolling-upgrade-notes.md`).
+
+### Declared web-package bindings (proposed; `DF-CON-2026-A004`)
+
+Chrona, Summa and Signal declare Forma and Folio only in `package.json` (as a
+tarball URL) and in `.echelon/foundations.json`. `upgrade --current`
+therefore plans no transition for them. A fixture that does declare them is
+refused, because the target version is not in the build's embedded
+`qualifiedVersions`. Together these two facts are the root cause of the drift
+CON-300 reports.
+
+- **CON-330** A consumer SHALL declare a web-package dependency as a
+  `conditor.json` component, for example `{ "id": "forma", "version": "0.4.1" }`.
+  Conditor SHALL then own that component's pins: every `package.json`
+  binding, its npm lockfile entry, and the `.echelon/foundations.json`
+  capability version.
+- **CON-331** When a declared web-package binding moves, `upgrade --current`
+  SHALL update the `.echelon/foundations.json` capability version in the same
+  transaction as `package.json` and the lockfile. The update SHALL be a
+  surgical JSON edit that preserves every other key. It SHALL be restored
+  byte-for-byte on any failure, and its post-condition (capability version
+  equals the target version) SHALL be checked before governance commit.
+- **CON-332** A repository that already consumes a registered web package
+  without declaring it SHALL be able to declare it through `upgrade --current`
+  as a binding opt-in. The user adds the component to `conditor.json` at the
+  version its pins name. Conditor proves the following before it plans
+  anything:
+  - every discovered pin (CON-301) names exactly that registered release;
+  - the lockfile locks it.
+
+  The plan SHALL then show the declaration and any transition to the target
+  set's selection together, under one authorization digest. A declared
+  version that disagrees with the observed pins SHALL be refused.
+- **CON-333** A required web-package binding SHALL NOT be refused merely
+  because the manifest declares no scaffold, when every binding target is an
+  existing, uniquely observed `package.json`. The CON-023 rule against
+  guessing targets still applies to repositories with no observed binding.
+- **CON-334** `conditor drift` SHALL recommend the CON-332 opt-in for every
+  undeclared pin of a registered web package, naming the exact `conditor.json`
+  entry to add.
+
+### Qualification without a Conditor build per library release (proposed; `DF-CON-2026-A004`)
+
+- **CON-340** A Registry-selected release of a `project-binding` component
+  SHALL become upgradable without a new Conditor build. This SHALL hold when
+  the release is within a line Conditor qualifies for that component, and
+  the Registry release record declares the binding contract that Conditor
+  qualifies for its distribution class.
+- **CON-341** Conditor SHALL qualify each binding *contract* and *line*. This
+  replaces the per-version list for project bindings.
+  - A binding contract is the mechanism Conditor proves, for example the
+    `echelon.web-package-binding/v1` contract of
+    `docs/web-package-upgrade-contract.md`.
+  - A line is a component's semantic-version range, for example
+    `>=0.2.0 <1.0.0`. It is declared in the embedded descriptor as
+    `qualifiedRange`.
+
+  A new major line, a new package identity, or a new contract version SHALL
+  still require a Conditor build.
+- **CON-342** The Registry claim SHALL travel inside bytes that Conditor
+  already verifies: the release manifest, whose SHA-256 the catalog snapshot
+  binds, and the resolved-set component entry, which the user-supplied set
+  digest binds. A claim outside that digest chain SHALL NOT qualify anything.
+- **CON-343** Repository-lifecycle and host-tool releases SHALL keep exact
+  per-version qualification. Those components run commands with repository
+  or host authority. A project binding only changes a dependency that the
+  repository's own verification then exercises.
+- **CON-344** A plan that uses contract qualification SHALL disclose it per
+  transition: the qualified range, the Registry contract claim and its
+  release-manifest digest. Full repository verification (CON-286) SHALL
+  remain mandatory before governance commit.
+- **CON-345** A descriptor MAY deny specific versions (`deniedVersions`). A
+  denied version SHALL be refused even when it is in range and the Registry
+  claims the contract.

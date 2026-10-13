@@ -2,8 +2,8 @@
 
 Status: proposed (for routing by the program lead)
 Owner of this note: Conditor
-Decision: `DF-CON-2026-A003`
-Conditor requirements: CON-300..CON-320 (`requirements/CONDITOR-REQUIREMENTS.md`)
+Decisions: `DF-CON-2026-A003` (accepted), `DF-CON-2026-A004` (proposed)
+Conditor requirements: CON-300..CON-320, CON-330..CON-345 (proposed) (`requirements/CONDITOR-REQUIREMENTS.md`)
 
 Conditor reports version drift (`conditor drift`) and plans stepwise current
 upgrades. Several needs fall outside Conditor's authority. This note records
@@ -66,6 +66,15 @@ does not implement them, and does not edit those repositories.
   "minimum supported" line (CON-318). The Registry SHOULD raise those lower
   bounds deliberately, as releases leave support, and record each change in
   the profile's version history.
+
+- **REG-RU-006** (needed only if `DF-CON-2026-A004` decision 2 is accepted)
+  Release manifests of project-binding systems SHOULD declare the consumer
+  contract they honour, for example
+  `consumerContracts: ["echelon.web-package-binding/v1"]`. Registry review
+  SHALL check the claim when it records the release, and SHALL backfill the
+  claim on active web-package and NuGet-library releases. If the lead
+  requires authenticity rather than digest integrity, the Registry SHALL also
+  sign release records (a separate requirement).
 
 ## Weekly cross-repository drift report (owner to be decided by the lead)
 

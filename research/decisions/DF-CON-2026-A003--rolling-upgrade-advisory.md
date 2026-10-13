@@ -20,8 +20,9 @@ confidence: medium
 provenance:
   contributions:
     EXE-20261013T150353451Z-40bfcd6e:
-      operations: [created]
+      operations: [created, modified]
       at: 2026-10-13T15:06:44.932Z
+      last: 2026-10-13T15:09:21.712Z
       actor:
         kind: agent
         id: anthropic/claude-code
@@ -127,8 +128,9 @@ reported it.
 
 - Chrona-style pins outside `conditor.json` become visible, with an exact next
   specifier and migration-notes links. Moving them is still manual, or comes
-  after they are declared to Conditor. Governing undeclared web pins through
-  `upgrade --current` is not part of this decision.
+  after they are declared to Conditor. Declaring and governing those pins, and
+  removing the per-version qualification coupling that refused Forma 0.5.0 and
+  0.6.1, are proposed separately in `DF-CON-2026-A004`.
 - Release manifests carry no release date and no migration-notes field. Drift
   uses Registry Git history for registration time and the GitHub release page
   for notes. Requirement notes REG-RU-001 and REG-RU-002 ask the Registry to
