@@ -33,6 +33,7 @@ let private usage () =
     Console.WriteLine "  conditor requirements import [--target PATH] [--manifest PATH] [--check] [--authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] --resolved-set PATH --resolved-set-sha256 SHA256 [--allow-downgrade] [--with OPTIONAL]* [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] --resolved-set PATH --resolved-set-sha256 SHA256 [--allow-downgrade] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
+    Console.WriteLine "  conditor workstation register  [--authorize DIGEST] [--profile NAME|PATH] --resolved-set PATH --resolved-set-sha256 SHA256 [--home DIR] [--praxis PATH] [--target-id ID]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
     Console.WriteLine "  conditor lifecycle plan  --operation init|status|verify|doctor|upgrade --root DIR --resolved-set PATH --resolved-set-sha256 SHA256 [--home DIR] [--json]"
@@ -1181,7 +1182,7 @@ let private runWorkstation (args: string array) =
             | Ok result ->
                 result.Reused |> List.iter (fun s -> Console.WriteLine $"  reused    {s} (receipt already matched)")
                 result.Completed |> List.iter (fun s -> Console.WriteLine $"  completed {s} (receipt matched)")
-                result.Registrations |> List.iter (fun (c, o) -> Console.WriteLine $"  registration {c}: {o}")
+                result.Registrations |> List.iter (fun (c, r) -> Console.WriteLine $"  registration {c}: {r.Outcome} ({r.Reason})")
 
                 match result.Failed with
                 | Some(step, why) ->
@@ -1191,6 +1192,51 @@ let private runWorkstation (args: string array) =
                 | None ->
                     Console.WriteLine "Workstation ready."
                     0
+    | Some "register" ->
+        // Backfill registrations for installs Conditor already performed
+        // (conditor#95, CON-366, DF-CON-2026-A006): planned and authorized
+        // like every other workstation effect.
+        let ctx = workstationContext args
+        let rid = Platform.runtimeIdentifier ()
+
+        match workstationProfile args with
+        | Error e ->
+            Console.Error.WriteLine e
+            1
+        | Ok profile ->
+            let plan = Engine.backfillPlan ctx probe profile rid
+
+            match optionValue "--authorize" args with
+            | None ->
+                Console.WriteLine $"Registration backfill plan: profile {profile.Id}@{profile.Version} (home {ctx.Home})"
+                Console.WriteLine $"  praxis: {Engine.describePraxisSource ctx plan.Praxis}"
+
+                for item in plan.Items do
+                    let last = item.LastOutcome |> Option.defaultValue "never attempted"
+                    Console.WriteLine $"  register {item.Component.Id} {item.Component.Version} (evidence {item.ReceiptStep}; last outcome: {last})"
+
+                for id, why in plan.Skipped do
+                    Console.WriteLine $"  skip     {id}: {why}"
+
+                for r in plan.Refusals do
+                    Console.WriteLine $"  REFUSED  {r}"
+
+                if plan.Items.IsEmpty then
+                    Console.WriteLine "Nothing to register."
+                    0
+                elif not plan.Refusals.IsEmpty then
+                    3
+                else
+                    Console.WriteLine $"Authorize exactly these registrations with: conditor workstation register --authorize {plan.Digest}"
+                    0
+            | Some digest ->
+                match Engine.backfillApply ctx probe plan rid digest with
+                | Error e ->
+                    Console.Error.WriteLine $"REFUSED {e}"
+                    3
+                | Ok results ->
+                    results |> List.iter (fun (c, r) -> Console.WriteLine $"  registration {c}: {r.Outcome} ({r.Reason})")
+                    if results |> List.forall (fun (_, r) -> Engine.registered r.Outcome) then 0 else 4
     | Some "status" ->
         let ctx = workstationContext args
         let entries = Ledger.read ctx
@@ -1372,7 +1418,7 @@ let private runUninstall (args: string array) =
                 3
             | Ok(results, registrations) ->
                 results |> List.iter (fun (r, _, o) -> Console.WriteLine $"  removed {r}: {o}")
-                registrations |> List.iter (fun (c, o) -> Console.WriteLine $"  removal registration {c}: {o}")
+                registrations |> List.iter (fun (c, r: Engine.Registration) -> Console.WriteLine $"  removal registration {c}: {r.Outcome} ({r.Reason})")
                 if results |> List.forall (fun (_, _, o) -> o = "match") then 0 else 4
 
 let private writeAdoptionJson (plan: AdoptionPlan) =

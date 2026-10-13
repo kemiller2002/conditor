@@ -644,13 +644,148 @@ module Engine =
 
     // -------------------------------------------------------- registration
 
+    /// A registration outcome and why (conditor#95). Outcomes Praxis reports
+    /// pass through unchanged (`recorded`, `replayed`, `unchanged`,
+    /// `submitted`, `refused`, `invalid`, `unavailable`, `misconfigured`).
+    /// Conditor itself uses the Registry's integration vocabulary
+    /// (spec/echelon-integration-standard.md): `unavailable` when no Praxis is
+    /// configured, `misconfigured` when a configured Praxis cannot produce an
+    /// installation result. Neither fails the install.
+    type Registration = { Outcome: string; Reason: string }
+
+    /// Outcomes that mean the installation is in the inventory.
+    let registered (outcome: string) = List.contains outcome [ "recorded"; "replayed"; "unchanged"; "submitted" ]
+
+    /// Where the Praxis that registers installations comes from
+    /// (DF-CON-2026-A006).
+    [<RequireQualifiedAccess>]
+    type PraxisSource =
+        /// `--praxis PATH` or `CONDITOR_PRAXIS`; always wins.
+        | Explicit of string
+        /// The workstation's own `~/.local/bin/praxis`, used only when the
+        /// ledger shows Conditor installed it and it still verifies.
+        | LedgerOwned of path: string * version: string
+        | NotConfigured of reason: string
+
+    let private shimTarget = Text.RegularExpressions.Regex("^exec \"(?<target>[^\"]+)\" \"\\$@\"$", Text.RegularExpressions.RegexOptions.Multiline)
+
+    /// The workstation's `~/.local/bin/praxis`, when it is the shim Conditor
+    /// installed and verified: the ledger records it as Conditor-created for
+    /// component `praxis`, its install step's last receipt matched, it is
+    /// still exactly the shim Conditor writes, it points into a
+    /// Conditor-created `praxis/<version>` install directory, and it reports
+    /// that version now. Anything else is a reason, never a guess.
+    let ledgerOwnedPraxis (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) : Result<string * string, string> =
+        let shim = Path.Combine(WorkstationPaths.binDir ctx, "praxis")
+        let display = WorkstationPaths.display ctx shim
+        let entries = Ledger.read ctx
+        let owned = Ledger.ownership entries |> Map.ofList
+        let ownedByConditor resource = owned |> Map.tryFind resource |> Option.bind (Map.tryFind "class") = Some(Ownership.toWire Ownership.ConditorCreated)
+
+        match owned |> Map.tryFind display with
+        | None -> Error $"{display} is not in the workstation ledger"
+        | Some record when not (ownedByConditor display) || Map.tryFind "component" record <> Some "praxis" ->
+            Error $"{display} is not a Conditor-created praxis shim in the ledger"
+        | Some _ ->
+            match Ledger.stepStatus entries "praxis-shim" with
+            | status when status <> Some "match" ->
+                let last = defaultArg status "absent"
+                Error $"the ledger's last receipt for praxis-shim is {last}, not match"
+            | _ when not (File.Exists shim) -> Error $"{display} is absent"
+            | _ ->
+                let text = File.ReadAllText shim
+                let m = shimTarget.Match text
+                let installRoot = Path.Combine(WorkstationPaths.installRoot ctx, "praxis")
+
+                if not (text.Contains "Managed by Conditor") || not m.Success then
+                    Error $"{display} is not the shim Conditor writes"
+                else
+                    let target = m.Groups["target"].Value
+                    let versionDir = Path.GetDirectoryName target |> Option.ofObj |> Option.defaultValue ""
+                    let version = Path.GetFileName versionDir |> Option.ofObj |> Option.defaultValue ""
+
+                    if not (String.Equals(Path.GetDirectoryName versionDir |> Option.ofObj |> Option.defaultValue "", installRoot, StringComparison.Ordinal)) || Path.GetFileName target <> "praxis" then
+                        Error $"{display} points outside Conditor's praxis install directory"
+                    elif not (ownedByConditor (WorkstationPaths.display ctx versionDir)) then
+                        Error $"{WorkstationPaths.display ctx versionDir} is not a Conditor-created install directory in the ledger"
+                    elif not (File.Exists target) then
+                        Error $"{WorkstationPaths.display ctx target} is absent"
+                    else
+                        let r = probe shim [ "--version" ]
+
+                        if r.ExitCode = 0 && r.StandardOutput.Contains version then Ok(shim, version)
+                        else Error $"{display} --version did not report {version} (exit {r.ExitCode})"
+
+    /// Explicit configuration wins; otherwise the ledger-owned shim; otherwise
+    /// not configured, with the reason.
+    let praxisSource (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) =
+        match ctx.Praxis with
+        | Some praxis -> PraxisSource.Explicit praxis
+        | None ->
+            match ledgerOwnedPraxis ctx probe with
+            | Ok(path, version) -> PraxisSource.LedgerOwned(path, version)
+            | Error why -> PraxisSource.NotConfigured why
+
+    let describePraxisSource (ctx: WorkstationContext) (source: PraxisSource) =
+        match source with
+        | PraxisSource.Explicit path -> $"{path} (explicit --praxis or CONDITOR_PRAXIS)"
+        | PraxisSource.LedgerOwned(path, version) -> $"{WorkstationPaths.display ctx path} (Conditor-installed Praxis {version}, verified from the ledger)"
+        | PraxisSource.NotConfigured why -> $"not configured: no --praxis or CONDITOR_PRAXIS, and {why}"
+
+    let private firstLine (text: string) =
+        text.Trim().Split('\n') |> Array.tryHead |> Option.map (fun l -> l.Trim()) |> Option.defaultValue ""
+
+    /// Interpret `praxis installation ... --json` output. A result without an
+    /// outcome is `misconfigured`, with what Praxis actually said.
+    let interpretRegistration (praxis: string) (r: ProcessResult) : Registration =
+        let text (node: JsonNode) (name: string) =
+            match node[name] with
+            | :? JsonValue as v ->
+                match v.TryGetValue<string>() with
+                | true, s -> s |> Option.ofObj |> Option.filter (fun s -> s.Trim() <> "")
+                | _ -> None
+            | _ -> None
+
+        let parsed =
+            try
+                match JsonNode.Parse r.StandardOutput with
+                | :? JsonObject as node -> Some(node :> JsonNode)
+                | _ -> None
+            with _ ->
+                None
+
+        match parsed |> Option.bind (fun node -> text node "outcome" |> Option.map (fun o -> node, o)) with
+        | Some(node, outcome) ->
+            let reason =
+                match text node "code", text node "message", text node "eventId" with
+                | Some code, Some message, _ -> $"{code}: {message}"
+                | None, Some message, _ -> message
+                | _, None, Some eventId -> $"event {eventId}"
+                | _ -> $"praxis reported {outcome}"
+
+            { Outcome = outcome; Reason = reason }
+        | None ->
+            let said = [ firstLine r.StandardError; firstLine r.StandardOutput ] |> List.filter (fun l -> l <> "") |> String.concat " / "
+            let said = if said = "" then "no output" else said
+
+            if r.ExitCode = -1 then
+                { Outcome = "misconfigured"; Reason = $"{praxis} could not be run: {said}" }
+            else
+                { Outcome = "misconfigured"; Reason = $"{praxis} exited {r.ExitCode} without an installation result: {said}" }
+
     /// Register an installed component through Praxis's
     /// `praxis installation register` (Project Administration's
     /// capability). Called only after the component's receipt matched.
-    let register (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (verb: string) (c: ProfileComponent) (rid: string) (stepId: string) =
-        match ctx.Praxis with
-        | None -> "unavailable", "no Praxis with installation registration configured (--praxis)"
-        | Some praxis ->
+    let register (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (verb: string) (c: ProfileComponent) (rid: string) (stepId: string) : Registration =
+        let praxis =
+            match praxisSource ctx probe with
+            | PraxisSource.Explicit path -> Ok path
+            | PraxisSource.LedgerOwned(path, _) -> Ok path
+            | PraxisSource.NotConfigured why -> Error why
+
+        match praxis with
+        | Error why -> { Outcome = "unavailable"; Reason = $"no Praxis configured for installation registration: no --praxis or CONDITOR_PRAXIS, and {why}" }
+        | Ok praxis ->
             let asset = c.Assets |> Map.tryFind rid
 
             let target =
@@ -665,23 +800,10 @@ module Engine =
                 @ (asset |> Option.map (fun a -> [ "--artifact"; a.Name; "--digest"; "sha256:" + a.Sha256 ]) |> Option.defaultValue [])
                 @ [ "--evidence"; $"receipt=conditor-workstation-ledger#{stepId}"; "--json" ]
 
-            let r = probe praxis args
+            interpretRegistration praxis (probe praxis args)
 
-            let outcome =
-                try
-                    match JsonNode.Parse r.StandardOutput with
-                    | null -> "unavailable"
-                    | node ->
-                        match node["outcome"] with
-                        | :? JsonValue as v ->
-                            match v.TryGetValue<string>() with
-                            | true, s -> s |> Option.ofObj |> Option.defaultValue "unavailable"
-                            | _ -> "unavailable"
-                        | _ -> "unavailable"
-                with _ ->
-                    "unavailable"
-
-            outcome, (r.StandardError + r.StandardOutput).Trim()
+    let private recordRegistration (ctx: WorkstationContext) (fields: (string * string) list) (r: Registration) =
+        Ledger.append ctx (fields @ [ "outcome", r.Outcome; "detail", r.Reason ])
 
     // ---------------------------------------------------------------- apply
 
@@ -690,7 +812,7 @@ module Engine =
           Reused: string list
           Failed: (string * string) option
           RolledBack: (string * string) list
-          Registrations: (string * string) list }
+          Registrations: (string * Registration) list }
 
     let private retrySafe (step: PlanStep) =
         match step.Operation with
@@ -811,9 +933,9 @@ module Engine =
                                     match step.Component, step.Id.EndsWith "-shim" with
                                     | Some id, true ->
                                         let c = plan.Profile.Components |> List.find (fun c -> c.Id = id)
-                                        let result, detail = register ctx probe "register" c plan.RuntimeIdentifier step.Id
-                                        Ledger.append ctx [ "entry", "registration"; "component", id; "version", c.Version; "outcome", result; "detail", detail ]
-                                        [ id, result ]
+                                        let registration = register ctx probe "register" c plan.RuntimeIdentifier step.Id
+                                        recordRegistration ctx [ "entry", "registration"; "component", id; "version", c.Version ] registration
+                                        [ id, registration ]
                                     | _ -> []
 
                                 loop rest { acc with Completed = acc.Completed @ [ step.Id ]; Registrations = acc.Registrations @ registrations }
@@ -942,12 +1064,116 @@ module Engine =
 
                     match profile |> Option.bind (fun p -> p.Components |> List.tryFind (fun c -> c.Id = id)) with
                     | Some c when all |> List.forall (fun (_, _, o) -> o = "match") ->
-                        let result, detail = register ctx probe "remove" c (Platform.runtimeIdentifier ()) $"{id}-uninstall"
-                        Ledger.append ctx [ "entry", "registration"; "component", id; "version", c.Version; "operation", "remove"; "outcome", result; "detail", detail ]
-                        Some(id, result)
+                        let registration = register ctx probe "remove" c (Platform.runtimeIdentifier ()) $"{id}-uninstall"
+                        recordRegistration ctx [ "entry", "registration"; "component", id; "version", c.Version; "operation", "remove" ] registration
+                        Some(id, registration)
                     | _ -> None)
 
             Ok(results, registrations)
+
+    // ------------------------------------------------ registration backfill
+
+    /// A component Conditor installed whose registration never succeeded.
+    type BackfillItem =
+        { Component: ProfileComponent
+          /// The install step whose matching receipt is the evidence.
+          ReceiptStep: string
+          /// The last recorded registration outcome for this version, if any.
+          LastOutcome: string option }
+
+    /// Register installations that already happened (conditor#95, CON-366):
+    /// planned and authorized like every other workstation effect.
+    type BackfillPlan =
+        { Praxis: PraxisSource
+          Items: BackfillItem list
+          /// Components not proposed, and why (not installed by Conditor at
+          /// this version, or already registered).
+          Skipped: (string * string) list
+          Refusals: string list
+          Digest: string }
+
+    /// The deterministic backfill plan, from the ledger and fresh receipts
+    /// only. A component qualifies when the ledger shows Conditor created its
+    /// shim, the shim step's last receipt matched, the shim still reports the
+    /// selected version now, and no registration of that version succeeded.
+    let backfillPlan (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (profile: WorkstationProfile) (rid: string) : BackfillPlan =
+        let entries = Ledger.read ctx
+        let owned = Ledger.ownership entries |> Map.ofList
+
+        let lastRegistration (c: ProfileComponent) =
+            entries
+            |> List.filter (fun e ->
+                Map.tryFind "entry" e = Some "registration"
+                && Map.tryFind "component" e = Some c.Id
+                && Map.tryFind "version" e = Some c.Version
+                && Map.tryFind "operation" e |> Option.forall (fun op -> op = "register"))
+            |> List.tryLast
+            |> Option.bind (Map.tryFind "outcome")
+
+        let assess (c: ProfileComponent) =
+            let shim = Path.Combine(WorkstationPaths.binDir ctx, c.Executable)
+            let display = WorkstationPaths.display ctx shim
+            let stepId = $"{c.Id}-shim"
+            let record = owned |> Map.tryFind display
+
+            if record |> Option.bind (Map.tryFind "class") <> Some(Ownership.toWire Ownership.ConditorCreated) || record |> Option.bind (Map.tryFind "component") <> Some c.Id then
+                Error $"{display} is not a Conditor-created {c.Id} shim in the ledger"
+            elif Ledger.stepStatus entries stepId <> Some "match" then
+                Error $"the ledger has no matching receipt for {stepId}"
+            else
+                match observe ctx probe (installedReceipt display c) with
+                | Outcome.Match, _ ->
+                    match lastRegistration c with
+                    | Some outcome when registered outcome -> Error $"{c.Id} {c.Version} is already registered ({outcome})"
+                    | last -> Ok { Component = c; ReceiptStep = stepId; LastOutcome = last }
+                | _, observed -> Error $"{display} does not report {c.Id} {c.Version} now ({observed})"
+
+        let assessed = profile.Components |> List.map (fun c -> c, assess c)
+        let items = assessed |> List.choose (fun (_, r) -> match r with Ok item -> Some item | Error _ -> None)
+        let skipped = assessed |> List.choose (fun (c, r) -> match r with Error why -> Some(c.Id, why) | Ok _ -> None)
+        let source = praxisSource ctx probe
+
+        let refusals =
+            match source with
+            | PraxisSource.NotConfigured why when not items.IsEmpty ->
+                [ $"unavailable: no Praxis configured for installation registration: no --praxis or CONDITOR_PRAXIS, and {why}" ]
+            | _ -> []
+
+        let canonical =
+            [ yield "praxis=" + (match source with
+                                 | PraxisSource.Explicit path -> "explicit:" + path
+                                 | PraxisSource.LedgerOwned(path, version) -> $"ledger:{WorkstationPaths.display ctx path}@{version}"
+                                 | PraxisSource.NotConfigured _ -> "none")
+              yield "target=" + defaultArg ctx.TargetId "-"
+              yield "source=" + defaultArg profile.SourceIdentity "-"
+              for item in items do
+                  let c = item.Component
+                  let digest = c.Assets |> Map.tryFind rid |> Option.map (fun a -> a.Name + "@sha256:" + a.Sha256) |> Option.defaultValue "-"
+                  yield $"register {c.Id}@{c.Version} {c.Repository} {c.Tag} {digest} receipt={item.ReceiptStep}" ]
+            |> String.concat "\n"
+
+        { Praxis = source
+          Items = items
+          Skipped = skipped
+          Refusals = refusals
+          Digest = "sha256:" + sha256Text ($"backfill {profile.Id}@{profile.Version}\n{canonical}") }
+
+    /// Apply an authorized backfill plan: refuses a digest that is not the
+    /// disclosed plan, or a plan with refusals. Each outcome is recorded in
+    /// the ledger with the original install receipt as evidence.
+    let backfillApply (ctx: WorkstationContext) (probe: string -> string list -> ProcessResult) (plan: BackfillPlan) (rid: string) (digest: string) =
+        if digest <> plan.Digest then
+            Error $"authorization {digest} does not match the backfill plan {plan.Digest}; re-run the plan and review it"
+        elif not plan.Refusals.IsEmpty then
+            Error(String.concat "; " plan.Refusals)
+        else
+            plan.Items
+            |> List.map (fun item ->
+                let c = item.Component
+                let registration = register ctx probe "register" c rid item.ReceiptStep
+                recordRegistration ctx [ "entry", "registration"; "component", c.Id; "version", c.Version; "operation", "register"; "trigger", "backfill" ] registration
+                c.Id, registration)
+            |> Ok
 
 /// Which host tools, at which versions (CON-360, CON-361, CON-363,
 /// DF-CON-2026-A005).
