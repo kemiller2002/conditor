@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T17:49:52.000Z",
+  "updatedAt": "2026-10-13T18:04:48.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1890,33 +1890,59 @@
     {
       "id": "WI-0040",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-13T17:49:52.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Workstation/Engine.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Cli/Program.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WorkstationSelectionTests.fs"
+        },
+        {
+          "type": "requirements",
+          "path": "requirements/CONDITOR-REQUIREMENTS.md"
+        },
+        {
+          "type": "decision",
+          "path": "research/decisions/DF-CON-2026-A005--workstation-host-tools-from-the-registry.md"
+        },
+        {
+          "type": "documentation",
+          "path": "docs/workstation.md"
+        }
+      ],
+      "updatedAt": "2026-10-13T18:04:48.000Z",
       "telemetryExecutionIds": [
         "EXE-20261013T174953100Z-477629ba"
       ],
       "latestCheckpoint": {
-        "id": "376833f1473e0992991442db",
-        "recordedAt": "2026-10-13T18:00:52.000Z",
+        "id": "582b5e639a1f37c3f2e53015",
+        "recordedAt": "2026-10-13T18:04:40.000Z",
         "executionId": "EXE-20261013T174953100Z-477629ba",
         "repository": "conditor",
-        "branch": "fix/workstation-registry-selection",
-        "commit": "9762c770adafd6c4da8a7dd79e57f215c87ca3d2",
+        "branch": "release/0.10.2",
+        "commit": "7bd6db206ac17f036f18e59ee8c02f07b4321555",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "fix/workstation-registry-selection",
-        "remoteCommit": "9762c770adafd6c4da8a7dd79e57f215c87ca3d2",
-        "summary": "Fixed the clean-host proof regression (JSON identity ReleaseVersion); equal-version no-op and older-version refusal tested",
-        "nextAction": "Gate-merge PR #93, request Conditor 0.10.2, record it in the registry",
+        "remoteBranch": "release/0.10.2",
+        "remoteCommit": "7bd6db206ac17f036f18e59ee8c02f07b4321555",
+        "summary": "PR #93 merged; Conditor 0.10.2 requested",
+        "nextAction": "Merge the release request; open the registry PR for 0.10.2",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
-      }
+      },
+      "completedAt": "2026-10-13T18:04:48.000Z"
     }
   ]
 }
