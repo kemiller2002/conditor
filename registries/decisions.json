@@ -84,5 +84,99 @@
     "title": "Indy Init day-of defaults for launch mode, slice policy, trace visibility, deployment, AI transport, persistence auth, organizer sign-off and demo scenario",
     "updated": "2026-10-08",
     "version": "1.0.0"
+  },
+  {
+    "confidence": "medium",
+    "created": "2026-10-13",
+    "decision_type": "architecture",
+    "id": "DF-CON-2026-A003",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A003--rolling-upgrade-advisory.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261013T150353451Z-40bfcd6e": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "agent",
+            "model": "unknown",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-10-13T15:06:44.932Z",
+          "last": "2026-10-13T15:09:21.712Z",
+          "operations": [
+            "created",
+            "modified"
+          ],
+          "reason": "Record the rolling-upgrade advisory decision: read-only drift, Registry-produced stepwise sets, declared staleness policy"
+        }
+      }
+    },
+    "related_documents": [
+      "requirements/CONDITOR-REQUIREMENTS.md",
+      "docs/drift-advisory.md",
+      "docs/requirements/rolling-upgrade-notes.md",
+      "docs/decisions/0001-registry-version-authority.md",
+      "docs/web-package-upgrade-contract.md"
+    ],
+    "research_area": "repository-lifecycle",
+    "status": "accepted",
+    "tags": [
+      "decision",
+      "upgrade",
+      "drift",
+      "registry"
+    ],
+    "title": "Conditor reports version drift as a read-only advisory and plans stepwise current upgrades only through Registry-produced resolved sets",
+    "updated": "2026-10-13",
+    "version": "1.0.0"
+  },
+  {
+    "confidence": "medium",
+    "created": "2026-10-13",
+    "decision_type": "architecture",
+    "id": "DF-CON-2026-A004",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A004--project-binding-qualification-and-declared-web-bindings.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261013T150353451Z-40bfcd6e": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "agent",
+            "model": "unknown",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-10-13T15:09:00.516Z",
+          "operations": [
+            "created"
+          ],
+          "reason": "Propose declared web bindings and contract-and-line qualification after echelon-registry#65 evidence"
+        }
+      }
+    },
+    "related_documents": [
+      "DF-CON-2026-A003",
+      "requirements/CONDITOR-REQUIREMENTS.md",
+      "docs/web-package-upgrade-contract.md",
+      "docs/decisions/0001-registry-version-authority.md"
+    ],
+    "research_area": "repository-lifecycle",
+    "status": "review",
+    "tags": [
+      "decision",
+      "upgrade",
+      "qualification",
+      "web-package",
+      "trust"
+    ],
+    "title": "Declared web-package bindings and contract-and-line qualification of project bindings (proposed)",
+    "updated": "2026-10-13",
+    "version": "0.1.0"
   }
 ]

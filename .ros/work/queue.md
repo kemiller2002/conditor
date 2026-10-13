@@ -44,3 +44,4 @@
 | WI-0035 | Release Conditor 0.8.2: Praxis 3.10.0 and 3.11.0 qualified for upgrade --current on echelon-current 1.17.0 | complete |  | high |
 | WI-0036 | Run Conditor's push-only CI jobs on pull requests so no gating check is skipped on a PR head | complete |  | high |
 | WI-0037 | Make the Registry-authority adoption test independent of the developer's PATH | complete |  | medium |
+| WI-0038 | Rolling-upgrade advisory: conditor drift, stepwise upgrade --current --check, and staleness policy | ready |  | medium |
