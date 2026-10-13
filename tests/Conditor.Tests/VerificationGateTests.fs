@@ -141,6 +141,15 @@ let private gateSelection check =
         (Registry.qualifiedVersions "ordo" |> Option.exists (Set.contains "1.5.0")
          && VerificationGate.argumentsFor "1.5.0" ordo = gateArguments)
 
+    // Ordo 1.6.0 and 1.7.0 are the next registered steps. They keep the
+    // ordo.verify-json/v1 integrity-only report; CI's integrity-gate matrix
+    // runs both released binaries through adoption.
+    for version in [ "1.6.0"; "1.7.0" ] do
+        check
+            $"Ordo {version} is qualified and verified through the integrity-only gate"
+            (Registry.qualifiedVersions "ordo" |> Option.exists (Set.contains version)
+             && VerificationGate.argumentsFor version ordo = gateArguments)
+
     check
         "Ordo releases without the integrity gate keep the fail-closed strict verify"
         (VerificationGate.argumentsFor "1.4.1" ordo = [ "verify"; "--strict" ]
