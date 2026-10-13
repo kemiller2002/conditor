@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T22:03:24Z",
+  "updatedAt": "2026-10-13T22:16:32Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1947,33 +1947,48 @@
     {
       "id": "WI-0041",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-13T22:03:24Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Workstation/Engine.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RegistrationBackfillTests.fs"
+        },
+        {
+          "type": "decision",
+          "path": "research/decisions/DF-CON-2026-A006--workstation-registrar-default.md"
+        }
+      ],
+      "updatedAt": "2026-10-13T22:16:32Z",
       "telemetryExecutionIds": [
         "EXE-20261013T220325306Z-15bc4dea"
       ],
       "latestCheckpoint": {
-        "id": "5ec92923bc84e7145f2636a1",
-        "recordedAt": "2026-10-13T22:10:48Z",
+        "id": "911e3f58bad6f13db6418eef",
+        "recordedAt": "2026-10-13T22:16:31Z",
         "executionId": "EXE-20261013T220325306Z-15bc4dea",
         "repository": "conditor",
-        "branch": "wi-0041-registration-backfill",
-        "commit": "0e159b3d82281e088c0ce1c704224b942e747af2",
+        "branch": "wi-0041-release-0.10.3",
+        "commit": "ecc8f9f330b6a06731f109355b739fcc825d6007",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "wi-0041-registration-backfill",
-        "remoteCommit": "0e159b3d82281e088c0ce1c704224b942e747af2",
-        "summary": "conditor#95 fixes 1-4 implemented: reasons, unavailable vs misconfigured, ledger-owned verified Praxis default (DF-CON-2026-A006), planned workstation register backfill; CON-364..366; 1073 checks pass; pushed 0e159b3d",
-        "nextAction": "Open PR, gate-merge on green exact head, then request 0.10.3",
+        "remoteBranch": "wi-0041-release-0.10.3",
+        "remoteCommit": "ecc8f9f330b6a06731f109355b739fcc825d6007",
+        "summary": "#96 merged at e87934f9; release request 0.10.3 pushed at ecc8f9f3",
+        "nextAction": "Gate-merge the release request, verify the 0.10.3 release, record it in the registry",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
-      }
+      },
+      "completedAt": "2026-10-13T22:16:32Z",
+      "conclusion": "conditor#95 fixed (CON-364..366, DF-CON-2026-A006); 0.10.3 requested"
     }
   ]
 }

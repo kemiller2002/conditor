@@ -991,10 +991,10 @@
       "description": null,
       "tags": [],
       "priority": "medium",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-13T22:03:17.956Z",
-      "updatedAt": "2026-10-13T22:03:20Z",
+      "updatedAt": "2026-10-13T22:16:32Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
