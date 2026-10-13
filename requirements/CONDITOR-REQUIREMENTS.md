@@ -678,3 +678,12 @@ recommended 1.5.0 → 1.6.0.
 - **CON-354** A successful current upgrade's idempotency proof (CON-289)
   SHALL require no remaining transitions and no remaining pin repairs.
 
+- **CON-355** A Conditor lock SHALL NOT depend on untracked or ignored files
+  in the working tree. In a Git work tree, Conditor SHALL record structural
+  review signals only for paths Git tracks. After it writes a lock,
+  `upgrade --current` SHALL verify that no review signal names an untracked
+  path, and SHALL restore the previous lock and fail if one does. A re-run
+  on a clean tree SHALL drop stale entries that earlier locks carried
+  forward. Outside a Git work tree, signals are recorded unchanged. The
+  scanner-side defect is kemiller2002/ordo#75: Ordo's structural review
+  scans gitignored build output, for example `bin/`.

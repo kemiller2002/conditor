@@ -1021,7 +1021,22 @@ module CurrentUpgrade =
                                         match Planner.createTrusting trust target Init committedManifest with
                                         | Error errors -> Error errors
                                         | Ok lockPlan ->
+                                            let lockFile = Path.Combine(Path.GetFullPath target, ".conditor", "lock.json")
+                                            let oldLock = if File.Exists lockFile then Some(File.ReadAllBytes lockFile) else None
                                             let lockPath = LockFile.writeWith target manifestPath lockPlan reviewSignals
+
+                                            // A lock never depends on untracked or
+                                            // ignored files (kemiller2002/ordo#75).
+                                            match LockFile.untrackedSignalPaths target with
+                                            | _ :: _ as untracked ->
+                                                match oldLock with
+                                                | Some bytes -> writeAtomically lockFile bytes
+                                                | None -> File.Delete lockFile
+
+                                                let shown = String.concat ", " untracked
+                                                Error [ $"The new lock names review-signal paths Git does not track ({shown}); a lock must not depend on untracked or ignored files." ]
+                                            | [] ->
+
                                             let remaining =
                                                 match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
                                                 | Ok second -> second.Transitions.IsEmpty && second.PinRepairs.IsEmpty

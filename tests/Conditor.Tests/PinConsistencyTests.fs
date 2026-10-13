@@ -30,14 +30,14 @@ let private sha256File (path: string) =
 /// A stand-in Ordo release archive: `ordo upgrade` moves .sde/VERSION to
 /// `version`, and `ordo verify --integrity-only --json` reports an
 /// ordo.verify-json/v1 pass for exactly that installed version.
-let private ordoBundle (mirror: string) (version: string) (rid: string) =
+let private ordoBundleWith (signals: string) (mirror: string) (version: string) (rid: string) =
     let staging = temp "bundle"
     let root = Path.Combine(staging, $"ordo-{rid}")
     Directory.CreateDirectory root |> ignore
     let executable = Path.Combine(root, "ordo")
 
     let report =
-        $$"""{"schemaVersion":1,"command":"verify","tool":"sde","package":"@echelon-foundry/sde","state":"installed","installedVersion":"{{version}}","managedFileCount":1,"mode":"integrity-only","strict":false,"passed":true,"problems":[],"strictFailures":[],"failures":[],"reviewSignals":[],"structural":{"ran":true,"error":null,"enabled":true,"configurationSource":"defaults","inspectedFiles":1,"findings":[]},"exitCode":0}"""
+        $$"""{"schemaVersion":1,"command":"verify","tool":"sde","package":"@echelon-foundry/sde","state":"installed","installedVersion":"{{version}}","managedFileCount":1,"mode":"integrity-only","strict":false,"passed":true,"problems":[],"strictFailures":[],"failures":[],"reviewSignals":[{{signals}}],"structural":{"ran":true,"error":null,"enabled":true,"configurationSource":"defaults","inspectedFiles":1,"findings":[]},"exitCode":0}"""
 
     let script =
         String.concat
@@ -64,6 +64,8 @@ let private ordoBundle (mirror: string) (version: string) (rid: string) =
         TarFile.CreateFromDirectory(staging, gzip, false)
 
     name, sha256File archive
+
+let private ordoBundle mirror version rid = ordoBundleWith "" mirror version rid
 
 /// A Registry-shaped set selecting Ordo `version` as a native host tool
 /// without the generic lifecycle contract: the embedded-qualified path.
@@ -340,6 +342,101 @@ let private invariantCatchesSkippedPin check =
                 "the invariant commits no Registry authority"
                 (not (File.Exists(Path.Combine(repo.Target, ".conditor", "authority", "resolved-release-set.json"))))
 
+let private gitAt (directory: string) (arguments: string list) =
+    let info = Diagnostics.ProcessStartInfo("git")
+    info.WorkingDirectory <- directory
+    info.UseShellExecute <- false
+    info.RedirectStandardOutput <- true
+    info.RedirectStandardError <- true
+
+    for argument in arguments do
+        info.ArgumentList.Add argument
+
+    for name, value in
+        [ "GIT_AUTHOR_NAME", "Fixture"
+          "GIT_AUTHOR_EMAIL", "fixture@example.invalid"
+          "GIT_COMMITTER_NAME", "Fixture"
+          "GIT_COMMITTER_EMAIL", "fixture@example.invalid" ] do
+        info.Environment[name] <- value
+
+    use proc = Diagnostics.Process.Start info |> nonNull
+    proc.StandardOutput.ReadToEnd() |> ignore
+    proc.StandardError.ReadToEnd() |> ignore
+    proc.WaitForExit()
+
+    if proc.ExitCode <> 0 then
+        failwith $"""git {String.concat " " arguments} failed in {directory}"""
+
+let private lockSignalPaths (repo: Repo) =
+    use document = Text.Json.JsonDocument.Parse(File.ReadAllBytes(Path.Combine(repo.Target, ".conditor", "lock.json")))
+    let mutable signals = Unchecked.defaultof<Text.Json.JsonElement>
+
+    if document.RootElement.TryGetProperty("reviewSignals", &signals) then
+        signals.EnumerateArray() |> Seq.map (fun signal -> signal.GetProperty("path").GetString() |> nonNull) |> Seq.sort |> Seq.toList
+    else
+        []
+
+/// A lock never depends on untracked or ignored files (kemiller2002/ordo#75).
+/// Ordo's structural review reports both a tracked source file and a
+/// gitignored build output that is on disk at authorize time.
+let private lockIgnoresUntrackedFiles check =
+    let ignoredBuild = "src/Summa.Wasm/bin/Release/net10.0/wwwroot/_framework/dotnet.js"
+
+    let signals =
+        String.concat
+            ","
+            [ for path in [ "src/Big.fs"; ignoredBuild ] ->
+                  $"{{\"code\":\"SDE-STRUCT-001\",\"band\":\"strong-review\",\"path\":\"{path}\",\"lineCount\":2100}}" ]
+
+    let repo = summaShaped "lock-tracked" "1.5.0" "1.5.0" (Some "1.5.0")
+    File.WriteAllText(Path.Combine(repo.Target, ".gitignore"), "bin/\n")
+    Directory.CreateDirectory(Path.Combine(repo.Target, "src")) |> ignore
+    File.WriteAllText(Path.Combine(repo.Target, "src", "Big.fs"), String.replicate 2100 "// line\n")
+    gitAt repo.Target [ "init"; "-q" ]
+    gitAt repo.Target [ "add"; "-A" ]
+    gitAt repo.Target [ "commit"; "-q"; "--no-gpg-sign"; "-m"; "fixture" ]
+
+    // The large build output exists on disk, ignored and untracked.
+    let buildPath = Path.Combine(repo.Target, ignoredBuild)
+    Directory.CreateDirectory(Path.GetDirectoryName buildPath |> nonNull) |> ignore
+    File.WriteAllText(buildPath, String.replicate 2100 "// generated\n")
+
+    let rid = Platform.runtimeIdentifier ()
+    let assetName, assetSha = ordoBundleWith signals repo.Mirror "1.6.0" rid
+    let setPath = Path.Combine(repo.Mirror, "ordo-1.6.0.json")
+    let set = setPath, ordoSet setPath "1.6.0" rid assetName assetSha
+
+    match preview repo set |> Result.bind (fun plan -> apply repo set plan.Digest) with
+    | Error errors -> check $"the upgrade with an ignored build output succeeds: {joined errors}" false
+    | Ok _ ->
+        check
+            "the lock records the tracked file's review signal and not the ignored build output"
+            (lockSignalPaths repo = [ "src/Big.fs" ])
+
+        check "the written lock names no untracked path" (LockFile.untrackedSignalPaths repo.Target).IsEmpty
+
+        // An existing lock written before this guard (0.10.0) carries the
+        // stale entry forward; the post-authorize check detects it.
+        let lockFile = Path.Combine(repo.Target, ".conditor", "lock.json")
+        let staleEntry = $"{{ \"component\": \"ordo\", \"code\": \"SDE-STRUCT-001\", \"band\": \"strong-review\", \"path\": \"{ignoredBuild}\", \"lineCount\": 1240 }},"
+        let current = File.ReadAllText lockFile
+        let index = current.IndexOf("\"reviewSignals\": [", StringComparison.Ordinal) + "\"reviewSignals\": [".Length
+        File.WriteAllText(lockFile, current.Insert(index, staleEntry))
+
+        check
+            "a lock naming an untracked path is detected (the post-authorize check)"
+            (LockFile.untrackedSignalPaths repo.Target = [ ignoredBuild ])
+
+        // A clean-tree re-run against the same set removes the stale entry.
+        File.Delete buildPath
+
+        match preview repo set |> Result.bind (fun plan -> apply repo set plan.Digest) with
+        | Error errors -> check $"the clean-tree re-run succeeds: {joined errors}" false
+        | Ok _ ->
+            check
+                "a clean-tree re-run removes the stale entry from the existing lock"
+                (lockSignalPaths repo = [ "src/Big.fs" ] && (LockFile.untrackedSignalPaths repo.Target).IsEmpty)
+
 let run (check: string -> bool -> unit) =
     if OperatingSystem.IsWindows() then
         check "pin consistency fixture is skipped on Windows" true
@@ -348,3 +445,4 @@ let run (check: string -> bool -> unit) =
         repairFoundationsBehind check
         repairConditorBehind check
         invariantCatchesSkippedPin check
+        lockIgnoresUntrackedFiles check

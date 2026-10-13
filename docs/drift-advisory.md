@@ -249,3 +249,13 @@ conditor upgrade --current --check --resolved-set .conditor/authority/resolved-r
 ```
 
 Then authorize the printed digest.
+
+## Locks record only tracked files (CON-355)
+
+Ordo's structural review can report gitignored build output, such as a
+`bin/` `dotnet.js` (kemiller2002/ordo#75). In a Git work tree, Conditor
+records review signals in `.conditor/lock.json` only for paths Git tracks.
+After every authorized current upgrade it checks the written lock, so a lock
+that names an untracked path fails the upgrade and the previous lock is
+restored. To drop a stale entry from an existing lock, re-run the current
+upgrade on a clean tree against the recorded authority.
