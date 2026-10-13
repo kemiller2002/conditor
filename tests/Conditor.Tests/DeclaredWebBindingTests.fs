@@ -14,6 +14,7 @@ open System
 open System.IO
 open System.Security.Cryptography
 open System.Text
+open System.Text.Json
 open Conditor.Core
 open Conditor.Core.Workstation
 
@@ -792,6 +793,161 @@ let private stepwise check =
          |> List.map string
          |> List.sort = [ "1.18.0"; "1.20.0" ])
 
+// ---- Attested qualification (CON-340..346, DF-CON-2026-A004 decision 2) ------
+// A web-package release outside this build's exact qualifiedVersions (Forma
+// 0.7.0) is qualified only by a Registry release attestation whose ECDSA
+// P-256 signature verifies under a pinned, unrevoked key and that claims the
+// web-package binding contract, inside the descriptor's qualifiedRange. Every
+// other case stays under exact qualification and is refused.
+
+let private attestedSet (repo: Repo) (name: string) (forma: string) (attestation: (string * string * string list) option) =
+    let root = Nodes.JsonNode.Parse(resolvedSetWith "1.21.0" "0.9.0" forma) |> nonNull :?> Nodes.JsonObject
+
+    match attestation with
+    | None -> ()
+    | Some(keyId, signature, contracts) ->
+        for item in (root["components"] |> nonNull :?> Nodes.JsonArray) do
+            let entry = item |> nonNull :?> Nodes.JsonObject
+
+            if string entry["systemId"] = "forma" then
+                let attestationNode = Nodes.JsonObject()
+                attestationNode["schema"] <- Nodes.JsonValue.Create ReleaseAttestation.StatementSchema
+                let claimed = Nodes.JsonArray()
+
+                for contract in contracts do
+                    claimed.Add(Nodes.JsonValue.Create contract)
+
+                attestationNode["consumerContracts"] <- claimed
+                attestationNode["keyId"] <- Nodes.JsonValue.Create keyId
+                attestationNode["algorithm"] <- Nodes.JsonValue.Create ReleaseAttestation.Algorithm
+                attestationNode["signature"] <- Nodes.JsonValue.Create signature
+                entry["releaseAttestation"] <- attestationNode
+
+    let path = Path.Combine(repo.Mirror, name)
+    File.WriteAllText(path, root.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
+    path, sha256Bytes (File.ReadAllBytes path)
+
+let private sign (key: System.Security.Cryptography.ECDsa) (version: string) (contracts: string list) =
+    let statement = ReleaseAttestation.statement "forma" version (String.replicate 64 "c") contracts
+    let signature = key.SignData(Encoding.UTF8.GetBytes statement, HashAlgorithmName.SHA256, System.Security.Cryptography.DSASignatureFormat.IeeeP1363FixedFieldConcatenation)
+    Convert.ToBase64String signature
+
+let private previewTrusting trust (repo: Repo) (setPath: string, setSha: string) =
+    match Manifest.load repo.ManifestPath with
+    | Error errors -> Error errors
+    | Ok manifest ->
+        let probe executable arguments = ProcessRunner.runProcess repo.Target executable arguments
+        CurrentUpgrade.previewTrusting trust repo.Target repo.ManifestPath manifest setPath setSha repo.Context probe
+
+let private attested check =
+    use key = System.Security.Cryptography.ECDsa.Create(System.Security.Cryptography.ECCurve.NamedCurves.nistP256)
+
+    let trusted =
+        [ { KeyId = "registry-test-1"
+            PublicKey = key.ExportSubjectPublicKeyInfo()
+            RevokedAt = None } ]
+
+    let revoked = trusted |> List.map (fun item -> { item with RevokedAt = Some(DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero)) })
+    let contract = [ ReleaseAttestation.WebPackageBindingContract ]
+
+    check
+        "this build pins no Registry release key yet, so contract qualification is inert until the Registry signs"
+        ReleaseAttestation.embedded.Value.IsEmpty
+
+    let scenario label (trust: TrustedKey list) (forma: string) attestation =
+        let repo = chronaShaped label "0.6.1" "0.6.1" "0.5.0"
+        File.WriteAllBytes(Path.Combine(repo.Mirror, $"echelon-foundry-design-system-{forma}.tgz"), formaBytes forma)
+        declare repo "0.6.1"
+        let set = attestedSet repo $"{label}.json" forma attestation
+        repo, set, previewTrusting trust repo set
+
+    let refusedWith label trust forma attestation (needle: string) =
+        let _, _, result = scenario label trust forma attestation
+
+        match result with
+        | Error errors -> check $"{label} plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                $"{label} is refused: {joined plan.Refusals}"
+                (plan.Refusals |> List.exists (fun refusal -> refusal.Contains("target version", StringComparison.Ordinal) && refusal.Contains(needle, StringComparison.Ordinal)))
+
+    // The signed, trusted, in-range, contract-claiming release is qualified.
+    let repo, set, result = scenario "attested-0.7.0" trusted "0.7.0" (Some("registry-test-1", sign key "0.7.0" contract, contract))
+
+    match result with
+    | Error errors -> check $"attested plan is produced: {joined errors}" false
+    | Ok plan ->
+        check $"a verified attestation qualifies Forma 0.7.0 without a new Conditor build: {joined plan.Refusals}" plan.Refusals.IsEmpty
+
+        check
+            "the plan discloses the attested qualification, its range and key (CON-344)"
+            (plan.WebPackageTransitions
+             |> List.exists (fun transition -> transition.Qualification = "attested:>=0.2.0 <1.0.0:registry-test-1"))
+
+        npmProduces repo "0.7.0"
+
+        withPath repo.Bin (fun () ->
+            match Manifest.load repo.ManifestPath with
+            | Error errors -> check $"attested manifest loads: {joined errors}" false
+            | Ok manifest ->
+                let probe executable arguments = ProcessRunner.runProcess repo.Target executable arguments
+
+                match CurrentUpgrade.applyTrusting trusted repo.Target repo.ManifestPath manifest (fst set) (snd set) repo.Context probe plan.Digest with
+                | Error errors -> check $"an attested upgrade applies with full verification: {joined errors}" false
+                | Ok result ->
+                    check "an attested upgrade lands on Forma 0.7.0 with no drift" (result.NoRemainingVersionChanges && declaredForma repo = Some "0.7.0"))
+
+    // Exact qualification is unchanged and never needs an attestation.
+    let _, _, exactResult = scenario "exact-0.6.1" [] "0.6.1" None
+
+    match exactResult with
+    | Ok plan -> check "an exactly qualified release needs no attestation" (plan.Refusals.IsEmpty)
+    | Error errors -> check $"exact plan is produced: {joined errors}" false
+
+    refusedWith "the same release with this build's (empty) pinned trust set" ReleaseAttestation.embedded.Value "0.7.0" (Some("registry-test-1", sign key "0.7.0" contract, contract)) "is not pinned"
+    refusedWith "an unsigned contract claim" trusted "0.7.0" None "never relies on an unsigned contract claim"
+    refusedWith "a signature over another version" trusted "0.7.0" (Some("registry-test-1", sign key "0.7.1" contract, contract)) "does not verify"
+    refusedWith "an attestation under a revoked key" revoked "0.7.0" (Some("registry-test-1", sign key "0.7.0" contract, contract)) "was revoked"
+
+    refusedWith
+        "an attestation that does not claim the web-package binding contract"
+        trusted
+        "0.7.0"
+        (Some("registry-test-1", sign key "0.7.0" [ "echelon.other/v1" ], [ "echelon.other/v1" ]))
+        "does not claim"
+
+    refusedWith "an attested release outside the qualified range" trusted "1.0.0" (Some("registry-test-1", sign key "1.0.0" contract, contract)) "outside its qualified range"
+
+    // Descriptor rules (CON-343, CON-345).
+    let descriptor (extra: string) (distribution: string) =
+        let lifecycle =
+            if distribution = "host-tool" then
+                "\"command\": \"tool\", \"versionArguments\": [\"--version\"],"
+            else
+                "\"applicationBinding\": \"npm\","
+
+        $$"""{ "schemaVersion": 1, "id": "sample", "displayName": "Sample", "distribution": "{{distribution}}", "package": "sample", "defaultVersion": "1.0.0", "qualifiedVersions": ["1.0.0"], {{lifecycle}} {{extra}} "initArguments": [], "verifyArguments": [], "doctorArguments": [], "upgradeArguments": [] }"""
+
+    check
+        "a project binding may declare a qualified range and denied versions"
+        (ComponentDescriptors.parse "sample" (descriptor "\"qualifiedRange\": \">=1.0.0 <2.0.0\", \"deniedVersions\": [\"1.2.0\"]," "npm")
+         |> Result.isOk)
+
+    check
+        "a lifecycle tool may not declare a qualified range (it stays exact)"
+        (match ComponentDescriptors.parse "sample" (descriptor "\"qualifiedRange\": \">=1.0.0 <2.0.0\"," "host-tool") with
+         | Error errors -> errors |> List.exists (fun error -> error.Contains "CON-343")
+         | Ok _ -> false)
+
+    check
+        "a denied version may not also be exactly qualified"
+        (ComponentDescriptors.parse "sample" (descriptor "\"qualifiedRange\": \">=1.0.0 <2.0.0\", \"deniedVersions\": [\"1.0.0\"]," "npm")
+         |> Result.isError)
+
+    check
+        "an unparseable qualified range is refused"
+        (ComponentDescriptors.parse "sample" (descriptor "\"qualifiedRange\": \"latest\"," "npm") |> Result.isError)
+
 let run (check: string -> bool -> unit) =
     requiredWithoutScaffold check
 
@@ -801,3 +957,4 @@ let run (check: string -> bool -> unit) =
         stepwiseAdoption check
         refusals check
         stepwise check
+        attested check

@@ -51,6 +51,17 @@
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/nonBlankString" }
     },
+    "qualifiedRange": {
+      "description": "Project bindings only: the release line this build qualifies under a verified Registry release attestation (CON-341, DF-CON-2026-A004). Lifecycle tools keep exact qualifiedVersions (CON-343).",
+      "type": "string",
+      "pattern": "^\\s*((>=|<=|>|<|=)?\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?\\s*)+$"
+    },
+    "deniedVersions": {
+      "description": "Versions refused even inside qualifiedRange (CON-345).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankString" }
+    },
     "lifecycleSource": {
       "oneOf": [
         {

@@ -58,8 +58,8 @@ module Doctor =
                   Detail = check.Detail
                   Remediation = if severity = Error then remediation else None }
 
-    let private addCompatibilityFindings (findings: ResizeArray<Finding>) manifest =
-        for error in Compatibility.validate manifest do
+    let private addCompatibilityFindings (findings: ResizeArray<Finding>) target manifest =
+        for error in Compatibility.validateIn target manifest do
             findings.Add
                 { Code = "COND-DOC-COMPAT"
                   Severity = Error
@@ -107,7 +107,7 @@ module Doctor =
     let inspect target manifestPath manifest =
         let findings = ResizeArray<Finding>()
 
-        addCompatibilityFindings findings manifest
+        addCompatibilityFindings findings target manifest
 
         let status = Status.inspect target manifestPath manifest
         addStatusFindings findings status

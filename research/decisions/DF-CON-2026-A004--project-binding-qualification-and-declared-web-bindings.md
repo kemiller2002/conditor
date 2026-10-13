@@ -21,7 +21,7 @@ provenance:
     EXE-20261013T150353451Z-40bfcd6e:
       operations: [created, modified]
       at: 2026-10-13T15:09:00.516Z
-      last: 2026-10-13T15:22:22.286Z
+      last: 2026-10-13T15:50:32.907Z
       actor:
         kind: agent
         id: anthropic/claude-code
@@ -193,3 +193,18 @@ precondition of D (see "Accepted condition" above).
 3. Build option D's Conditor side, gated on signature verification.
 4. The Registry implements REG-SIG-001..008. Until it does, step 3 stays
    inert, and exact qualification remains the only path.
+
+# Implementation status
+
+- Decision 1 shipped in Conditor 0.9.0 (#85).
+- Decision 2's Conditor side is implemented, but inert:
+  - `qualifiedRange` and `deniedVersions` on project-binding descriptors;
+  - ECDSA P-256 verification of `releaseAttestation` against
+    `trust/registry-release-keys.json`, which ships empty;
+  - the same rule in planning, final verification and the compatibility
+    graph.
+
+  It activates only when the Registry signs (REG-SIG-001..008, whose
+  statement-based payload replaced the earlier manifest-bytes wording so
+  that Conditor can verify offline from the resolved set) and a Conditor
+  release pins the key.

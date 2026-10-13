@@ -113,7 +113,9 @@ module Planner =
           Selections: RegistryAuthorityBinding.RegistryAuthoritySet
           /// Selected `nuget-library` releases distributed as GitHub release
           /// assets, installed through the local NuGet feed.
-          NugetFeeds: Map<string, NugetFeedRelease> }
+          NugetFeeds: Map<string, NugetFeedRelease>
+          /// The authority bytes, digest-verified, for attestation checks.
+          Bytes: byte array }
 
     let private loadRegistryAuthority target (manifest: ProjectManifest) : Result<LoadedAuthority option, string> =
         match manifest.RegistryAuthority with
@@ -138,7 +140,8 @@ module Planner =
                             Some
                                 { Profile = profile
                                   Selections = selections
-                                  NugetFeeds = feeds })))
+                                  NugetFeeds = feeds
+                                  Bytes = bytes })))
 
     let private registryLifecycleComponents (profile: WorkstationProfile option) =
         profile
@@ -198,7 +201,9 @@ module Planner =
 
         Directory.Exists root && walk root
 
-    let create target operation (declaredManifest: ProjectManifest) : Result<InstallationPlan, string list> =
+    /// Plans under an explicit Registry release-attestation trust set
+    /// (CON-346); `create` uses the keys pinned in this build.
+    let createTrusting (trust: TrustedKey list) target operation (declaredManifest: ProjectManifest) : Result<InstallationPlan, string list> =
         let errors = ResizeArray<string>()
         let resolved = ResizeArray<ResolvedComponent>()
         let actions = ResizeArray<PlanAction>()
@@ -234,7 +239,12 @@ module Planner =
 
         let externalIds =
             Seq.append (registryLifecycle |> Map.keys) (nugetFeeds |> Map.keys) |> Set.ofSeq
-        Compatibility.validateWithExternalIds externalIds manifest |> List.iter errors.Add
+        let attested =
+            loadedAuthority
+            |> Option.map (fun authority -> ReleaseAttestation.attestedSelections trust authority.Bytes)
+            |> Option.defaultValue Set.empty
+
+        Compatibility.validateWithAttested externalIds attested manifest |> List.iter errors.Add
 
         for requirement in manifest.Requirements do
             validateRequirement target requirement |> List.iter errors.Add
@@ -564,3 +574,6 @@ module Planner =
                   Operation = operation
                   Components = List.ofSeq resolved
                   Actions = List.ofSeq actions }
+
+    let create target operation (declaredManifest: ProjectManifest) : Result<InstallationPlan, string list> =
+        createTrusting ReleaseAttestation.embedded.Value target operation declaredManifest

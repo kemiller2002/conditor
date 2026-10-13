@@ -59,7 +59,10 @@ module Compatibility =
     let private componentIds (manifest: ProjectManifest) =
         manifest.Components |> List.map _.Id |> Set.ofList
 
-    let validateWithExternalIds (externalIds: Set<string>) (manifest: ProjectManifest) =
+    /// Validates the manifest, accepting `attested` (system id, version)
+    /// selections of the verified Registry authority as qualified by
+    /// attestation (CON-340..346) in addition to exact qualification.
+    let validateWithAttested (externalIds: Set<string>) (attested: Set<string * string>) (manifest: ProjectManifest) =
         let errors = ResizeArray<string>()
         let ids = componentIds manifest
 
@@ -71,7 +74,7 @@ module Compatibility =
             | Some support ->
                 let version = requestedVersion request
 
-                if not (support.Versions.Contains version) then
+                if not (support.Versions.Contains version) && not (attested.Contains(request.Id, version)) then
                     let known = support.Versions |> Seq.sort |> String.concat ", "
                     errors.Add
                         $"Component '{request.Id}' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: {known}."
@@ -91,6 +94,9 @@ module Compatibility =
 
         List.ofSeq errors
 
+    let validateWithExternalIds (externalIds: Set<string>) (manifest: ProjectManifest) =
+        validateWithAttested externalIds Set.empty manifest
+
     let validate (manifest: ProjectManifest) =
         let externallyResolvable =
             if manifest.RegistryAuthority.IsSome then
@@ -102,6 +108,40 @@ module Compatibility =
                 Set.empty
 
         validateWithExternalIds externallyResolvable manifest
+
+    /// `validate`, also accepting the attested selections of the
+    /// repository's recorded Registry authority when its bytes still match
+    /// the recorded digest (CON-340..346, under the keys this build pins).
+    let validateIn (target: string) (manifest: ProjectManifest) =
+        let attested =
+            manifest.RegistryAuthority
+            |> Option.bind (fun authority ->
+                let path = IO.Path.Combine(IO.Path.GetFullPath target, authority.Path)
+
+                if IO.File.Exists path then
+                    let bytes = IO.File.ReadAllBytes path
+
+                    let digest =
+                        Security.Cryptography.SHA256.HashData bytes |> Convert.ToHexString |> fun value -> value.ToLowerInvariant()
+
+                    if digest = authority.Sha256 then
+                        Some(ReleaseAttestation.attestedSelections ReleaseAttestation.embedded.Value bytes)
+                    else
+                        None
+                else
+                    None)
+            |> Option.defaultValue Set.empty
+
+        let externallyResolvable =
+            if manifest.RegistryAuthority.IsSome then
+                manifest.Components
+                |> List.choose (fun request ->
+                    if Registry.tryFind request.Id |> Option.isNone then Some request.Id else None)
+                |> Set.ofList
+            else
+                Set.empty
+
+        validateWithAttested externallyResolvable attested manifest
 
     let describe () =
         supported

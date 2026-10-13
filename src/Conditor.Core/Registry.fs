@@ -17,6 +17,14 @@ module Registry =
         |> List.tryFind (fun descriptor -> descriptor.Definition.Id = id)
         |> Option.map _.QualifiedVersions
 
+    /// The qualified range and denied versions a project binding may be
+    /// qualified by under a verified Registry release attestation.
+    let attestedQualification id =
+        descriptors
+        |> List.tryFind (fun descriptor -> descriptor.Definition.Id = id)
+        |> Option.bind (fun descriptor ->
+            descriptor.QualifiedRange |> Option.map (fun range -> range, descriptor.DeniedVersions))
+
     let descriptorSha256 id =
         descriptors
         |> List.tryFind (fun descriptor -> descriptor.Definition.Id = id)

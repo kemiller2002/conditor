@@ -546,7 +546,7 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
             let target = transition.Target
 
             Console.WriteLine
-                $"    {transition.Id}: {transition.FromVersion} -> {target.Version} [{WebPackageTransition.mode transition}] {target.Package}@{target.Specifier} (package sha256:{target.ArtifactSha256})"
+                $"    {transition.Id}: {transition.FromVersion} -> {target.Version} [{WebPackageTransition.mode transition}] {target.Package}@{target.Specifier} (package sha256:{target.ArtifactSha256}; qualified {transition.Qualification})"
 
             for directory, arguments in WebPackageTransition.steps transition do
                 let rendered = String.concat " " arguments

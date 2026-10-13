@@ -1,0 +1,5 @@
+{
+  "schema": "conditor.registry-release-keys/v1",
+  "description": "Registry release-attestation public keys this Conditor build trusts (DF-CON-2026-A004 decision 2, CON-346, REG-SIG-001..008). Empty until the Echelon Registry signs release attestations; while empty, every project binding stays under exact per-version qualification. A key is added or revoked only by a Conditor release.",
+  "keys": []
+}

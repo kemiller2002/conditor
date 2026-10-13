@@ -274,6 +274,7 @@ module CurrentUpgrade =
             if not added.IsEmpty && withoutAdded = established then Some added else None
 
     let private prepare
+        (trust: TrustedKey list)
         target
         manifestPath
         (manifest: ProjectManifest)
@@ -372,9 +373,9 @@ module CurrentUpgrade =
                     | None when targetEntry.DistributionClass = WebPackageBinding.DistributionClass ->
                         let planBinding =
                             if added |> List.exists (fun optIn -> optIn.Id = request.Id) then
-                                WebPackageBinding.planOptIn
+                                WebPackageBinding.planOptInTrusting trust
                             else
-                                WebPackageBinding.plan
+                                WebPackageBinding.planTrusting trust
 
                         match planBinding target manifest request fromVersion targetSetPath with
                         | Ok webTransition ->
@@ -434,7 +435,7 @@ module CurrentUpgrade =
             // the pins must already name exactly that release.
             | Some declared, Some entry, None when entry.DistributionClass = WebPackageBinding.DistributionClass ->
                 if declared = entry.Version then
-                    match WebPackageBinding.verifyDeclaredAtTarget target request declared targetSetPath with
+                    match WebPackageBinding.verifyDeclaredAtTargetTrusting trust target request declared targetSetPath with
                     | Ok() -> ()
                     | Error problems -> problems |> List.iter errors.Add
             | declared, entry, _ ->
@@ -625,15 +626,20 @@ module CurrentUpgrade =
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
 
-    let preview target manifestPath manifest targetSetPath targetDigest ctx probe =
+    /// The current-upgrade plan under an explicit release-attestation trust
+    /// set (tests); `preview` uses the keys pinned in this build.
+    let previewTrusting trust target manifestPath manifest targetSetPath targetDigest ctx probe =
         if not (File.Exists manifestPath) then
             Error [ $"Manifest not found: {manifestPath}" ]
         elif not (File.Exists targetSetPath) then
             Error [ $"Target resolved set not found: {targetSetPath}" ]
         else
-            match prepare target manifestPath manifest targetSetPath targetDigest ctx probe with
+            match prepare trust target manifestPath manifest targetSetPath targetDigest ctx probe with
             | None -> Error [ "Unable to construct a current-upgrade plan from the target Registry release set." ]
             | Some plan -> Ok plan
+
+    let preview target manifestPath manifest targetSetPath targetDigest ctx probe =
+        previewTrusting ReleaseAttestation.embedded.Value target manifestPath manifest targetSetPath targetDigest ctx probe
 
     let private writeAtomically (path: string) (bytes: byte array) =
         let parent = Path.GetDirectoryName path |> Option.ofObj |> Option.defaultValue "."
@@ -707,7 +713,8 @@ module CurrentUpgrade =
                 $"Current upgrade ran {transition.Id}@{transition.ToVersion} upgrade, but its repository verification failed."
                 :: reasons)
 
-    let apply
+    let applyTrusting
+        (trust: TrustedKey list)
         target
         manifestPath
         manifest
@@ -717,6 +724,9 @@ module CurrentUpgrade =
         probe
         authorization
         =
+        let preview target manifestPath manifest targetSetPath targetDigest ctx probe =
+            previewTrusting trust target manifestPath manifest targetSetPath targetDigest ctx probe
+
         match preview target manifestPath manifest targetSetPath targetDigest ctx probe with
         | Error errors -> Error errors
         | Ok plan when plan.Digest <> authorization ->
@@ -842,7 +852,7 @@ module CurrentUpgrade =
                         let verification =
                             Requirements.verify target verificationManifest
                             |> Result.bind (fun () ->
-                                Planner.create target Verify verificationManifest
+                                Planner.createTrusting trust target Verify verificationManifest
                                 |> Result.bind (fun verifyPlan ->
                                     Installer.executeWithSignalsUsing (ProcessRunner.runIn installed) target String.Empty verifyPlan
                                     |> Result.map snd))
@@ -868,7 +878,7 @@ module CurrentUpgrade =
                                     match Manifest.load manifestPath with
                                     | Error errors -> Error errors
                                     | Ok committedManifest ->
-                                        match Planner.create target Init committedManifest with
+                                        match Planner.createTrusting trust target Init committedManifest with
                                         | Error errors -> Error errors
                                         | Ok lockPlan ->
                                             let lockPath = LockFile.writeWith target manifestPath lockPlan reviewSignals
@@ -909,3 +919,6 @@ module CurrentUpgrade =
 
                                 Error("Committing the current upgrade failed; the previous authority and conditor.json were restored." :: errors)
                             | Ok _ -> commitResult)
+
+    let apply target manifestPath manifest targetSetPath targetDigest ctx probe authorization =
+        applyTrusting ReleaseAttestation.embedded.Value target manifestPath manifest targetSetPath targetDigest ctx probe authorization

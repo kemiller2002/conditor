@@ -73,7 +73,11 @@ type WebPackageTransition =
       /// True when the component is being declared to Conditor by this
       /// upgrade (CON-332): its source is proven by the repository's pins and
       /// lockfile, not by a recorded Registry authority.
-      OptIn: bool }
+      OptIn: bool
+      /// How the target release is qualified (CON-344): `exact` (this build's
+      /// qualifiedVersions) or `attested:<range>:<keyId>` (a verified Registry
+      /// release attestation inside the descriptor's qualifiedRange).
+      Qualification: string }
 
 module DependencySection =
     let all = [ Dependencies; DevDependencies; OptionalDependencies; PeerDependencies ]
@@ -137,10 +141,13 @@ module WebPackageTransition =
 
         let optIn = if transition.OptIn then [ "  opt-in" ] else []
 
+        let qualification =
+            if transition.Qualification = "exact" then [] else [ $"  qualification|{transition.Qualification}" ]
+
         transition.Bindings
         |> List.map (fun binding ->
             $"  {binding.PackageJsonPath}|{DependencySection.jsonName binding.Section}|{binding.Package}|{binding.Specifier}|sha256:{binding.PackageJsonSha256}|{binding.LockPath}|sha256:{binding.LockSha256}")
-        |> fun lines -> String.concat "\n" (header :: lines @ foundations @ optIn)
+        |> fun lines -> String.concat "\n" (header :: lines @ foundations @ optIn @ qualification)
 
 module WebPackageBinding =
     [<Literal>]
@@ -259,6 +266,21 @@ module WebPackageBinding =
             | _, _, [ _ ] -> refuse "has no valid package artifact name and SHA-256 digest."
             | _ -> refuse "has more than one package artifact; the binding target is ambiguous."
         | _ -> refuse "is missing its exact version, owner/name repository, or tag."
+
+    /// The release attestation outcome of the entry a set selects for `id`.
+    let private attestationIn (trust: TrustedKey list) (setPath: string) (id: string) =
+        try
+            use document = JsonDocument.Parse(File.ReadAllBytes setPath)
+
+            match tryProperty "components" document.RootElement with
+            | Some value when value.ValueKind = JsonValueKind.Array ->
+                value.EnumerateArray()
+                |> Seq.tryFind (fun entry -> str "systemId" entry = Some id)
+                |> Option.map (ReleaseAttestation.verify trust)
+                |> Option.defaultValue (NotAttested "the set does not select it")
+            | _ -> NotAttested "the set selects nothing"
+        with ex ->
+            NotAttested $"the set cannot be read: {ex.Message}"
 
     /// The exact release a resolved release set selects for `id`.
     let releaseIn (setPath: string) (id: string) : Result<WebPackageRelease, string list> =
@@ -601,7 +623,46 @@ module WebPackageBinding =
 
     // ---- Planning -------------------------------------------------------------
 
+    /// How `version` is qualified for `id`: exactly, or (target releases
+    /// only) under a verified attestation inside the descriptor's
+    /// qualifiedRange. A denied version is never qualified (CON-345).
+    let private qualify
+        (trust: TrustedKey list)
+        (targetSetPath: string option)
+        (id: string)
+        (qualified: Set<string>)
+        (version: string)
+        : Result<string, string> =
+        let attested = Registry.attestedQualification id
+
+        match attested with
+        | Some(_, denied) when denied.Contains version -> Error $"version {version} is denied by this Conditor build."
+        | _ when qualified.Contains version -> Ok "exact"
+        | None -> Error $"version {version} is not qualified by this Conditor build."
+        | Some(range, _) ->
+            let inRange =
+                Option.map2 VersionRange.contains (VersionRange.tryParse range) (SemanticVersion.tryParse version)
+                |> Option.defaultValue false
+
+            if not inRange then
+                Error $"version {version} is not qualified by this Conditor build and is outside its qualified range {range}."
+            else
+                match targetSetPath with
+                // A source release is already installed: the line suffices.
+                | None -> Ok $"range:{range}"
+                | Some setPath ->
+                    match attestationIn trust setPath id with
+                    | Attested(keyId, contracts) when contracts |> List.contains ReleaseAttestation.WebPackageBindingContract ->
+                        Ok $"attested:{range}:{keyId}"
+                    | Attested(keyId, _) ->
+                        Error
+                            $"version {version} is not qualified by this Conditor build, and its attestation under key '{keyId}' does not claim {ReleaseAttestation.WebPackageBindingContract}."
+                    | NotAttested reason ->
+                        Error
+                            $"version {version} is not qualified by this Conditor build, and {reason}; Conditor never relies on an unsigned contract claim (CON-346)."
+
     let private planWith
+        (trust: TrustedKey list)
         (optIn: bool)
         (target: string)
         (manifest: ProjectManifest)
@@ -620,13 +681,17 @@ module WebPackageBinding =
             | None, _
             | _, None -> Error [ $"{label} Conditor has no descriptor for this component." ]
             | Some definition, Some qualified ->
+                let targetQualification = qualify trust (Some targetSetPath) request.Id qualified release.Version
+
                 let descriptorProblems =
                     [ if definition.Distribution <> NpmPackage || definition.ApplicationBinding <> Some NpmDependency then
                           yield $"{label} Conditor's descriptor does not declare an npm application binding."
-                      if not (qualified.Contains fromVersion) then
-                          yield $"{label} source version {fromVersion} is not qualified by this Conditor build."
-                      if not (qualified.Contains release.Version) then
-                          yield $"{label} target version {release.Version} is not qualified by this Conditor build."
+                      match qualify trust None request.Id qualified fromVersion with
+                      | Error reason -> yield $"{label} source {reason}"
+                      | Ok _ -> ()
+                      match targetQualification with
+                      | Error reason -> yield $"{label} target {reason}"
+                      | Ok _ -> ()
                       let expected = ComponentDefinition.packageFor release.Version definition
 
                       if expected <> release.Package then
@@ -672,24 +737,32 @@ module WebPackageBinding =
                                   Target = release
                                   Bindings = bindings
                                   Foundations = foundations
-                                  OptIn = optIn }))
+                                  OptIn = optIn
+                                  Qualification = targetQualification |> Result.defaultValue "exact" }))
 
     /// Plans the move of a declared web-package binding to the target set's
     /// selection.
+    let planTrusting trust target manifest request fromVersion targetSetPath =
+        planWith trust false target manifest request fromVersion targetSetPath
+
     let plan target manifest request fromVersion targetSetPath =
-        planWith false target manifest request fromVersion targetSetPath
+        planTrusting ReleaseAttestation.embedded.Value target manifest request fromVersion targetSetPath
 
     /// Plans declaring a web package the repository already consumes
     /// (CON-332) at `declaredVersion` and moving it to the target set's
     /// selection, under one authorization.
+    let planOptInTrusting trust target manifest request declaredVersion targetSetPath =
+        planWith trust true target manifest request declaredVersion targetSetPath
+
     let planOptIn target manifest request declaredVersion targetSetPath =
-        planWith true target manifest request declaredVersion targetSetPath
+        planOptInTrusting ReleaseAttestation.embedded.Value target manifest request declaredVersion targetSetPath
 
     /// Proves that declaring a web package at exactly the version the target
     /// set selects records what the repository already pins: every
     /// package.json declaration is that release's exact pin, locked at that
     /// version, and any foundations capability names it.
-    let verifyDeclaredAtTarget
+    let verifyDeclaredAtTargetTrusting
+        (trust: TrustedKey list)
         (target: string)
         (request: ComponentRequest)
         (version: string)
@@ -704,7 +777,9 @@ module WebPackageBinding =
             Error [ $"{label} the target set selects {release.Version}, not {version}." ]
         | Ok release ->
             match Registry.tryFind request.Id, Registry.qualifiedVersions request.Id with
-            | Some definition, Some qualified when qualified.Contains version && ComponentDefinition.packageFor version definition = release.Package ->
+            | Some definition, Some qualified when
+                (qualify trust (Some targetSetPath) request.Id qualified version |> Result.isOk)
+                && ComponentDefinition.packageFor version definition = release.Package ->
                 let bindingProblems =
                     packageJsonFiles root
                     |> List.collect (fun path ->
@@ -923,3 +998,6 @@ module WebPackageBinding =
             match applied with
             | Ok() -> Ok()
             | Error errors -> restore errors
+
+    let verifyDeclaredAtTarget target request version targetSetPath =
+        verifyDeclaredAtTargetTrusting ReleaseAttestation.embedded.Value target request version targetSetPath
