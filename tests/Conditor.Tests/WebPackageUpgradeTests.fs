@@ -480,7 +480,215 @@ let private refusals check =
         [ (limenComponent (sha256Bytes limenBytes)).Replace("\"package\": \"@echelon-foundry/limen\"", "\"package\": \"@echelon-foundry/other\"")
           formaComponent (sha256Bytes formaBytes) ]
 
+// ---- echelon-current 1.20.0: Forma 0.6.1 and Folio 0.4.0 -------------------
+// The Registry selected Forma 0.6.1 and Folio 0.4.0 in echelon-current 1.20.0
+// (echelon-registry#65). Applications pinned Forma 0.4.1 and Folio 0.3.0 by
+// GitHub release-asset tarball. Before these versions were qualified,
+// `upgrade --current` refused both moves as "not qualified by this Conditor
+// build". This fixture is that application, declared to Conditor.
+
+let private githubRelease (system: string) (package: string) (artifactStem: string) (version: string) (packageSha: string) =
+    $$"""
+    {
+      "systemId": "{{system}}",
+      "role": "project-binding",
+      "required": true,
+      "version": "{{version}}",
+      "repository": "kemiller2002/{{system}}",
+      "tag": "v{{version}}",
+      "commit": "{{String.replicate 40 "4"}}",
+      "releaseStage": "stable",
+      "lifecycleState": "active",
+      "distributionClass": "web-package",
+      "executable": null,
+      "releaseManifest": { "schema": "echelon.release/v2", "sha256": "{{String.replicate 64 "c"}}" },
+      "distribution": {
+        "mechanism": "github-release",
+        "package": "{{package}}",
+        "url": "https://github.com/kemiller2002/{{system}}/releases/tag/v{{version}}"
+      },
+      "artifacts": [
+        { "name": "{{artifactStem}}-{{version}}.tgz", "purpose": "package", "platform": null, "sha256": "{{packageSha}}" }
+      ]
+    }"""
+
+let private releaseAsset (system: string) (artifactStem: string) (version: string) =
+    $"https://github.com/kemiller2002/{system}/releases/download/v{version}/{artifactStem}-{version}.tgz"
+
+let private FormaPackage = "@echelon-foundry/design-system"
+let private FolioPackage = "@echelon-foundry/print-components"
+let private FormaStem = "echelon-foundry-design-system"
+let private FolioStem = "echelon-foundry-print-components"
+
+let private registeredStepRepository check (formaTarget: string) (folioTarget: string) =
+    let label = $"forma-{formaTarget}-folio-{folioTarget}"
+    let target = temp $"{label}-target"
+    let home = temp $"{label}-home"
+    let mirror = temp $"{label}-mirror"
+    let bin = temp $"{label}-bin"
+    let afterInstall = temp $"{label}-after"
+    let formaTargetBytes = Encoding.UTF8.GetBytes $"fixture forma {formaTarget} package tarball"
+    let folioTargetBytes = Encoding.UTF8.GetBytes $"fixture folio {folioTarget} package tarball"
+    File.WriteAllBytes(Path.Combine(mirror, $"{FormaStem}-{formaTarget}.tgz"), formaTargetBytes)
+    File.WriteAllBytes(Path.Combine(mirror, $"{FolioStem}-{folioTarget}.tgz"), folioTargetBytes)
+
+    let resolvedPath = Path.Combine(mirror, "current.resolved.json")
+
+    let resolvedSha =
+        resolvedSet
+            resolvedPath
+            [ githubRelease "forma" FormaPackage FormaStem formaTarget (sha256Bytes formaTargetBytes)
+              githubRelease "folio" FolioPackage FolioStem folioTarget (sha256Bytes folioTargetBytes) ]
+
+    let manifestPath = Path.Combine(target, "conditor.json")
+
+    File.WriteAllText(
+        manifestPath,
+        """{
+  "schemaVersion": 1,
+  "name": "chrona-shaped",
+  "components": [
+    { "id": "forma", "version": "0.4.1", "required": false },
+    { "id": "folio", "version": "0.3.0", "required": false }
+  ],
+  "requirements": [],
+  "execution": { "enabled": false }
+}
+"""
+    )
+
+    LockFile.write
+        target
+        manifestPath
+        { ProjectName = "chrona-shaped"
+          Operation = Init
+          Components =
+            [ { Id = "forma"
+                Version = "0.4.1"
+                Distribution = NpmPackage
+                Package = FormaPackage
+                SourceReference = Some $"npm:{FormaPackage}@0.4.1" }
+              { Id = "folio"
+                Version = "0.3.0"
+                Distribution = NpmPackage
+                Package = FolioPackage
+                SourceReference = Some $"npm:{FolioPackage}@0.3.0" } ]
+          Actions = [] }
+    |> ignore
+
+    let packageJson (forma: string) (folio: string) =
+        $$"""{
+  "name": "chrona-shaped",
+  "private": true,
+  "dependencies": {
+    "{{FormaPackage}}": "{{releaseAsset "forma" FormaStem forma}}",
+    "{{FolioPackage}}": "{{releaseAsset "folio" FolioStem folio}}"
+  }
+}
+"""
+
+    let lockJson (forma: string) (folio: string) (formaIntegrity: string) (folioIntegrity: string) =
+        $$"""{
+  "name": "chrona-shaped",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": { "name": "chrona-shaped" },
+    "node_modules/{{FormaPackage}}": { "version": "{{forma}}", "resolved": "{{releaseAsset "forma" FormaStem forma}}"{{formaIntegrity}} },
+    "node_modules/{{FolioPackage}}": { "version": "{{folio}}", "resolved": "{{releaseAsset "folio" FolioStem folio}}"{{folioIntegrity}} }
+  }
+}
+"""
+
+    File.WriteAllText(Path.Combine(target, "package.json"), packageJson "0.4.1" "0.3.0")
+    File.WriteAllText(Path.Combine(target, "package-lock.json"), lockJson "0.4.1" "0.3.0" "" "")
+    File.WriteAllText(Path.Combine(afterInstall, "package.json"), packageJson formaTarget folioTarget)
+
+    File.WriteAllText(
+        Path.Combine(afterInstall, "package-lock.json"),
+        lockJson
+            formaTarget
+            folioTarget
+            $", \"integrity\": \"{integrity formaTargetBytes}\""
+            $", \"integrity\": \"{integrity folioTargetBytes}\""
+    )
+
+    let log = Path.Combine(bin, "npm.log")
+    fakeNpm bin afterInstall log
+
+    { Target = target
+      ManifestPath = manifestPath
+      ResolvedPath = resolvedPath
+      ResolvedSha = resolvedSha
+      Context = context home mirror
+      Bin = bin
+      Log = log
+      AfterInstall = afterInstall }
+
+let private echelonCurrent120 check =
+    let f = registeredStepRepository check "0.6.1" "0.4.0"
+
+    withPath f.Bin (fun () ->
+        match preview f with
+        | Error errors -> check $"echelon-current 1.20.0 web plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                $"current upgrade accepts Forma 0.4.1 -> 0.6.1 and Folio 0.3.0 -> 0.4.0 tarball pins: {joined plan.Refusals}"
+                plan.Refusals.IsEmpty
+
+            check
+                "Forma and Folio move as package-manager binding transitions"
+                (plan.Transitions
+                 |> List.map (fun transition -> transition.Id, transition.FromVersion, transition.ToVersion, transition.Mode)
+                 |> List.sort = [ "folio", "0.3.0", "0.4.0", "web-package-binding"
+                                  "forma", "0.4.1", "0.6.1", "web-package-binding" ])
+
+            match apply f plan.Digest with
+            | Error errors -> check $"authorized Forma/Folio upgrade succeeds: {joined errors}" false
+            | Ok result ->
+                let invocations = File.ReadAllLines f.Log |> Array.toList
+
+                check
+                    "Forma 0.6.1 is installed as the exact GitHub release-asset pin"
+                    (invocations
+                     |> List.contains (
+                         let asset = releaseAsset "forma" FormaStem "0.6.1"
+                         $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {FormaPackage}@{asset}"
+                     ))
+
+                check
+                    "Folio 0.4.0 is installed as the exact GitHub release-asset pin"
+                    (invocations
+                     |> List.contains (
+                         let asset = releaseAsset "folio" FolioStem "0.4.0"
+                         $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {FolioPackage}@{asset}"
+                     ))
+
+                check "Forma/Folio upgrade leaves no version drift" result.NoRemainingVersionChanges
+
+                check
+                    "Forma/Folio upgrade records the Registry versions"
+                    (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "0.6.1"; "folio", Some "0.4.0" ]))
+
+    // Qualification is still exact: a release Conditor has not qualified is
+    // refused before anything changes.
+    let unqualified = registeredStepRepository check "0.7.0" "0.4.0"
+
+    withPath unqualified.Bin (fun () ->
+        let refusals = refusalsOf unqualified
+
+        check
+            $"an unqualified Forma release is still refused: {joined refusals}"
+            (refusals |> List.exists (fun refusal -> refusal.Contains "target version 0.7.0 is not qualified"))
+
+        check "a refused Forma release runs no package manager" (not (File.Exists unqualified.Log)))
+
 let run (check: string -> bool -> unit) =
+    check
+        "Conditor qualifies the echelon-current 1.20.0 Forma 0.6.1 and Folio 0.4.0 web packages"
+        (Registry.qualifiedVersions "forma" |> Option.exists (Set.contains "0.6.1")
+         && Registry.qualifiedVersions "folio" |> Option.exists (Set.contains "0.4.0"))
+
     if OperatingSystem.IsWindows() then
         check "web-package current upgrade fixture is skipped on Windows" true
     else
@@ -488,6 +696,7 @@ let run (check: string -> bool -> unit) =
         boundRepository check
         integrityMismatchRollsBack check
         refusals check
+        echelonCurrent120 check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"
