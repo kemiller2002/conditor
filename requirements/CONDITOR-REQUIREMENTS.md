@@ -726,3 +726,54 @@ the host tools.
     not a downgrade, and re-applying the same set is a zero-effect no-op.
 - **CON-363** `--resolved-set` given alone (no `--profile`) keeps its existing
   meaning: the whole set's native environment. It is already Registry-bound.
+
+### Workstation installation registration (WI-0041, conditor#95, `DF-CON-2026-A006`)
+
+Conditor 0.10.2 printed `registration ordo: unavailable` with no reason.
+On the shared workstation no `--praxis` was given, so registration never
+ran, and the ledger recorded `unavailable` for strata, praxis and ordo. A
+configured Praxis that could not produce a result (`--praxis /bin/false`)
+was reported the same way.
+
+- **CON-364** Every workstation registration and removal-registration
+  outcome SHALL be printed and recorded in the ledger with its reason.
+  Outcomes Praxis reports SHALL pass through unchanged, with Praxis's code
+  and message as the reason. Conditor's own outcomes SHALL use the
+  Registry's integration vocabulary (echelon-registry
+  `spec/echelon-integration-standard.md`):
+  - `unavailable` when no Praxis is configured; the reason SHALL name
+    `--praxis`, `CONDITOR_PRAXIS` and why the workstation's own Praxis was
+    not used;
+  - `misconfigured` when a configured Praxis cannot be run or returns no
+    installation outcome; the reason SHALL name the executable, its exit
+    code and what it printed.
+
+  Neither outcome fails the install.
+- **CON-365** With no `--praxis` and no `CONDITOR_PRAXIS`, registration SHALL
+  use the workstation's `~/.local/bin/praxis` only when all of these hold:
+  - the ledger records it as a Conditor-created shim for component `praxis`,
+    and the `praxis-shim` step's last receipt matched;
+  - it is still exactly the shim Conditor writes, pointing at a
+    Conditor-created `praxis/<version>` install directory under the
+    workstation's install root;
+  - it reports that version now.
+
+  Anything else SHALL be `unavailable`, with the failing condition as the
+  reason. An explicit `--praxis` or `CONDITOR_PRAXIS` SHALL always win.
+  A Praxis found only on `PATH` SHALL never be used (DF-CON-2026-A006).
+- **CON-366** `conditor workstation register` SHALL backfill registrations
+  for installs Conditor already performed. It SHALL plan and authorize like
+  every other workstation effect: a read-only plan by default, then
+  `--authorize DIGEST`.
+  - **What it proposes:** a selected component only when the ledger shows
+    Conditor created its shim, the shim step's last receipt matched, the shim
+    reports the selected version now, and no registration of that version
+    succeeded (`recorded`, `replayed`, `unchanged` or `submitted`).
+    Everything else is listed as skipped, with the reason.
+  - **The digest** SHALL bind the registrar (explicit path, or the
+    ledger-owned shim and its version), the target, the selection's source
+    identity and each proposed registration.
+  - **Refusals:** a plan with work to do but no registrar SHALL be refused as
+    `unavailable`. A digest that is not the plan SHALL be refused.
+  - **Evidence:** each registration SHALL cite the original install receipt
+    and be recorded in the ledger with `trigger: backfill`.

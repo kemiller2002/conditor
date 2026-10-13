@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T18:04:48.000Z",
+  "updatedAt": "2026-10-13T22:03:24Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1943,6 +1943,37 @@
         }
       },
       "completedAt": "2026-10-13T18:04:48.000Z"
+    },
+    {
+      "id": "WI-0041",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-13T22:03:24Z",
+      "telemetryExecutionIds": [
+        "EXE-20261013T220325306Z-15bc4dea"
+      ],
+      "latestCheckpoint": {
+        "id": "5ec92923bc84e7145f2636a1",
+        "recordedAt": "2026-10-13T22:10:48Z",
+        "executionId": "EXE-20261013T220325306Z-15bc4dea",
+        "repository": "conditor",
+        "branch": "wi-0041-registration-backfill",
+        "commit": "0e159b3d82281e088c0ce1c704224b942e747af2",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "wi-0041-registration-backfill",
+        "remoteCommit": "0e159b3d82281e088c0ce1c704224b942e747af2",
+        "summary": "conditor#95 fixes 1-4 implemented: reasons, unavailable vs misconfigured, ledger-owned verified Praxis default (DF-CON-2026-A006), planned workstation register backfill; CON-364..366; 1073 checks pass; pushed 0e159b3d",
+        "nextAction": "Open PR, gate-merge on green exact head, then request 0.10.3",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }

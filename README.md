@@ -347,9 +347,12 @@ The clean-room CI path now proves initialization, a second zero-drift initializa
 
 ## Workstation bootstrap
 
-`conditor workstation plan|apply|status|reconcile` and `conditor uninstall`
+`conditor workstation plan|apply|status|reconcile|register` and `conditor uninstall`
 bootstrap an Echelon engineering host from versioned profiles, with
 plan-before-authorization, per-step receipts, an ownership ledger,
-partial-failure rollback and installation registration through Praxis. See
+partial-failure rollback and installation registration through Praxis
+(by default the workstation's own Conditor-installed Praxis; every outcome
+carries its reason; `workstation register` backfills missed registrations
+through a reviewed plan). See
 [`docs/workstation.md`](docs/workstation.md). Release an operator build with
 `gh workflow run release-orchestrator.yml -f bump=patch`.

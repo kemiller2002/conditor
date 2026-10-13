@@ -7,6 +7,7 @@ Project Administration records what is installed where.
 ```
 conditor workstation plan      [--profile echelon-engineering|minimal|FILE] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--with OPTIONAL]* [--home DIR] [--json]
 conditor workstation apply     --authorize PLAN-DIGEST [--profile ...] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--praxis PATH] [--target-id ID] [--no-rollback]
+conditor workstation register  [--authorize DIGEST] [--profile ...] --resolved-set SET --resolved-set-sha256 SHA [--praxis PATH] [--target-id ID] [--home DIR]
 conditor workstation status    [--home DIR]
 conditor workstation reconcile --step ID [--profile ...]
 conditor uninstall --plan
@@ -133,8 +134,55 @@ praxis installation register --system <id> --version <v> --target-kind environme
   --artifact <asset> --digest sha256:<...> --evidence receipt=conditor-workstation-ledger#<step>
 ```
 
-This uses `--praxis PATH` or `CONDITOR_PRAXIS`. Each component is
-registered separately against the same target.
+Each component is registered separately against the same target.
+
+### Which Praxis registers (CON-365, DF-CON-2026-A006)
+
+1. `--praxis PATH` or `CONDITOR_PRAXIS`, when given, always wins.
+2. Otherwise Conditor uses the workstation's own `~/.local/bin/praxis`, but
+   only when all of these hold:
+   - the ledger records that Conditor created it, for component `praxis`,
+     and its install receipt matched;
+   - it is still exactly the shim Conditor writes, pointing at a
+     Conditor-created `praxis/<version>` install directory;
+   - it reports that version now.
+3. Otherwise registration is `unavailable`, and the reason names what was
+   missing. A Praxis found only on `PATH` is never used.
+
+### Outcomes and reasons (CON-364)
+
+Every outcome is printed and recorded in the ledger with its reason:
+`registration <id>: <outcome> (<reason>)`.
+
+- **Praxis's own outcomes** pass through with its code and message:
+  `recorded`, `replayed`, `unchanged`, `submitted`, `refused`, `invalid`,
+  `unavailable` and `misconfigured`.
+- **Conditor's own outcomes** follow the Registry's integration vocabulary:
+  - `unavailable`: no Praxis is configured;
+  - `misconfigured`: a configured Praxis could not be run, or returned no
+    installation outcome. The reason gives the executable, its exit code and
+    what it printed.
+
+### Backfill (CON-366)
+
+Installs whose registration never succeeded are repaired with a planned,
+authorized command:
+
+```
+conditor workstation register --profile echelon-engineering --resolved-set SET --resolved-set-sha256 SHA
+conditor workstation register --authorize <digest> --profile echelon-engineering --resolved-set SET --resolved-set-sha256 SHA
+```
+
+- **The plan** lists the registrar and each proposed registration, with its
+  evidence receipt and last outcome. Everything else is skipped, with the
+  reason. It writes nothing.
+- **What it proposes:** only components the ledger shows Conditor installed,
+  whose shim reports the selected version now, and whose registration of
+  that version never succeeded.
+- **The digest** binds the registrar, the target, the Registry selection and
+  each registration.
+- **Refusals:** a plan with work to do but no registrar is refused as
+  `unavailable`.
 
 - A component whose receipt is a mismatch or indeterminate is never
   registered.
@@ -143,8 +191,8 @@ registered separately against the same target.
   resolved component against the repository (`CONDITOR_PRAXIS`).
 - The Conditor lock stays local installation evidence. It is not the central
   inventory.
-- Registration is optional. When it is unavailable, that outcome is recorded
-  and the bootstrap still succeeds.
+- Registration is optional. When it is `unavailable` or `misconfigured`,
+  that outcome and its reason are recorded and the bootstrap still succeeds.
 
 ## Generic repository lifecycle (CON-DIST-036..038)
 
