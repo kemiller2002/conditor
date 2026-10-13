@@ -267,8 +267,9 @@ module WebPackageBinding =
             | _ -> refuse "has more than one package artifact; the binding target is ambiguous."
         | _ -> refuse "is missing its exact version, owner/name repository, or tag."
 
-    /// The release attestation outcome of the entry a set selects for `id`.
-    let private attestationIn (trust: TrustedKey list) (setPath: string) (id: string) =
+    /// The release attestation outcome of the entry a set selects for `id`,
+    /// which must select exactly `version`.
+    let private attestationIn (trust: TrustedKey list) (setPath: string) (id: string) (version: string) =
         try
             use document = JsonDocument.Parse(File.ReadAllBytes setPath)
 
@@ -276,8 +277,12 @@ module WebPackageBinding =
             | Some value when value.ValueKind = JsonValueKind.Array ->
                 value.EnumerateArray()
                 |> Seq.tryFind (fun entry -> str "systemId" entry = Some id)
-                |> Option.map (ReleaseAttestation.verify trust)
-                |> Option.defaultValue (NotAttested "the set does not select it")
+                |> Option.map (fun entry ->
+                    match str "version" entry with
+                    | Some selected when selected = version -> ReleaseAttestation.verify trust entry
+                    | Some selected -> NotAttested $"the Registry set selects {selected}, not {version}"
+                    | None -> NotAttested "the Registry set names no version")
+                |> Option.defaultValue (NotAttested "the Registry set does not select it")
             | _ -> NotAttested "the set selects nothing"
         with ex ->
             NotAttested $"the set cannot be read: {ex.Message}"
@@ -623,12 +628,15 @@ module WebPackageBinding =
 
     // ---- Planning -------------------------------------------------------------
 
-    /// How `version` is qualified for `id`: exactly, or (target releases
-    /// only) under a verified attestation inside the descriptor's
-    /// qualifiedRange. A denied version is never qualified (CON-345).
+    /// How `version` is qualified for `id`: exactly, or under a verified
+    /// attestation that `setPath` carries for exactly that version, inside the
+    /// descriptor's qualifiedRange. With no Registry set to carry an
+    /// attestation (`None`), only exact qualification applies: option D is
+    /// gated on signatures in its entirety, for sources as well as targets
+    /// (CON-346). A denied version is never qualified (CON-345).
     let private qualify
         (trust: TrustedKey list)
-        (targetSetPath: string option)
+        (setPath: string option)
         (id: string)
         (qualified: Set<string>)
         (version: string)
@@ -647,11 +655,12 @@ module WebPackageBinding =
             if not inRange then
                 Error $"version {version} is not qualified by this Conditor build and is outside its qualified range {range}."
             else
-                match targetSetPath with
-                // A source release is already installed: the line suffices.
-                | None -> Ok $"range:{range}"
-                | Some setPath ->
-                    match attestationIn trust setPath id with
+                match setPath with
+                | None ->
+                    Error
+                        $"version {version} is not qualified by this Conditor build, and no digest-verified Registry set attests it; Conditor never relies on an unsigned contract claim (CON-346)."
+                | Some path ->
+                    match attestationIn trust path id version with
                     | Attested(keyId, contracts) when contracts |> List.contains ReleaseAttestation.WebPackageBindingContract ->
                         Ok $"attested:{range}:{keyId}"
                     | Attested(keyId, _) ->
@@ -660,6 +669,16 @@ module WebPackageBinding =
                     | NotAttested reason ->
                         Error
                             $"version {version} is not qualified by this Conditor build, and {reason}; Conditor never relies on an unsigned contract claim (CON-346)."
+
+    /// The repository's recorded Registry authority, when its bytes still
+    /// match the recorded digest: the set the repository was last applied
+    /// from, which is the only set that can attest a source version.
+    let private recordedAuthority (target: string) (manifest: ProjectManifest) =
+        manifest.RegistryAuthority
+        |> Option.bind (fun authority ->
+            let path = Path.Combine(Path.GetFullPath target, authority.Path)
+
+            if File.Exists path && sha256File path = authority.Sha256 then Some path else None)
 
     let private planWith
         (trust: TrustedKey list)
@@ -686,7 +705,7 @@ module WebPackageBinding =
                 let descriptorProblems =
                     [ if definition.Distribution <> NpmPackage || definition.ApplicationBinding <> Some NpmDependency then
                           yield $"{label} Conditor's descriptor does not declare an npm application binding."
-                      match qualify trust None request.Id qualified fromVersion with
+                      match qualify trust (recordedAuthority target manifest) request.Id qualified fromVersion with
                       | Error reason -> yield $"{label} source {reason}"
                       | Ok _ -> ()
                       match targetQualification with

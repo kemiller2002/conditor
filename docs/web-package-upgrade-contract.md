@@ -55,7 +55,12 @@ attestation** only when every one of these holds:
   and is not revoked;
 * it claims `echelon.web-package-binding/v1`.
 
-A **source** version, which is already installed, needs only the range.
+A **source** version outside `qualifiedVersions` is qualified only by the same
+attestation, carried by the repository's **recorded Registry authority**: the
+digest-verified set the repository was last applied from. That set must
+select exactly the source version. A range alone never qualifies anything:
+option D is gated on signatures in its entirety (CON-346). This holds for
+the declared path and the opt-in path alike.
 
 Anything else is refused as "not qualified by this Conditor build", with the
 reason. That includes no attestation, an unknown or revoked key, a bad

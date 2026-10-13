@@ -918,6 +918,92 @@ let private attested check =
 
     refusedWith "an attested release outside the qualified range" trusted "1.0.0" (Some("registry-test-1", sign key "1.0.0" contract, contract)) "outside its qualified range"
 
+    // Sources are gated exactly like targets (CON-346). Forma 0.4.0 is in the
+    // qualified range but never exactly qualified: it is an acceptable source
+    // only when the repository's recorded authority selects it with a trusted
+    // attestation.
+    let sourceScenario label (trust: TrustedKey list) (declaredInLock: bool) (authorityAttestation: (string * string * string list) option) =
+        let repo = chronaShaped label "0.4.0" "0.4.0" "0.4.0"
+        declare repo "0.4.0"
+
+        // The recorded authority: the set the repository was last applied
+        // from, selecting Forma 0.4.0, attested or not.
+        let authorityPath, authoritySha = attestedSet repo $"{label}-authority.json" "0.4.0" authorityAttestation
+        let recorded = Path.Combine(repo.Target, ".conditor", "authority", "resolved-release-set.json")
+        File.Copy(authorityPath, recorded, true)
+        let manifestText = File.ReadAllText repo.ManifestPath
+        let previousSha = Text.RegularExpressions.Regex.Match(manifestText, "\"sha256\": \"([0-9a-f]{64})\"").Groups[1].Value
+        File.WriteAllText(repo.ManifestPath, manifestText.Replace(previousSha, authoritySha))
+
+        let lockedComponents =
+            [ { Id = "limen"
+                Version = "0.9.0"
+                Distribution = NpmPackage
+                Package = LimenPackage
+                SourceReference = Some $"npm:{LimenPackage}@0.9.0" } ]
+            @ (if declaredInLock then
+                   [ { Id = "forma"
+                       Version = "0.4.0"
+                       Distribution = NpmPackage
+                       Package = FormaPackage
+                       SourceReference = Some $"npm:{FormaPackage}@0.4.0" } ]
+               else
+                   [])
+
+        if declaredInLock then
+            LockFile.write
+                repo.Target
+                repo.ManifestPath
+                { ProjectName = "chrona-shaped"
+                  Operation = Init
+                  Components = lockedComponents
+                  Actions = [] }
+            |> ignore
+        else
+            // An opt-in: the lock records the manifest without Forma.
+            let withoutForma =
+                File.ReadAllText(repo.ManifestPath).Replace(",\n    { \"id\": \"forma\", \"version\": \"0.4.0\", \"required\": true }", "")
+
+            let declared = File.ReadAllText repo.ManifestPath
+            File.WriteAllText(repo.ManifestPath, withoutForma)
+
+            LockFile.write
+                repo.Target
+                repo.ManifestPath
+                { ProjectName = "chrona-shaped"
+                  Operation = Init
+                  Components = lockedComponents
+                  Actions = [] }
+            |> ignore
+
+            File.WriteAllText(repo.ManifestPath, declared)
+
+        let target = writeSet repo $"{label}-target.json" "1.19.0" "0.5.0"
+        previewTrusting trust repo target
+
+    let sourceRefused label trust declaredInLock attestation =
+        match sourceScenario label trust declaredInLock attestation with
+        | Error errors -> check $"{label} plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                $"{label}: an in-range, non-exact source is refused: {joined plan.Refusals}"
+                (plan.Refusals
+                 |> List.exists (fun refusal -> refusal.Contains("source version 0.4.0 is not qualified", StringComparison.Ordinal)))
+
+    let sourceAccepted label trust declaredInLock attestation =
+        match sourceScenario label trust declaredInLock attestation with
+        | Error errors -> check $"{label} plan is produced: {joined errors}" false
+        | Ok plan -> check $"{label}: an attested source is accepted: {joined plan.Refusals}" plan.Refusals.IsEmpty
+
+    let attestation040 = Some("registry-test-1", sign key "0.4.0" contract, contract)
+
+    sourceRefused "declared source with the shipped empty trust set" ReleaseAttestation.embedded.Value true attestation040
+    sourceRefused "opt-in source with the shipped empty trust set" ReleaseAttestation.embedded.Value false attestation040
+    sourceRefused "declared source whose recorded authority is unsigned" trusted true None
+    sourceRefused "opt-in source whose recorded authority is unsigned" trusted false None
+    sourceAccepted "declared source attested by its recorded authority" trusted true attestation040
+    sourceAccepted "opt-in source attested by its recorded authority" trusted false attestation040
+
     // Descriptor rules (CON-343, CON-345).
     let descriptor (extra: string) (distribution: string) =
         let lifecycle =

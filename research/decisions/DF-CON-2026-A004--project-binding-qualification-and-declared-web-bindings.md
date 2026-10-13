@@ -21,7 +21,7 @@ provenance:
     EXE-20261013T150353451Z-40bfcd6e:
       operations: [created, modified]
       at: 2026-10-13T15:09:00.516Z
-      last: 2026-10-13T15:50:32.907Z
+      last: 2026-10-13T15:54:59.036Z
       actor:
         kind: agent
         id: anthropic/claude-code
@@ -203,6 +203,15 @@ precondition of D (see "Accepted condition" above).
     `trust/registry-release-keys.json`, which ships empty;
   - the same rule in planning, final verification and the compatibility
     graph.
+
+  Sources are gated as strictly as targets. A source version outside
+  `qualifiedVersions` qualifies only through a trusted attestation on the
+  repository's digest-verified recorded authority entry for exactly that
+  version. A first draft let an in-range source qualify by range alone. The
+  lead caught it in review (conditor#88): that is unsigned qualification
+  taking effect before signing lands, which the user's two-key condition
+  forbids. A range alone therefore never qualifies a version, and "never
+  unsigned" stays true after activation as well.
 
   It activates only when the Registry signs (REG-SIG-001..008, whose
   statement-based payload replaced the earlier manifest-bytes wording so
