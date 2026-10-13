@@ -49,3 +49,4 @@
 | WI-0040 | workstation plan/apply: host-tool versions from a digest-verified resolved set, downgrade refusal, no stale embedded pins (0.10.2) | complete |  | medium |
 | WI-0041 | Workstation registration: reasons, not-configured vs misconfigured, ledger-owned Praxis default and backfill (conditor#95) | complete |  | medium |
 | WI-0042 | Qualify Praxis 3.12.0 for upgrade --current (echelon-current 1.23.0) and release Conditor 0.10.4 | complete |  | medium |
+| WI-0043 | Qualify Ordo 1.8.2 for upgrade --current (echelon-current 1.24.0) and release Conditor 0.10.5 | ready |  | medium |

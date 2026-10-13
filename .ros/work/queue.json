@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 43,
+  "nextSeq": 44,
   "items": [
     {
       "id": "WI-0001",
@@ -1016,6 +1016,27 @@
       "attachments": [],
       "createdAt": "2026-10-13T22:35:32.158Z",
       "updatedAt": "2026-10-13T22:54:32Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0043",
+      "title": "Qualify Ordo 1.8.2 for upgrade --current (echelon-current 1.24.0) and release Conditor 0.10.5",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-13T23:46:12.752Z",
+      "updatedAt": "2026-10-13T23:46:16Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
