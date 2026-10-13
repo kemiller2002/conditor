@@ -16,6 +16,7 @@
     <Compile Include="RegistryAuthorityBindingTests.fs" />
     <Compile Include="LimenPackageIdentityTests.fs" />
     <Compile Include="ComponentSchemaTests.fs" />
+    <Compile Include="DriftTests.fs" />
     <Compile Include="VerificationGateTests.fs" />
     <Compile Include="LibraryScaffoldTests.fs" />
     <Compile Include="WebScaffoldTests.fs" />

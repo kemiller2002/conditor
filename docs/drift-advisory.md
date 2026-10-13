@@ -8,7 +8,9 @@ CON-300..CON-320. Decision: `DF-CON-2026-A003`.
 
 - Implementation: `src/Conditor.Core/Drift.fs` and
   `src/Conditor.Core/StepwiseUpgrade.fs`.
-- Specification by test: `tests/Conditor.Tests/DriftTests.fs`.
+- Specification by test: `tests/Conditor.Tests/DriftTests.fs` (drift) and
+  `tests/Conditor.Tests/DeclaredWebBindingTests.fs` (stepwise).
+- Report schema: `schemas/conditor-drift-report.schema.json`.
 
 ## `conditor drift`
 
@@ -47,13 +49,13 @@ whose `releaseStage` is one of the profile's `allowedReleaseStages`. The
 
 ### Pins discovered
 
-| Source | Pin | Attributed to a system by |
+| Source (`pins[].source`) | Pin | Attributed to a system by |
 |---|---|---|
-| `conditor.json` | `components[].version` | the component id |
-| `**/package.json` | `dependencies`, `devDependencies`, `optionalDependencies`, `peerDependencies` | a registered release's `distribution.package` |
-| `.echelon/foundations.json` | `capabilities.<id>.version` | the capability key (only when it is a registered system) |
-| `vendor/nuget/*.lock` | `system` / `version` lines (`conditor.nuget-feed-lock/v1`) | the `system` line |
-| `Directory.Packages.props`, `Directory.Build.props`, `**/*.{fs,cs}proj` | `PackageVersion`/`PackageReference` `Include`+`Version` | a registered release's NuGet `distribution.package` or `.nupkg` artifact id |
+| `conditor.json` (`conditor.json`) | `components[].version` | the component id |
+| `**/package.json` (`package.json`) | `dependencies`, `devDependencies`, `optionalDependencies`, `peerDependencies` | a registered release's `distribution.package` |
+| `.echelon/foundations.json` (`foundations`) | `capabilities.<id>.version` | the capability key (only when it is a registered system) |
+| `vendor/nuget/*.lock` (`nuget-feed-lock`) | `system` / `version` lines (`conditor.nuget-feed-lock/v1`) | the `system` line |
+| `Directory.Packages.props`, `Directory.Build.props`, `**/*.{fs,cs}proj` (`msbuild`, specifier `<id> <version>`) | `PackageVersion`/`PackageReference` `Include`+`Version` | a registered release's NuGet `distribution.package` or `.nupkg` artifact id |
 
 Directory walks skip `node_modules`, `.git`, `bin`, `obj`, `.conditor` and
 symbolic links.
@@ -71,6 +73,7 @@ Anything else is reported verbatim with `version: null` and level at least
 
 | Field | Meaning |
 |---|---|
+| `declared` | true when `conditor.json` declares the component |
 | `pins[]` | `source`, `path`, `line`, `specifier`, `version`, `pinnedSince` (committer time of the Git commit that last changed that line; `null` when unavailable or uncommitted) |
 | `pinnedVersion` | the oldest resolved pin (CON-305) |
 | `consistent` | false when the resolved pins disagree |
@@ -83,7 +86,7 @@ Anything else is reported verbatim with `version: null` and level at least
 | `pinAgeDays` | days since the oldest `pinnedSince` |
 | `behindSince` | the Registry registration time of the first registered release newer than the pin (Registry Git history; `null` when unavailable) |
 | `level`, `reasons[]` | `ok`, `info`, `warn` or `fail`, with the reasons |
-| `nextStep` | `{ version, crosses: [{ version, migrationNotes }], action }`, or `null` when current |
+| `nextStep` | `{ version, crosses: [{ version, migrationNotes }], pinUpdates: [{ source, path, line, from, to }], command, declare }`, or `null` when there is no registered step |
 
 `nextStep.version` is the newest registered patch of the next registered minor
 line (DF-CON-2026-A003 decision 4). `crosses` lists every registered release
@@ -91,12 +94,14 @@ in `(pinned, next]`. `migrationNotes` is the release manifest's
 `migrationNotes` when present, and otherwise
 `https://github.com/<repository>/releases/tag/<tag>`.
 
-`action` takes one of two forms:
+`pinUpdates` gives the exact new specifier of every pin outside
+`conditor.json`. For a tarball pin, that is the next release's asset URL.
 
-- For a component declared in `conditor.json`, it is the stepwise
+- `command`: for a component declared in `conditor.json`, the stepwise
   current-upgrade command.
-- Otherwise, it gives the exact new specifier for each pin. For a tarball
-  pin, that is the next release's asset URL.
+- `declare`: for an undeclared web package, the exact `conditor.json` entry
+  that lets `upgrade --current` adopt it and then move every pin (CON-334,
+  `docs/web-package-upgrade-contract.md`).
 
 ### Staleness policy
 
@@ -158,8 +163,8 @@ Candidate step sets are all Registry-produced (CON-311):
 The planner starts from the versions `conditor.json` declares. It then
 repeatedly picks the newest candidate that meets all of these conditions:
 
-- it selects every declared component;
-- it does not downgrade any declared component;
+- it selects every declared component that the target set selects;
+- it does not downgrade any of those components;
 - it does not pass the final target;
 - it advances each component by at most one registered minor line;
 - it advances at least one component.

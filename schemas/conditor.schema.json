@@ -331,6 +331,44 @@
           }
         }
       }
+    },
+    "stalenessPolicy": {
+      "description": "Drift advisory staleness policy (CON-316..317, docs/drift-advisory.md). Each field overrides the Registry resolved set's, which overrides the built-in default; null disables a threshold.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "warnAfterMinorsBehind": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "warnAfterMajorsBehind": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "warnAfterReleasesBehind": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "warnAfterPinAgeDays": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "failBelowSupportedRange": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "allOf": [

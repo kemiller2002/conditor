@@ -1752,20 +1752,20 @@
         "EXE-20261013T150353451Z-40bfcd6e"
       ],
       "latestCheckpoint": {
-        "id": "44caf681f0b88a0d3db01f05",
-        "recordedAt": "2026-10-13T15:23:17.000Z",
+        "id": "6e6570bd93e0b69ccb602367",
+        "recordedAt": "2026-10-13T15:40:54.000Z",
         "executionId": "EXE-20261013T150353451Z-40bfcd6e",
         "repository": "conditor",
-        "branch": "feat/declared-web-bindings",
-        "commit": "bbbdfb190c8b9dfccc0202eebc690d96aa25c471",
+        "branch": "feat/drift-command",
+        "commit": "0d0badff924df3e2d9137d7f490342c554c2add0",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "feat/declared-web-bindings",
-        "remoteCommit": "bbbdfb190c8b9dfccc0202eebc690d96aa25c471",
-        "summary": "PR #84 merged (95f7d16). Declared web-binding opt-in, foundations.json ownership and the no-scaffold rule pushed with the Chrona-shaped stepwise proof",
-        "nextAction": "Gate and merge the declared-binding PR, request Conditor 0.9.0, then drift",
+        "remoteBranch": "feat/drift-command",
+        "remoteCommit": "0d0badff924df3e2d9137d7f490342c554c2add0",
+        "summary": "Conditor 0.9.0 released (64ffc78). Drift advisory, staleness policy and stepwise planning pushed with tests",
+        "nextAction": "Gate and merge the drift PR; then option D gated on signatures",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"

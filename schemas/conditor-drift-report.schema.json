@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor/drift-report/v1",
+  "title": "Conditor drift report (conditor drift --json)",
+  "description": "Read-only rolling-upgrade advisory: how far each pinned Registry component is behind its channel, and the next step one registered minor line at a time (CON-300..320, DF-CON-2026-A003). Unavailable observations are null, never zero.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "target", "observedAt", "registry", "policy", "level", "components"],
+  "properties": {
+    "schema": { "const": "conditor.drift-report/v1" },
+    "target": { "type": "string", "minLength": 1 },
+    "observedAt": { "$ref": "#/$defs/timestamp" },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "channel", "channelSha256", "platform", "profile", "resolvedSet", "resolvedSetSha256", "catalogSnapshotSha256"],
+      "properties": {
+        "path": { "type": "string" },
+        "channel": { "type": "string", "minLength": 1 },
+        "channelSha256": { "$ref": "#/$defs/sha256" },
+        "platform": { "type": "string", "minLength": 1 },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version"],
+          "properties": {
+            "id": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        },
+        "resolvedSet": { "type": "string" },
+        "resolvedSetSha256": { "$ref": "#/$defs/sha256" },
+        "catalogSnapshotSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["warnAfterMinorsBehind", "warnAfterMajorsBehind", "warnAfterReleasesBehind", "warnAfterPinAgeDays", "failBelowSupportedRange", "sources"],
+      "properties": {
+        "warnAfterMinorsBehind": { "$ref": "#/$defs/threshold" },
+        "warnAfterMajorsBehind": { "$ref": "#/$defs/threshold" },
+        "warnAfterReleasesBehind": { "$ref": "#/$defs/threshold" },
+        "warnAfterPinAgeDays": { "$ref": "#/$defs/threshold" },
+        "failBelowSupportedRange": { "type": "boolean" },
+        "sources": {
+          "type": "object",
+          "additionalProperties": { "enum": ["default", "registry", "conditor.json"] }
+        }
+      }
+    },
+    "level": { "$ref": "#/$defs/level" },
+    "components": { "type": "array", "items": { "$ref": "#/$defs/component" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "threshold": { "type": ["integer", "null"], "minimum": 0 },
+    "level": { "enum": ["ok", "info", "warn", "fail"] },
+    "optionalString": { "type": ["string", "null"] },
+    "optionalCount": { "type": ["integer", "null"], "minimum": 0 },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "declared", "pins", "pinnedVersion", "consistent", "channelSelected", "latestRegistered", "releasesBehind", "minorsBehind", "majorsBehind", "supportedRange", "belowSupportedRange", "pinAgeDays", "behindSince", "level", "reasons", "nextStep"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "declared": { "type": "boolean" },
+        "pins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "path", "line", "specifier", "version", "pinnedSince"],
+            "properties": {
+              "source": { "enum": ["conditor.json", "package.json", "foundations", "nuget-feed-lock", "msbuild"] },
+              "path": { "type": "string", "minLength": 1 },
+              "line": { "type": ["integer", "null"], "minimum": 1 },
+              "specifier": { "type": "string" },
+              "version": { "$ref": "#/$defs/optionalString" },
+              "pinnedSince": { "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] }
+            }
+          }
+        },
+        "pinnedVersion": { "$ref": "#/$defs/optionalString" },
+        "consistent": { "type": "boolean" },
+        "channelSelected": { "$ref": "#/$defs/optionalString" },
+        "latestRegistered": { "$ref": "#/$defs/optionalString" },
+        "releasesBehind": { "$ref": "#/$defs/optionalCount" },
+        "minorsBehind": { "$ref": "#/$defs/optionalCount" },
+        "majorsBehind": { "$ref": "#/$defs/optionalCount" },
+        "supportedRange": { "$ref": "#/$defs/optionalString" },
+        "belowSupportedRange": { "type": ["boolean", "null"] },
+        "pinAgeDays": { "$ref": "#/$defs/optionalCount" },
+        "behindSince": { "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+        "level": { "$ref": "#/$defs/level" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "nextStep": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["version", "crosses", "pinUpdates", "command", "declare"],
+              "properties": {
+                "version": { "type": "string", "minLength": 1 },
+                "crosses": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["version", "migrationNotes"],
+                    "properties": {
+                      "version": { "type": "string" },
+                      "migrationNotes": { "type": "string", "pattern": "^https://" }
+                    }
+                  }
+                },
+                "pinUpdates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["source", "path", "line", "from", "to"],
+                    "properties": {
+                      "source": { "type": "string" },
+                      "path": { "type": "string" },
+                      "line": { "type": ["integer", "null"], "minimum": 1 },
+                      "from": { "type": "string" },
+                      "to": { "type": "string" }
+                    }
+                  }
+                },
+                "command": { "$ref": "#/$defs/optionalString" },
+                "declare": { "$ref": "#/$defs/optionalString" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

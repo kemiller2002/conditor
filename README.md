@@ -276,7 +276,23 @@ For each already-declared system, Conditor uses the strongest available generic 
 - legacy native lifecycle systems are upgraded only when this Conditor build has explicitly qualified the exact target version and lifecycle command contract;
 - package-distributed repository lifecycle tools (Registry distribution class `repository-lifecycle`, such as the Visual Engineering npm CLI) are upgraded only when this Conditor build qualifies the exact target version, the Registry release names the descriptor's package and exactly one package artifact digest, and the descriptor maps that version to an immutable distribution. Conditor runs the package's own `upgrade` at exactly the target version, then its verify contract (`verify --strict` for Visual Engineering); for example Visual Engineering 1.0.0 -> 1.0.1, whose upgrade rewrites its managed `.gitignore` region to `!.visual-engineering/`.
 
-Conditor never silently adds a new component to a repository during `--current`, never downgrades a declared component, and never guesses a project-binding migration. A changed Forma, Folio, Limen, Aegis, or other application binding is refused until its distribution exposes a safe generic migration contract.
+Conditor never silently adds a new component to a repository during `--current`, never downgrades a declared component, and never guesses a project-binding migration. Web packages (Limen, Forma, Folio) move under `docs/web-package-upgrade-contract.md`, and NuGet release-asset libraries under `docs/nuget-feed-contract.md`. Any other changed application binding, Aegis for example, is refused until its distribution exposes a safe generic migration contract.
+
+#### Declaring a web package the repository already pins
+
+Some repositories pin Forma or Folio by tarball in `package.json` and `.echelon/foundations.json` without declaring them to Conditor. Do not hand-edit those pins. Instead:
+
+1. Declare the package in `conditor.json` at the version its pins name, for example `{ "id": "forma", "version": "0.4.1", "required": true }`.
+2. Run `upgrade --current --check`.
+3. Authorize the printed digest.
+
+That one plan adopts the binding and moves it to the set's selection. It moves `package.json` and the lockfile through npm, and moves the `foundations.json` capability version with them. See `docs/web-package-upgrade-contract.md`.
+
+#### Drift advisory and stepwise upgrades
+
+`conditor drift --registry <echelon-registry checkout> [--json] [--fail-on warn|fail]` reports, read-only, how far every pinned Registry component is behind the channel. It also gives the next step, one registered minor line at a time. It exits 0 unless `--fail-on` is given.
+
+`conditor upgrade --current --check --stepwise --registry <checkout> ...` breaks a large move into Registry-produced steps (for example Forma 0.4.1 → 0.5.0 → 0.6.1). Step 1 is checked in full and can be authorized. See `docs/drift-advisory.md`.
 
 #### Opting in to an optional native tool
 
