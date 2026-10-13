@@ -1750,7 +1750,27 @@
       "updatedAt": "2026-10-13T15:03:52.000Z",
       "telemetryExecutionIds": [
         "EXE-20261013T150353451Z-40bfcd6e"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "27cc85f05181b4182c55c8bb",
+        "recordedAt": "2026-10-13T15:07:03.000Z",
+        "executionId": "EXE-20261013T150353451Z-40bfcd6e",
+        "repository": "conditor",
+        "branch": "feat/drift-advisory",
+        "commit": "b060ac5d1ad5b8811793b71ca21af8ece14dabef",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "feat/drift-advisory",
+        "remoteCommit": "b060ac5d1ad5b8811793b71ca21af8ece14dabef",
+        "summary": "Requirements CON-300..320, DF-CON-2026-A003, drift contract and requirement notes pushed",
+        "nextAction": "Open requirements PR; implement Drift.fs with tests on a follow-up branch",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
