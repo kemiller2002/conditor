@@ -13,6 +13,7 @@
     <Compile Include="CurrentUpgradeTests.fs" />
     <Compile Include="WebPackageUpgradeTests.fs" />
     <Compile Include="DeclaredWebBindingTests.fs" />
+    <Compile Include="PinConsistencyTests.fs" />
     <Compile Include="RegistryAuthorityBindingTests.fs" />
     <Compile Include="LimenPackageIdentityTests.fs" />
     <Compile Include="ComponentSchemaTests.fs" />

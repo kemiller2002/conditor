@@ -597,6 +597,24 @@ let private integration check (schema: string -> Result<unit, string list>) =
             (report.PolicySources |> List.contains ("warnAfterPinAgeDays", "registry"))
     | _ -> check "Registry-policy report is produced" false
 
+    // CON-305: for a declared component the declared version is effective,
+    // and a stale pin is a pin repair, not a step back.
+    let stale = temp "stale-pin"
+    chronaShaped stale None true
+    let foundationsPath = Path.Combine(stale, ".echelon", "foundations.json")
+    File.WriteAllText(foundationsPath, File.ReadAllText(foundationsPath).Replace("\"version\": \"0.9.0\"", "\"version\": \"0.8.9\""))
+
+    match reportFor registry stale |> Result.map (fun report -> componentOf report "limen") with
+    | Ok(Some limen) ->
+        check
+            "a declared component's effective pin is its conditor.json version, and a stale pin is a repair"
+            (limen.PinnedVersion = Some "0.9.0"
+             && not limen.Consistent
+             && limen.Level = DriftWarn
+             && limen.NextStep.IsNone
+             && limen.Reasons |> List.exists (fun reason -> reason.Contains "pin repair"))
+    | _ -> check "stale-pin report is produced" false
+
     // CON-304: no Git history is "unavailable", never zero.
     let bareRegistry = standardRegistry (temp "registry-nogit") None false
     let bareTarget = temp "target-nogit"

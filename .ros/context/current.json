@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T15:59:17.000Z",
+  "updatedAt": "2026-10-13T16:31:45.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1817,6 +1817,37 @@
         }
       },
       "completedAt": "2026-10-13T15:59:17.000Z"
+    },
+    {
+      "id": "WI-0039",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-13T16:31:45.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261013T163145636Z-72e9d991"
+      ],
+      "latestCheckpoint": {
+        "id": "839c7722bf10b81d26669e9b",
+        "recordedAt": "2026-10-13T16:43:44.000Z",
+        "executionId": "EXE-20261013T163145636Z-72e9d991",
+        "repository": "conditor",
+        "branch": "fix/lifecycle-foundations-consistency",
+        "commit": "c7115fc2252170f07bdf248423e891db7c41ea2f",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/lifecycle-foundations-consistency",
+        "remoteCommit": "c7115fc2252170f07bdf248423e891db7c41ea2f",
+        "summary": "Pin consistency fix plus tracked-only lock review signals (CON-355, ordo#75 filed) pushed with tests",
+        "nextAction": "Gate-merge PR #90, request Conditor 0.10.1, complete WI-0039",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }

@@ -1199,6 +1199,7 @@ CurrentUpgradeTests.runOptIn check
 CurrentUpgradeTests.runPraxisQualification check
 WebPackageUpgradeTests.run check
 DeclaredWebBindingTests.run check
+PinConsistencyTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
 ComponentSchemaTests.run check

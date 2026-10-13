@@ -166,9 +166,69 @@ module LockFile =
             | :? JsonException as ex -> Error [ $"Conditor lock is not valid JSON: {ex.Message}" ]
             | ex -> Error [ $"Unable to verify locked component identities: {ex.Message}" ]
 
+    /// The repository-relative paths Git tracks below `target`, or None when
+    /// `target` is not inside a Git work tree (then tracking is unknowable).
+    let trackedPaths (target: string) : Set<string> option =
+        let root = Path.GetFullPath target
+        let inside = ProcessRunner.runProcess root "git" [ "rev-parse"; "--is-inside-work-tree" ]
+
+        if inside.ExitCode <> 0 || inside.StandardOutput.Trim() <> "true" then
+            None
+        else
+            let listed = ProcessRunner.runProcess root "git" [ "ls-files"; "-z" ]
+
+            if listed.ExitCode <> 0 then
+                None
+            else
+                listed.StandardOutput.Split('\000', StringSplitOptions.RemoveEmptyEntries)
+                |> Set.ofArray
+                |> Some
+
+    let private normalized (path: string) =
+        let forward = path.Replace('\\', '/')
+        if forward.StartsWith("./", StringComparison.Ordinal) then forward.Substring 2 else forward
+
+    /// Only the review signals for files Git tracks: a lock must never depend
+    /// on untracked or ignored files in the working tree, such as build output
+    /// that a structural scanner happened to see (kemiller2002/ordo#75).
+    /// Outside a Git work tree the signals are kept unchanged.
+    let trackedSignals (target: string) (signals: ReviewSignal list) =
+        match trackedPaths target with
+        | None -> signals
+        | Some tracked -> signals |> List.filter (fun signal -> tracked.Contains(normalized signal.Path))
+
+    /// The review-signal paths the written lock names that Git does not track
+    /// (empty outside a Git work tree).
+    let untrackedSignalPaths (target: string) : string list =
+        let path = Path.Combine(target, ".conditor", "lock.json")
+
+        match trackedPaths target with
+        | Some tracked when File.Exists path ->
+            try
+                use document = JsonDocument.Parse(File.ReadAllBytes path)
+                let mutable signals = Unchecked.defaultof<JsonElement>
+
+                if document.RootElement.TryGetProperty("reviewSignals", &signals) && signals.ValueKind = JsonValueKind.Array then
+                    signals.EnumerateArray()
+                    |> Seq.choose (fun signal ->
+                        let mutable value = Unchecked.defaultof<JsonElement>
+
+                        if signal.TryGetProperty("path", &value) && value.ValueKind = JsonValueKind.String then
+                            value.GetString() |> Option.ofObj
+                        else
+                            None)
+                    |> Seq.filter (fun signalPath -> not (tracked.Contains(normalized signalPath)))
+                    |> Seq.toList
+                else
+                    []
+            with :? JsonException ->
+                []
+        | _ -> []
+
     /// Writes the lock, recording the structural review signals the integrity
-    /// gates reported (omitted when there are none).
+    /// gates reported for files Git tracks (omitted when there are none).
     let writeWith target manifestPath (plan: InstallationPlan) (reviewSignals: ReviewSignal list) =
+        let reviewSignals = trackedSignals target reviewSignals
         let directory = Path.Combine(target, ".conditor")
         Directory.CreateDirectory directory |> ignore
         let path = Path.Combine(directory, "lock.json")

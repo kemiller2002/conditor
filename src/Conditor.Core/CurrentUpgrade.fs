@@ -49,6 +49,12 @@ type CurrentUpgradePlan =
       /// NuGet release-asset feeds to establish: an opt-in (no previous
       /// version) or a version change (previous version's pins move).
       NugetFeedChanges: (NugetFeedRelease * string option) list
+      /// `.echelon/foundations.json` capability moves of non-web transitions
+      /// (CON-350); web-package transitions carry their own.
+      FoundationsEdits: FoundationsEdit list
+      /// Stale foundations capabilities of components that do not move,
+      /// aligned to the declared version with no version change (CON-352).
+      PinRepairs: FoundationsEdit list
       Refusals: string list
       Digest: string }
 
@@ -452,6 +458,69 @@ module CurrentUpgrade =
             |> Seq.toList
             |> List.filter (fun transition -> transition.Mode <> "refused")
 
+        // CON-350: every non-web transition also moves the component's
+        // foundations capability when one exists (web transitions carry
+        // their own edit). A capability stale against the source is refused
+        // with the repair that fixes it first.
+        let repairHint =
+            match manifest.RegistryAuthority with
+            | Some authority ->
+                $" Repair it first: conditor upgrade --current --check --resolved-set \"{Path.Combine(Path.GetFullPath target, authority.Path)}\" --resolved-set-sha256 {authority.Sha256} (CON-352)."
+            | None -> " Bring it into agreement with conditor.json first (CON-352)."
+
+        let webModes = set [ WebPackageTransition.DeclarationMode; WebPackageTransition.BindingMode ]
+
+        let foundationsEdits =
+            transitionList
+            |> List.filter (fun transition -> not (webModes.Contains transition.Mode))
+            |> List.choose (fun transition ->
+                let label = $"'{transition.Id}' {transition.FromVersion} -> {transition.ToVersion}:"
+
+                match WebPackageBinding.foundationsEdit label (Path.GetFullPath target) transition.Id transition.FromVersion transition.ToVersion with
+                | Ok edit -> edit
+                | Error problems ->
+                    problems |> List.iter (fun problem -> errors.Add(problem + repairHint))
+                    None)
+
+        // CON-352: a declared component that does not move must have every
+        // pin at its declared version. Stale foundations capabilities are
+        // repaired; any other disagreeing pin is refused by name.
+        let movingIds = transitions |> Seq.map (fun transition -> transition.Id) |> Set.ofSeq
+
+        let steady =
+            manifest.Components
+            |> List.choose (fun request ->
+                match request.Version, entryMap |> Map.tryFind request.Id with
+                | Some version, Some entry when entry.Version = version && not (movingIds.Contains request.Id) -> Some(request.Id, version)
+                | _ -> None)
+            |> Map.ofList
+
+        let setReleases =
+            try
+                Drift.releasesFromSet (File.ReadAllBytes targetSetPath)
+            with _ ->
+                Map.empty
+
+        let pinRepairs =
+            Drift.pinDisagreements setReleases (Path.GetFullPath target) steady
+            |> List.choose (fun pin ->
+                let declared = steady[pin.SystemId]
+
+                match pin.Source, pin.Version with
+                | "foundations", Some stale ->
+                    let label = $"'{pin.SystemId}' pin repair {stale} -> {declared}:"
+
+                    match WebPackageBinding.foundationsEdit label (Path.GetFullPath target) pin.SystemId stale declared with
+                    | Ok edit -> edit
+                    | Error problems ->
+                        problems |> List.iter errors.Add
+                        None
+                | _ ->
+                    errors.Add
+                        $"'{pin.SystemId}' {pin.Path} pins \"{pin.Specifier}\", but conditor.json declares {declared}; Conditor cannot align this pin kind by itself, so it refuses rather than report the component as current (CON-352)."
+
+                    None)
+
         let manifestIds = manifest.Components |> List.map _.Id |> Set.ofList
 
         let workstationProfile =
@@ -602,7 +671,16 @@ module CurrentUpgrade =
                   |> String.concat "\n"
                   genericInitPlan |> Option.map (fun plan -> $"lifecycleInit={plan.Digest}") |> Option.defaultValue "lifecycleInit=-" ]
 
-        let digestMaterial = String.concat "\n" (planLines @ optInLines @ feedLines)
+        // Only a plan that moves or repairs a foundations capability carries
+        // these lines, so every other plan's digest is unchanged.
+        let foundationsLines =
+            (foundationsEdits |> List.map (fun edit -> "foundations", edit))
+            @ (pinRepairs |> List.map (fun edit -> "pin-repair", edit))
+            |> List.sortBy (fun (_, edit) -> edit.Capability)
+            |> List.map (fun (kind, edit) ->
+                $"{kind}|{edit.Path}|{edit.Capability}|{edit.FromVersion}->{edit.ToVersion}|sha256:{edit.Sha256}")
+
+        let digestMaterial = String.concat "\n" (planLines @ optInLines @ feedLines @ foundationsLines)
 
         targetProfile
         |> Option.map (fun profile ->
@@ -623,6 +701,8 @@ module CurrentUpgrade =
               PackageLifecycleTransitions = packageTransitions |> Seq.toList |> List.sortBy _.Transition.Id
               WebPackageTransitions = webTransitions |> Seq.toList |> List.sortBy _.Id
               NugetFeedChanges = feedChanges |> Seq.toList |> List.sortBy (fun (release, _) -> release.Id)
+              FoundationsEdits = foundationsEdits
+              PinRepairs = pinRepairs
               Refusals = errors |> Seq.distinct |> Seq.toList
               Digest = "sha256:" + sha256Text digestMaterial })
 
@@ -736,6 +816,31 @@ module CurrentUpgrade =
         | Ok plan when not plan.Refusals.IsEmpty ->
             Error plan.Refusals
         | Ok plan ->
+            // Every file Conditor itself edits, as it was before this upgrade,
+            // so a failed consistency invariant restores them (CON-351).
+            let edited =
+                [ for transition in plan.WebPackageTransitions do
+                      for binding in transition.Bindings do
+                          yield binding.PackageJsonPath
+                          yield binding.LockPath
+                      match transition.Foundations with
+                      | Some edit -> yield edit.Path
+                      | None -> ()
+                  for edit in plan.FoundationsEdits @ plan.PinRepairs do
+                      yield edit.Path ]
+                |> List.distinct
+                |> List.filter File.Exists
+                |> List.map (fun path -> path, File.ReadAllBytes path)
+
+            let restoreEdited (errors: string list) =
+                edited |> List.iter (fun (path: string, bytes: byte array) -> File.WriteAllBytes(path, bytes))
+
+                errors
+                @ (if edited.IsEmpty then
+                       []
+                   else
+                       [ "Every file Conditor edited (foundations.json, package.json, lockfiles) was restored; conditor.json, the authority and the lock are unchanged." ])
+
             let workstationResult =
                 match plan.WorkstationPlan with
                 | None -> Ok()
@@ -799,6 +904,41 @@ module CurrentUpgrade =
                             NugetFeed.ensure (NugetFeed.fetchWith ctx.ArtifactMirror ctx.Offline) target previous release
                             |> Result.mapError (fun errors -> $"NuGet feed {release.Id}@{release.Version} failed:" :: errors)))
                     (Ok()))
+            |> Result.bind (fun () ->
+                // CON-350, CON-352: move or repair foundations capabilities.
+                (plan.FoundationsEdits @ plan.PinRepairs)
+                |> List.fold
+                    (fun state edit ->
+                        state
+                        |> Result.bind (fun () ->
+                            WebPackageBinding.applyFoundations edit
+                            |> Result.mapError (fun problem -> [ $"'{edit.Capability}' {problem}" ])))
+                    (Ok())
+                |> Result.mapError restoreEdited)
+            |> Result.bind (fun () ->
+                // CON-351: every pin kind drift reads names the version this
+                // upgrade leaves declared, or nothing is committed.
+                let transitionsById = plan.Transitions |> List.map (fun transition -> transition.Id, transition.ToVersion) |> Map.ofList
+
+                let expected =
+                    manifest.Components
+                    |> List.choose (fun request ->
+                        match transitionsById |> Map.tryFind request.Id with
+                        | Some version -> Some(request.Id, version)
+                        | None -> request.Version |> Option.map (fun version -> request.Id, version))
+                    |> Map.ofList
+
+                let releases = Drift.releasesFromSet (File.ReadAllBytes plan.TargetSetPath)
+
+                match Drift.pinDisagreements releases (Path.GetFullPath target) expected with
+                | [] -> Ok()
+                | disagreements ->
+                    disagreements
+                    |> List.map (fun pin ->
+                        let shown = pin.Version |> Option.defaultValue $"\"{pin.Specifier}\""
+                        $"Pin consistency invariant failed: '{pin.SystemId}' {pin.Path} ({pin.Source}) names {shown}, not {expected[pin.SystemId]} (CON-351).")
+                    |> restoreEdited
+                    |> Error)
             |> Result.bind (fun () ->
                 match plan.GenericVerifyPlan with
                 | None -> Ok()
@@ -881,10 +1021,25 @@ module CurrentUpgrade =
                                         match Planner.createTrusting trust target Init committedManifest with
                                         | Error errors -> Error errors
                                         | Ok lockPlan ->
+                                            let lockFile = Path.Combine(Path.GetFullPath target, ".conditor", "lock.json")
+                                            let oldLock = if File.Exists lockFile then Some(File.ReadAllBytes lockFile) else None
                                             let lockPath = LockFile.writeWith target manifestPath lockPlan reviewSignals
+
+                                            // A lock never depends on untracked or
+                                            // ignored files (kemiller2002/ordo#75).
+                                            match LockFile.untrackedSignalPaths target with
+                                            | _ :: _ as untracked ->
+                                                match oldLock with
+                                                | Some bytes -> writeAtomically lockFile bytes
+                                                | None -> File.Delete lockFile
+
+                                                let shown = String.concat ", " untracked
+                                                Error [ $"The new lock names review-signal paths Git does not track ({shown}); a lock must not depend on untracked or ignored files." ]
+                                            | [] ->
+
                                             let remaining =
                                                 match preview target manifestPath committedManifest targetSetPath targetDigest ctx probe with
-                                                | Ok second -> second.Transitions.IsEmpty
+                                                | Ok second -> second.Transitions.IsEmpty && second.PinRepairs.IsEmpty
                                                 | Error _ -> false
 
                                             Ok
