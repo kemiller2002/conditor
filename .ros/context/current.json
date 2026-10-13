@@ -1752,20 +1752,20 @@
         "EXE-20261013T150353451Z-40bfcd6e"
       ],
       "latestCheckpoint": {
-        "id": "2825f0746af6268c7a24fcf4",
-        "recordedAt": "2026-10-13T15:14:19.000Z",
+        "id": "44caf681f0b88a0d3db01f05",
+        "recordedAt": "2026-10-13T15:23:17.000Z",
         "executionId": "EXE-20261013T150353451Z-40bfcd6e",
         "repository": "conditor",
-        "branch": "fix/qualify-echelon-current-1.20",
-        "commit": "abfd20b2e527c95541262d9af605b5bfadaaa2d1",
+        "branch": "feat/declared-web-bindings",
+        "commit": "bbbdfb190c8b9dfccc0202eebc690d96aa25c471",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "fix/qualify-echelon-current-1.20",
-        "remoteCommit": "abfd20b2e527c95541262d9af605b5bfadaaa2d1",
-        "summary": "Requirements PR #83 merged; qualification patch (Forma 0.6.1, Folio 0.4.0, Ordo 1.6.0/1.7.0) pushed with tests",
-        "nextAction": "Gate and merge the qualification PR, request Conditor 0.8.3, then implement drift",
+        "remoteBranch": "feat/declared-web-bindings",
+        "remoteCommit": "bbbdfb190c8b9dfccc0202eebc690d96aa25c471",
+        "summary": "PR #84 merged (95f7d16). Declared web-binding opt-in, foundations.json ownership and the no-scaffold rule pushed with the Chrona-shaped stepwise proof",
+        "nextAction": "Gate and merge the declared-binding PR, request Conditor 0.9.0, then drift",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
