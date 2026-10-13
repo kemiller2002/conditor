@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T22:35:39Z",
+  "updatedAt": "2026-10-13T22:54:32Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1993,13 +1993,44 @@
     {
       "id": "WI-0042",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-13T22:35:39Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/praxis.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-13T22:54:32Z",
       "telemetryExecutionIds": [
         "EXE-20261013T223539899Z-ca2e6486"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "a3b8f4b359a7e5d18b8be10b",
+        "recordedAt": "2026-10-13T22:54:30Z",
+        "executionId": "EXE-20261013T223539899Z-ca2e6486",
+        "repository": "conditor",
+        "branch": "wi-0042-release-0.10.4",
+        "commit": "7d5d52e0b1630d4c8612a29902299cd3734f0063",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "wi-0042-release-0.10.4",
+        "remoteCommit": "7d5d52e0b1630d4c8612a29902299cd3734f0063",
+        "summary": "#98 merged at a90df25e (Praxis 3.12.0 qualified; CI sweep 1.17.0->1.22.0->1.23.0 ran the real 3.12.0); 0.10.4 requested at 7d5d52e0",
+        "nextAction": "Gate-merge the request, verify the 0.10.4 release, record it, then the 1.23.0 channel PR",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-13T22:54:32Z",
+      "conclusion": "Praxis 3.12.0 qualified for upgrade --current; 0.10.4 requested"
     }
   ]
 }
