@@ -1752,20 +1752,20 @@
         "EXE-20261013T150353451Z-40bfcd6e"
       ],
       "latestCheckpoint": {
-        "id": "27cc85f05181b4182c55c8bb",
-        "recordedAt": "2026-10-13T15:07:03.000Z",
+        "id": "2825f0746af6268c7a24fcf4",
+        "recordedAt": "2026-10-13T15:14:19.000Z",
         "executionId": "EXE-20261013T150353451Z-40bfcd6e",
         "repository": "conditor",
-        "branch": "feat/drift-advisory",
-        "commit": "b060ac5d1ad5b8811793b71ca21af8ece14dabef",
+        "branch": "fix/qualify-echelon-current-1.20",
+        "commit": "abfd20b2e527c95541262d9af605b5bfadaaa2d1",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "feat/drift-advisory",
-        "remoteCommit": "b060ac5d1ad5b8811793b71ca21af8ece14dabef",
-        "summary": "Requirements CON-300..320, DF-CON-2026-A003, drift contract and requirement notes pushed",
-        "nextAction": "Open requirements PR; implement Drift.fs with tests on a follow-up branch",
+        "remoteBranch": "fix/qualify-echelon-current-1.20",
+        "remoteCommit": "abfd20b2e527c95541262d9af605b5bfadaaa2d1",
+        "summary": "Requirements PR #83 merged; qualification patch (Forma 0.6.1, Folio 0.4.0, Ordo 1.6.0/1.7.0) pushed with tests",
+        "nextAction": "Gate and merge the qualification PR, request Conditor 0.8.3, then implement drift",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
