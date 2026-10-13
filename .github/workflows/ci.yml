@@ -397,6 +397,63 @@ jobs:
           }
           sweep 1.16.0 "$SET_116_COMMIT" "$SET_116_SHA256" 3.7.2 3.10.0
           sweep 1.17.0 "$SET_117_COMMIT" "$SET_117_SHA256" 3.10.0 3.11.0
+      - name: Sweep to echelon-current 1.22.0 and 1.23.0 - Ordo 1.5.0 -> 1.7.0, then only Praxis 3.11.0 -> 3.12.0
+        shell: bash
+        env:
+          # 1.22.0 is echelon-registry main at merge 0bf2633 (Ordo 1.7.0, Praxis
+          # 3.11.0). 1.23.0 differs from it only in Praxis 3.12.0; its linux-x64
+          # set is vendored at tests/fixtures/registry/ byte-for-byte as the
+          # Registry generated it (echelon-registry WI-0051), because the
+          # Registry's REG-RU-007 gate requires this Conditor to be released
+          # before the channel move can merge. The sha256 is the set's identity
+          # in channel.json, so the same bytes are what the channel publishes.
+          # The sweep installs the real Praxis 3.12.0 release and runs it.
+          SET_122_COMMIT: 0bf2633c486c51a458ab60ff47e7cc49a24c3cde
+          SET_122_SHA256: f969e5e92d6a3a208f35df7da4c74cd8159b3d80646de6a9d90ca77ed55fcd72
+          SET_123_PATH: tests/fixtures/registry/echelon-current-1.23.0-linux-x64.json
+          SET_123_SHA256: fd7006ea1ad6a8d37a565b6beea7528ff9af494c97366ac17a9c21ac6ac76a91
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          export PATH="$RUNNER_TEMP/ve-1.0.1/node_modules/.bin:$PATH"
+          repo="$RUNNER_TEMP/sweep"
+          home="$RUNNER_TEMP/sweep-next-home"
+          step() {
+            local profile="$1" set="$2" sha="$3" expected="$4" ordo="$5" praxis="$6"
+            local plan="$RUNNER_TEMP/sweep-$profile.txt"
+            echo "$sha  $set" | sha256sum -c -
+            local args=(--home "$home" --target "$repo" --resolved-set "$set" --resolved-set-sha256 "$sha")
+            conditor upgrade --current --check "${args[@]}" | tee "$plan"
+            grep -F "Current upgrade plan: echelon-current@$profile" "$plan"
+            # Exactly the expected version transitions, nothing else.
+            actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$plan" | sed -E 's/^ +//; s/ \[.*//' | sort | paste -sd';')
+            test "$actual" = "$expected" || { echo "transitions: '$actual', expected '$expected'" >&2; exit 1; }
+            if grep -E "REFUSED|arca|strata" "$plan"; then exit 1; fi
+            local authorization
+            authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$plan" | cut -d' ' -f2)
+            conditor upgrade --current "${args[@]}" --authorize "$authorization"
+            python3 - "$repo" "$sha" "$ordo" "$praxis" <<'PY'
+          import json, sys, pathlib
+          repo, sha, ordo, praxis = pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+          manifest = json.loads((repo / "conditor.json").read_text())
+          versions = {c["id"]: c["version"] for c in manifest["components"]}
+          assert versions == {"ordo": ordo, "praxis": praxis, "visual-engineering": "1.0.1"}, versions
+          assert manifest["registryAuthority"]["sha256"] == sha, manifest
+          toolchain = json.loads((repo / ".echelon/toolchain.json").read_text())
+          assert toolchain["praxis"] == praxis and toolchain["ordo"] == ordo, toolchain
+          PY
+            conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+            "$home/.local/bin/praxis" --version | grep -Fx "praxis $praxis"
+            PATH="$home/.local/bin:$PATH" conditor status --target "$repo"
+            git -C "$repo" add -A
+            git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current $profile"
+          }
+          set122="$RUNNER_TEMP/set-1.22.0.json"
+          curl -fsSL "https://raw.githubusercontent.com/kemiller2002/echelon-registry/$SET_122_COMMIT/channels/echelon-current/linux-x64.json" -o "$set122"
+          step 1.22.0 "$set122" "$SET_122_SHA256" "ordo: 1.5.0 -> 1.7.0" 1.7.0 3.11.0
+          step 1.23.0 "$SET_123_PATH" "$SET_123_SHA256" "praxis: 3.11.0 -> 3.12.0" 1.7.0 3.12.0
+          # The installed Praxis 3.12.0 itself verifies the swept repository.
+          "$home/.local/bin/praxis" --root "$repo" verify --strict
 
   host-tool-upgrade-boundary:
     needs: build-test
