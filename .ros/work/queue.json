@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 34,
+  "nextSeq": 39,
   "items": [
     {
       "id": "WI-0001",
@@ -917,6 +917,27 @@
         "id": "anthropic/claude-code",
         "provider": "anthropic",
         "model": "claude-opus-5-5",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0038",
+      "title": "Rolling-upgrade advisory: conditor drift, stepwise upgrade --current --check, and staleness policy",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-13T15:03:44.953Z",
+      "updatedAt": "2026-10-13T15:03:48.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
         "runtime": "claude-code"
       },
       "source": "manual",

@@ -418,3 +418,128 @@ Tracked by GitHub issue #5.
 - **CON-288** Successful current upgrade SHALL persist the exact target resolved-set bytes in the repository, update declared component versions and authority digest, and write a fresh lock only after full verification succeeds.
 - **CON-289** After a successful current upgrade, Conditor SHALL recalculate the current plan and require zero remaining version transitions as the idempotency completion proof.
 - **CON-290** Failure before the final governance commit SHALL preserve the prior Conditor manifest and Registry authority; any component-owned partial migration SHALL remain explicit remediation evidence rather than being hidden by a false lock update.
+
+
+## Rolling-upgrade advisory
+
+Small, frequent version steps are easier and safer than one large jump. A
+repository that stops tracking its registered dependencies drifts until it has
+to make several breaking moves at once. Conditor therefore reports drift as a
+read-only advisory. It can also plan an upgrade as a sequence of
+Registry-produced steps, one release line at a time. Decision:
+`DF-CON-2026-A003`. Contract: `docs/drift-advisory.md`.
+
+### Drift advisory
+
+- **CON-300** Conditor SHALL provide a read-only `conditor drift` operation.
+  For a target repository and an Echelon Registry channel, it SHALL report,
+  for every pinned Registry component: the pinned version or versions, the
+  version the channel selects, the newest registered version, the number of
+  registered releases behind, the number of registered minor lines and majors
+  behind, the age of the pin, and the recommended next step.
+- **CON-301** Drift discovery SHALL read every kind of pin Conditor knows how
+  to establish:
+  - `conditor.json` component versions;
+  - `package.json` dependencies on a registered web package, whether pinned by
+    exact version or by GitHub release-asset tarball URL;
+  - `.echelon/foundations.json` capability versions;
+  - Conditor NuGet release-asset feed locks (`vendor/nuget/*.lock`);
+  - MSBuild `PackageVersion` and `PackageReference` pins of a registered NuGet
+    package.
+
+  A pin outside `conditor.json` SHALL be reported even though `upgrade
+  --current` does not govern it.
+- **CON-302** A tarball-URL pin SHALL resolve to a version only when it equals
+  the release-asset URL of the package artifact of exactly one registered
+  release. Any other specifier SHALL be reported verbatim as unregistered and
+  SHALL NOT be guessed into a version.
+- **CON-303** Drift SHALL derive the registered releases, the channel
+  selection and the supported range only from Registry bytes whose SHA-256
+  values chain from the channel index: the channel index binds the platform
+  resolved set and the catalog snapshot, and the snapshot binds every release
+  and profile manifest. A digest mismatch SHALL stop the advisory with an
+  error and SHALL NOT produce a partial report.
+- **CON-304** Drift SHALL NOT mutate the target repository or the Registry
+  checkout, download artifacts, or invoke component lifecycle operations.
+  History observations (pin age, release registration time) SHALL use
+  read-only Git queries. When they are unavailable, the field SHALL be
+  reported as unavailable, never as zero.
+- **CON-305** When pins of the same component disagree, drift SHALL report
+  every pin, treat the oldest as the effective pin, and raise a warning.
+- **CON-306** Drift SHALL emit a machine-readable JSON document
+  (`conditor.drift-report/v1`, `schemas/conditor-drift-report.schema.json`)
+  with `--json`, and human-readable text otherwise. Both SHALL carry the same
+  findings.
+- **CON-307** The recommended next step SHALL name one registered release
+  line at a time. That release is the newest registered patch of the next
+  registered minor line above the effective pin. The step SHALL link every
+  registered release it crosses to its migration notes. The link is the
+  release manifest's `migrationNotes` when it declares one, and otherwise
+  the release's GitHub release page.
+- **CON-308** Drift SHALL be advisory: it SHALL exit 0 whatever it finds,
+  unless the caller passes `--fail-on warn|fail`, in which case it SHALL exit
+  3 when the overall level reaches that threshold. Invalid arguments or
+  unverifiable Registry input SHALL exit 2.
+
+### Stepwise current upgrade
+
+- **CON-310** `conditor upgrade --current --check --stepwise --registry DIR`
+  SHALL plan the move to the supplied target resolved set as an ordered
+  sequence of steps. In each step, every declared component advances by at
+  most one registered minor line. The existing direct mode SHALL be unchanged
+  when `--stepwise` is absent.
+- **CON-311** Every stepwise step SHALL target a Registry-produced resolved
+  set: the supplied target set, the channel's current set, or a historical
+  set of the channel recovered from the Registry checkout's Git history whose
+  SHA-256 equals the digest that the channel index at the same commit
+  records. Conditor SHALL NOT compose, edit or re-resolve a resolved set
+  (`DF-CON-2026-A003`; preserves decision 0001, `docs/decisions/0001-registry-version-authority.md`, and CON-277).
+- **CON-312** A step SHALL never downgrade a declared component, SHALL never
+  move a component past the final target, and SHALL be the newest admissible
+  Registry set. When no Registry set provides an admissible step, the plan
+  SHALL report the gap, naming the components and release lines it would
+  skip. It SHALL then continue with the smallest larger Registry step,
+  disclosed as a multi-line jump.
+- **CON-313** The first step SHALL be checked in full against the current
+  repository with the existing current-upgrade preview, and SHALL disclose
+  that preview's plan digest, refusals and the exact `--authorize` command.
+  Each later step SHALL disclose its Registry set path and SHA-256 and the
+  `--check` command to run once the previous step has been applied, because
+  its digest depends on repository state that does not yet exist.
+- **CON-314** Every step SHALL list the registered releases that it crosses
+  for each moving component, with their migration-notes links (CON-307).
+- **CON-315** Stepwise planning SHALL be read-only with respect to the target
+  repository and the Registry checkout. It MAY write a recovered historical
+  Registry set, content-addressed by SHA-256, below Conditor's non-authoritative
+  workstation cache so that the set can be passed to `--resolved-set`
+  (CON-029).
+
+### Staleness policy
+
+- **CON-316** Drift levels SHALL come from a staleness policy that is
+  declared, never hard-coded per application. Fields that neither source sets
+  keep the built-in defaults:
+  - warn when more than one registered minor line behind
+    (`warnAfterMinorsBehind: 1`);
+  - warn when any major behind (`warnAfterMajorsBehind: 0`);
+  - no release-count or pin-age warning;
+  - fail only when the pin is below the Registry profile's minimum supported
+    range (`failBelowSupportedRange: true`).
+- **CON-317** The policy MAY be declared as `stalenessPolicy` in the Registry
+  resolved set and in `conditor.json`. Each field of the repository's
+  declaration overrides the Registry's, which overrides the default. The
+  report SHALL name the source of every effective field.
+- **CON-318** The supported range SHALL be the Registry profile's
+  `version.range` for the component. A pin below that range's lower bound is
+  `fail` under the default policy. A component that the profile does not
+  select has no supported range, and SHALL NOT fail on range.
+- **CON-319** A pin that names no registered release, or that disagrees with
+  another pin of the same component, SHALL be at least `warn`.
+
+### Integration
+
+- **CON-320** The advisory SHALL be callable non-interactively by work-start
+  tooling and CI with a stable exit-code contract (CON-308) and the JSON
+  report (CON-306). `docs/drift-advisory.md` SHALL document the integration
+  point for Praxis `work start` and for a CI job. Changes to Praxis itself
+  belong to Praxis (`docs/requirements/rolling-upgrade-notes.md`).
