@@ -11,6 +11,12 @@ open System.Text.RegularExpressions
 type ComponentDescriptor =
     { Definition: ComponentDefinition
       QualifiedVersions: Set<string>
+      /// The release line a project binding is qualified for under a verified
+      /// Registry release attestation (CON-341, DF-CON-2026-A004 decision 2).
+      /// Never set for lifecycle tools, which stay exact (CON-343).
+      QualifiedRange: string option
+      /// Versions refused even inside the qualified range (CON-345).
+      DeniedVersions: Set<string>
       Sha256: string }
 
 /// A structural rule of `schemas/conditor-component.schema.json` that a
@@ -106,6 +112,8 @@ module ComponentDescriptors =
               "historicalPackages"
               "defaultVersion"
               "qualifiedVersions"
+              "qualifiedRange"
+              "deniedVersions"
               "lifecycleSource"
               "applicationBinding"
               "command"
@@ -509,6 +517,34 @@ module ComponentDescriptors =
                     markerErrors |> List.iter errors.Add
                     []
 
+            let qualifiedRange =
+                match tryProperty "qualifiedRange" root with
+                | None -> None
+                | Some value when value.ValueKind = JsonValueKind.String ->
+                    let text = value.GetString() |> Option.ofObj |> Option.defaultValue ""
+
+                    match VersionRange.tryParse text with
+                    | Some _ -> Some text
+                    | None ->
+                        errors.Add $"'qualifiedRange' '{text}' is not a version range such as '>=0.2.0 <1.0.0'."
+                        None
+                | Some _ ->
+                    errors.Add "'qualifiedRange' must be a string."
+                    None
+
+            let deniedVersions =
+                match tryProperty "deniedVersions" root with
+                | None -> Set.empty
+                | Some _ -> collectArray "deniedVersions" |> Set.ofList
+
+            match distribution, qualifiedRange with
+            | (HostTool | LifecycleNpm), Some _ ->
+                errors.Add $"Lifecycle component '{id}' must not declare qualifiedRange; lifecycle tools keep exact qualification (CON-343)."
+            | _ -> ()
+
+            for version in Set.intersect deniedVersions qualifiedVersions do
+                errors.Add $"'deniedVersions' names '{version}', which qualifiedVersions also qualifies for '{id}'."
+
             if not (String.IsNullOrWhiteSpace defaultVersion)
                && not (qualifiedVersions.Contains defaultVersion) then
                 errors.Add $"defaultVersion '{defaultVersion}' is not present in qualifiedVersions for '{id}'."
@@ -570,6 +606,8 @@ module ComponentDescriptors =
                           IntegrityGate = integrityGate
                           InstallationMarkers = installationMarkers }
                       QualifiedVersions = qualifiedVersions
+                      QualifiedRange = qualifiedRange
+                      DeniedVersions = deniedVersions
                       Sha256 = descriptorSha256 }
         with
         | :? JsonException as ex -> Error [ $"Component descriptor '{resourceName}' is invalid JSON: {ex.Message}" ]

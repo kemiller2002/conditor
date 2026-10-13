@@ -34,6 +34,49 @@ version; its specifier is then the only acceptable source pin. Without recorded
 authority, the source pin must be the exact version or a GitHub release-asset
 tarball of exactly that version.
 
+## Qualification (CON-340..346, DF-CON-2026-A004 decision 2)
+
+A source or target version is **exactly qualified** when the embedded
+descriptor lists it in `qualifiedVersions`. This is the only rule for
+lifecycle tools.
+
+A project binding's descriptor may also declare `qualifiedRange` (Forma
+`>=0.2.0 <1.0.0`, Folio `>=0.3.0 <1.0.0`, Limen `>=0.6.1 <1.0.0`) and
+`deniedVersions`.
+
+A **target** release outside `qualifiedVersions` is qualified **by
+attestation** only when every one of these holds:
+
+* the version is in `qualifiedRange` and not in `deniedVersions`;
+* the resolved-set entry carries a `releaseAttestation`;
+* its ECDSA P-256 signature verifies over the statement
+  `echelon.release-attestation/v1|<systemId>|<version>|<releaseManifest.sha256>|<sorted contracts>`;
+* the key that signed it is pinned in this build (`trust/registry-release-keys.json`)
+  and is not revoked;
+* it claims `echelon.web-package-binding/v1`.
+
+A **source** version outside `qualifiedVersions` is qualified only by the same
+attestation, carried by the repository's **recorded Registry authority**: the
+digest-verified set the repository was last applied from. That set must
+select exactly the source version. A range alone never qualifies anything:
+option D is gated on signatures in its entirety (CON-346). This holds for
+the declared path and the opt-in path alike.
+
+Anything else is refused as "not qualified by this Conditor build", with the
+reason. That includes no attestation, an unknown or revoked key, a bad
+signature, a missing contract, a version out of range and a denied version.
+Conditor never relies on an unsigned contract claim.
+
+Each transition discloses how it was qualified: `exact` or
+`attested:<range>:<keyId>`. An attested qualification is bound into the plan
+digest. The compatibility graph, used by the final verification, by
+`verify` and by `doctor`, accepts the same attested selections of the
+repository's digest-verified authority.
+
+**This build pins no key.** Until the Registry signs release attestations
+(REG-SIG-001..008) and a Conditor release pins its key, every project binding
+stays under exact qualification.
+
 ## Repository observation
 
 Every `package.json` below the repository root (excluding `node_modules`,

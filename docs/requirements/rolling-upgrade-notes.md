@@ -81,46 +81,61 @@ The user accepted contract-and-line qualification only behind signed release
 records. Until these requirements are met, Conditor keeps exact per-version
 qualification (CON-346).
 
-- **REG-SIG-001 (key).** The Registry SHALL hold a dedicated release-record
-  signing key, used only to sign release records. It SHALL be an Ed25519 key
-  or an equivalent asymmetric key. The private key SHALL be kept outside the
-  repository and outside agent sessions: in a GitHub Actions environment
-  secret protected by required reviewers, or in a KMS/HSM. Each public key
-  SHALL be published with a stable key id in a Registry trust document, for
-  example `trust/release-signing-keys.json` (`echelon.registry-keys/v1`), and
-  SHALL also be pinned in Conditor's build. A key or trust document fetched
-  over the network is never trusted on its own.
-- **REG-SIG-002 (what is signed).** The signature SHALL cover the canonical
-  bytes of one release manifest (`echelon.release/v2`, or a successor that
-  carries `consumerContracts`). Those bytes are the exact file whose SHA-256
-  the catalog snapshot records. The signature SHALL be detached, for example
-  in `releases/<system>/<version>.release.sig.json`, and SHALL contain:
-  - the key id;
-  - the algorithm;
-  - the signed manifest's SHA-256;
-  - the system id and version;
-  - the signing time;
-  - the signature.
+- **REG-SIG-001 (key).** The Registry SHALL hold a dedicated release
+  attestation signing key, used only to sign release attestations.
+  - **Algorithm:** ECDSA P-256 with SHA-256, so that Conditor verifies with
+    the .NET base class library and needs no external cryptography
+    dependency.
+  - **Storage:** the private key SHALL be kept outside the repository and
+    outside agent sessions, in a GitHub Actions environment secret
+    protected by required reviewers, or in a KMS/HSM.
+  - **Publication:** each public key SHALL be published as base64
+    SubjectPublicKeyInfo with a stable key id, in a Registry trust document
+    such as `trust/release-signing-keys.json` (`echelon.registry-keys/v1`).
+  - **Pinning:** each key SHALL also be pinned in Conditor's build
+    (`trust/registry-release-keys.json`). A key fetched over the network,
+    or a key that only the Registry's trust document names, is never
+    trusted on its own.
+- **REG-SIG-002 (what is signed).** The signed payload SHALL be one release
+  attestation statement, not the manifest file. It is the UTF-8 bytes of
+  this exact line:
 
-  Signing a manifest SHALL NOT change its bytes, so existing digests and
-  resolved sets stay valid.
+  ```text
+  echelon.release-attestation/v1|<systemId>|<version>|<release manifest sha256>|<consumerContracts sorted, comma-joined>
+  ```
+
+  Because the statement binds the release manifest's SHA-256, it binds the
+  manifest's bytes as well. Signing SHALL NOT change any manifest, so
+  existing digests and resolved sets stay valid.
 - **REG-SIG-003 (signing workflow).** Only the Registry's protected release
   registration workflow SHALL sign. It SHALL sign after the registration pull
   request has been reviewed and merged (REG-RU-001), on the default branch,
   in an environment that requires approval. Agents and pull-request
   workflows SHALL NOT have access to the key. The workflow SHALL be able to
-  backfill signatures for the active releases that need them.
-- **REG-SIG-004 (resolved sets carry the signature).** A resolved-set
-  component entry SHALL carry its release signature, or a digest-bound
-  reference to it, next to `releaseManifest.sha256`. Conditor can then
-  verify a selection from the supplied set without fetching anything, and
-  the user-supplied set digest still binds the claim.
-- **REG-SIG-005 (how Conditor verifies).** Conditor SHALL treat a contract
-  claim as qualifying only when all of these hold:
-  - the signature verifies over the exact release-manifest bytes;
-  - the signed SHA-256 equals the manifest digest the set records;
-  - the key id is in Conditor's pinned trust set and not revoked;
-  - the signed system and version equal the selection.
+  backfill attestations for the active releases that need them.
+- **REG-SIG-004 (resolved sets carry the attestation).** The resolver SHALL
+  copy the attestation into each resolved-set component entry:
+
+  ```json
+  "releaseAttestation": {
+    "schema": "echelon.release-attestation/v1",
+    "consumerContracts": [ "echelon.web-package-binding/v1" ],
+    "keyId": "<id>",
+    "algorithm": "ecdsa-p256-sha256",
+    "signature": "<base64 IEEE P1363 r||s>"
+  }
+  ```
+
+  Conditor can then verify a selection from the supplied set, offline, and
+  the user-supplied set digest binds the attestation too.
+- **REG-SIG-005 (how Conditor verifies).** Conditor SHALL rebuild the
+  statement from the entry's own `systemId`, `version`,
+  `releaseManifest.sha256` and `consumerContracts`, and SHALL treat a
+  contract claim as qualifying only when all of these hold:
+  - the signature verifies over that statement;
+  - the key id is in Conditor's pinned trust set;
+  - the key has not been revoked;
+  - the algorithm is `ecdsa-p256-sha256`.
 
   Any other outcome SHALL leave the release under exact qualification, and
   the plan SHALL disclose the reason.

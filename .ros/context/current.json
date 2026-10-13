@@ -1752,20 +1752,20 @@
         "EXE-20261013T150353451Z-40bfcd6e"
       ],
       "latestCheckpoint": {
-        "id": "6e6570bd93e0b69ccb602367",
-        "recordedAt": "2026-10-13T15:40:54.000Z",
+        "id": "708467156eb39277bb476a95",
+        "recordedAt": "2026-10-13T15:51:56.000Z",
         "executionId": "EXE-20261013T150353451Z-40bfcd6e",
         "repository": "conditor",
-        "branch": "feat/drift-command",
-        "commit": "0d0badff924df3e2d9137d7f490342c554c2add0",
+        "branch": "feat/attested-qualification",
+        "commit": "86748cf3b8f7c03e3f8d419061b501b873f86fc6",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "feat/drift-command",
-        "remoteCommit": "0d0badff924df3e2d9137d7f490342c554c2add0",
-        "summary": "Conditor 0.9.0 released (64ffc78). Drift advisory, staleness policy and stepwise planning pushed with tests",
-        "nextAction": "Gate and merge the drift PR; then option D gated on signatures",
+        "remoteBranch": "feat/attested-qualification",
+        "remoteCommit": "86748cf3b8f7c03e3f8d419061b501b873f86fc6",
+        "summary": "#87 merged (511ac4e). Attested contract-and-line qualification (inert until Registry signs) pushed with tests",
+        "nextAction": "Gate and merge attested PR; request Conditor 0.10.0; complete WI-0038",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
