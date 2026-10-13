@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T15:03:52.000Z",
+  "updatedAt": "2026-10-13T15:59:17.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1744,33 +1744,79 @@
     {
       "id": "WI-0038",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-13T15:03:52.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Drift.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/StepwiseUpgrade.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/ReleaseAttestation.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/WebPackageBinding.fs"
+        },
+        {
+          "type": "requirements",
+          "path": "requirements/CONDITOR-REQUIREMENTS.md"
+        },
+        {
+          "type": "decision",
+          "path": "research/decisions/DF-CON-2026-A003--rolling-upgrade-advisory.md"
+        },
+        {
+          "type": "decision",
+          "path": "research/decisions/DF-CON-2026-A004--project-binding-qualification-and-declared-web-bindings.md"
+        },
+        {
+          "type": "documentation",
+          "path": "docs/drift-advisory.md"
+        },
+        {
+          "type": "documentation",
+          "path": "docs/requirements/rolling-upgrade-notes.md"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/DriftTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/DeclaredWebBindingTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-13T15:59:17.000Z",
       "telemetryExecutionIds": [
         "EXE-20261013T150353451Z-40bfcd6e"
       ],
       "latestCheckpoint": {
-        "id": "708467156eb39277bb476a95",
-        "recordedAt": "2026-10-13T15:51:56.000Z",
+        "id": "105843ef304782b39ac48022",
+        "recordedAt": "2026-10-13T15:59:06.000Z",
         "executionId": "EXE-20261013T150353451Z-40bfcd6e",
         "repository": "conditor",
-        "branch": "feat/attested-qualification",
-        "commit": "86748cf3b8f7c03e3f8d419061b501b873f86fc6",
+        "branch": "release/0.10.0",
+        "commit": "58637151c43eb5254906f72963008c921b5ea180",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor"
         },
-        "remoteBranch": "feat/attested-qualification",
-        "remoteCommit": "86748cf3b8f7c03e3f8d419061b501b873f86fc6",
-        "summary": "#87 merged (511ac4e). Attested contract-and-line qualification (inert until Registry signs) pushed with tests",
-        "nextAction": "Gate and merge attested PR; request Conditor 0.10.0; complete WI-0038",
+        "remoteBranch": "release/0.10.0",
+        "remoteCommit": "58637151c43eb5254906f72963008c921b5ea180",
+        "summary": "All WI-0038 slices merged (#83-#88); Conditor 0.9.0 released; 0.10.0 requested",
+        "nextAction": "Merge the 0.10.0 release request; Registry records Conditor 0.9.0 and 0.10.0",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
-      }
+      },
+      "completedAt": "2026-10-13T15:59:17.000Z"
     }
   ]
 }
