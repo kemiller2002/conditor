@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-13T16:49:49.000Z",
+  "updatedAt": "2026-10-13T17:49:52.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -1886,6 +1886,37 @@
         }
       },
       "completedAt": "2026-10-13T16:49:49.000Z"
+    },
+    {
+      "id": "WI-0040",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-13T17:49:52.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261013T174953100Z-477629ba"
+      ],
+      "latestCheckpoint": {
+        "id": "376833f1473e0992991442db",
+        "recordedAt": "2026-10-13T18:00:52.000Z",
+        "executionId": "EXE-20261013T174953100Z-477629ba",
+        "repository": "conditor",
+        "branch": "fix/workstation-registry-selection",
+        "commit": "9762c770adafd6c4da8a7dd79e57f215c87ca3d2",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "fix/workstation-registry-selection",
+        "remoteCommit": "9762c770adafd6c4da8a7dd79e57f215c87ca3d2",
+        "summary": "Fixed the clean-host proof regression (JSON identity ReleaseVersion); equal-version no-op and older-version refusal tested",
+        "nextAction": "Gate-merge PR #93, request Conditor 0.10.2, record it in the registry",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }

@@ -46,3 +46,4 @@
 | WI-0037 | Make the Registry-authority adoption test independent of the developer's PATH | complete |  | medium |
 | WI-0038 | Rolling-upgrade advisory: conditor drift, stepwise upgrade --current --check, and staleness policy | complete |  | medium |
 | WI-0039 | Lifecycle-tool upgrades move foundations.json; post-authorize pin consistency invariant; pin repair for disagreeing pins (0.10.1) | complete |  | medium |
+| WI-0040 | workstation plan/apply: host-tool versions from a digest-verified resolved set, downgrade refusal, no stale embedded pins (0.10.2) | ready |  | medium |

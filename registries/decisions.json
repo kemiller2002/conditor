@@ -180,5 +180,49 @@
     "title": "Declared web-package bindings and contract-and-line qualification of project bindings, gated on signed Registry release records",
     "updated": "2026-10-13",
     "version": "1.0.0"
+  },
+  {
+    "confidence": "high",
+    "created": "2026-10-13",
+    "decision_type": "architecture",
+    "id": "DF-CON-2026-A005",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A005--workstation-host-tools-from-the-registry.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261013T174953100Z-477629ba": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "agent",
+            "model": "unknown",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-10-13T17:50:14.071Z",
+          "operations": [
+            "created"
+          ],
+          "reason": "Decide that workstation host-tool versions come from a digest-verified Registry set and that a profile without one is refused"
+        }
+      }
+    },
+    "related_documents": [
+      "requirements/CONDITOR-REQUIREMENTS.md",
+      "docs/workstation.md",
+      "DF-CON-2026-A003"
+    ],
+    "research_area": "workstation-bootstrap",
+    "status": "accepted",
+    "tags": [
+      "decision",
+      "workstation",
+      "registry",
+      "downgrade"
+    ],
+    "title": "Workstation host-tool versions come from a digest-verified Registry set; profiles without a set are refused",
+    "updated": "2026-10-13",
+    "version": "1.0.0"
   }
 ]

@@ -31,8 +31,8 @@ let private usage () =
     Console.WriteLine "  conditor supervise [--launcher claude|codex] [--permission-mode MODE] [--until ISO-8601] [--max-launches N] [--stop-file PATH] [--dry-run] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor repo create --repository OWNER/NAME [--target PATH] [--public] [--deploy github-pages] [--dry-run]"
     Console.WriteLine "  conditor requirements import [--target PATH] [--manifest PATH] [--check] [--authorize PLAN-DIGEST]"
-    Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] [--with OPTIONAL]* [--home DIR] [--json]"
-    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
+    Console.WriteLine "  conditor workstation plan      [--profile NAME|PATH] --resolved-set PATH --resolved-set-sha256 SHA256 [--allow-downgrade] [--with OPTIONAL]* [--home DIR] [--json]"
+    Console.WriteLine "  conditor workstation apply     --authorize PLAN-DIGEST [--profile NAME|PATH] --resolved-set PATH --resolved-set-sha256 SHA256 [--allow-downgrade] [--home DIR] [--artifact-mirror DIR] [--offline] [--praxis PATH] [--target-id ID] [--no-rollback]"
     Console.WriteLine "  conditor workstation status    [--home DIR] [--json]"
     Console.WriteLine "  conditor workstation reconcile --step ID [--profile NAME|PATH] [--home DIR]"
     Console.WriteLine "  conditor lifecycle plan  --operation init|status|verify|doctor|upgrade --root DIR --resolved-set PATH --resolved-set-sha256 SHA256 [--home DIR] [--json]"
@@ -1071,26 +1071,41 @@ let private probe (executable: string) (arguments: string list) =
 let private optionValues name (args: string array) =
     args |> Array.toList |> List.pairwise |> List.choose (fun (flag, value) -> if flag = name then Some value else None)
 
+/// The profile to plan (CON-360, CON-361, CON-363): a named profile's tool
+/// list with the Registry set's versions, a set alone, or a profile without
+/// host tools. Never embedded version pins.
 let private workstationProfile (args: string array) =
     let runtimeIdentifier = Platform.runtimeIdentifier ()
 
-    match optionValue "--resolved-set" args with
-    | Some path ->
-        match optionValue "--resolved-set-sha256" args with
-        | None ->
-            Error "--resolved-set requires --resolved-set-sha256 SHA256 so Registry selection is integrity-bound"
-        | Some digest ->
-            ResolvedReleaseSets.loadFile runtimeIdentifier (Path.GetFullPath path) digest
-    | None ->
-        Profiles.resolve (optionValue "--profile" args |> Option.defaultValue "echelon-engineering")
+    let set =
+        match optionValue "--resolved-set" args, optionValue "--resolved-set-sha256" args with
+        | None, _ -> Ok None
+        | Some _, None -> Error "--resolved-set requires --resolved-set-sha256 SHA256 so Registry selection is integrity-bound"
+        | Some path, Some digest -> ResolvedReleaseSets.loadFile runtimeIdentifier (Path.GetFullPath path) digest |> Result.map Some
 
+    let profile =
+        match optionValue "--profile" args, optionValue "--resolved-set" args with
+        | Some name, _ -> Profiles.resolve name |> Result.map Some
+        | None, Some _ -> Ok None
+        | None, None -> Profiles.resolve "echelon-engineering" |> Result.map Some
+
+    match set, profile with
+    | Error e, _
+    | _, Error e -> Error e
+    | Ok set, Ok profile -> Selection.select profile set
+
+/// The workstation plan, with every host-tool downgrade refused unless
+/// --allow-downgrade authorizes it (CON-362); the second value lists the
+/// downgrades so the plan can disclose them.
 let private workstationPlan (args: string array) =
     let ctx = workstationContext args
 
     workstationProfile args
     |> Result.map (fun profile ->
         let prerequisites = Engine.discover probe profile.Prerequisites
-        ctx, Engine.plan ctx profile (Platform.runtimeIdentifier ()) prerequisites (optionValues "--with" args))
+        let plan = Engine.plan ctx profile (Platform.runtimeIdentifier ()) prerequisites (optionValues "--with" args)
+        let guarded, downgrades = Downgrade.guard (hasFlag "--allow-downgrade" args) ctx probe plan
+        ctx, guarded, downgrades)
 
 let private printPlan (json: bool) (ctx: WorkstationContext) (plan: WorkstationPlan) =
     if json then
@@ -1142,8 +1157,13 @@ let private runWorkstation (args: string array) =
         | Error e ->
             Console.Error.WriteLine e
             1
-        | Ok(ctx, plan) ->
+        | Ok(ctx, plan, downgrades) ->
             printPlan (hasFlag "--json" args) ctx plan
+
+            if hasFlag "--allow-downgrade" args && not (hasFlag "--json" args) then
+                for id, planned, current, where in downgrades do
+                    Console.WriteLine $"  DOWNGRADE (explicitly allowed) {id} {current} -> {planned} ({where})"
+
             if plan.Refusals.IsEmpty then 0 else 3
     | Some "apply" ->
         match workstationPlan args, optionValue "--authorize" args with
@@ -1153,7 +1173,7 @@ let private runWorkstation (args: string array) =
         | _, None ->
             Console.Error.WriteLine "apply requires --authorize PLAN-DIGEST; run `conditor workstation plan` and review it first"
             2
-        | Ok(ctx, plan), Some digest ->
+        | Ok(ctx, plan, _), Some digest ->
             match Engine.apply ctx probe plan digest (not (hasFlag "--no-rollback" args)) with
             | Error e ->
                 Console.Error.WriteLine $"REFUSED {e}"
@@ -1189,7 +1209,7 @@ let private runWorkstation (args: string array) =
         | _, None ->
             Console.Error.WriteLine "reconcile requires --step ID"
             2
-        | Ok(ctx, plan), Some step ->
+        | Ok(ctx, plan, _), Some step ->
             match Engine.reconcile ctx probe plan step with
             | Ok finding ->
                 Console.WriteLine $"{step}: effect {finding}"
