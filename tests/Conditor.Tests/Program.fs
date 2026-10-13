@@ -109,7 +109,7 @@ withManifest
             | Error errors ->
                 check
                     "application package binding requires scaffold"
-                    (errors |> List.exists (fun error -> error.Contains("A scaffold is required")))
+                    (errors |> List.exists (fun error -> error.Contains("A scaffold or an existing package.json binding is required")))
             | Ok _ ->
                 check "application package binding is explicit" false)
 
@@ -125,7 +125,7 @@ withManifest
             | Error errors ->
                 check
                     "limen project binding requires an explicit scaffold target"
-                    (errors |> List.exists (fun error -> error.Contains("A scaffold is required")))
+                    (errors |> List.exists (fun error -> error.Contains("A scaffold or an existing package.json binding is required")))
             | Ok _ ->
                 check "limen project binding requires an explicit scaffold target" false)
 
@@ -1198,6 +1198,7 @@ CurrentUpgradeTests.run check
 CurrentUpgradeTests.runOptIn check
 CurrentUpgradeTests.runPraxisQualification check
 WebPackageUpgradeTests.run check
+DeclaredWebBindingTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
 ComponentSchemaTests.run check

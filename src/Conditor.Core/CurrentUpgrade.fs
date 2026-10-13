@@ -370,7 +370,13 @@ module CurrentUpgrade =
                         mode <- NugetFeed.Mode
                         feedChanges.Add(feeds[request.Id], Some fromVersion)
                     | None when targetEntry.DistributionClass = WebPackageBinding.DistributionClass ->
-                        match WebPackageBinding.plan target manifest request fromVersion targetSetPath with
+                        let planBinding =
+                            if added |> List.exists (fun optIn -> optIn.Id = request.Id) then
+                                WebPackageBinding.planOptIn
+                            else
+                                WebPackageBinding.plan
+
+                        match planBinding target manifest request fromVersion targetSetPath with
                         | Ok webTransition ->
                             mode <- WebPackageTransition.mode webTransition
                             webTransitions.Add webTransition
@@ -422,6 +428,15 @@ module CurrentUpgrade =
             // A NuGet release-asset library is established through its feed.
             | Some declared, Some entry, None when declared = entry.Version && feeds.ContainsKey request.Id ->
                 feedChanges.Add(feeds[request.Id], None)
+            // A web package the repository already consumes is declared at the
+            // version its pins name (CON-332). Behind the target, the
+            // transition above proves the pins and moves them; at the target,
+            // the pins must already name exactly that release.
+            | Some declared, Some entry, None when entry.DistributionClass = WebPackageBinding.DistributionClass ->
+                if declared = entry.Version then
+                    match WebPackageBinding.verifyDeclaredAtTarget target request declared targetSetPath with
+                    | Ok() -> ()
+                    | Error problems -> problems |> List.iter errors.Add
             | declared, entry, _ ->
                 let selected =
                     entry |> Option.map (fun value -> $"selects {value.Version}") |> Option.defaultValue "does not select it"
@@ -429,7 +444,7 @@ module CurrentUpgrade =
                 let asked = declared |> Option.defaultValue "no version"
 
                 errors.Add
-                    $"'{request.Id}' ({asked}) was added to conditor.json, but --current can only opt in to a native repository-lifecycle component or a NuGet release-asset library at exactly the version the target set selects; the target set {selected}."
+                    $"'{request.Id}' ({asked}) was added to conditor.json, but --current can only opt in to a native repository-lifecycle component or a NuGet release-asset library at exactly the version the target set selects, or a web package at the version its pins name; the target set {selected}."
 
         let transitionList : CurrentUpgradeTransition list =
             transitions

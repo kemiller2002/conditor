@@ -52,12 +52,28 @@ type WebPackageBinding =
       LockPath: string
       LockSha256: string }
 
+/// The `.echelon/foundations.json` capability version a web-package
+/// transition moves with its package pins (CON-331): a surgical edit of
+/// exactly the capability's `version` value, computed and proven at plan time.
+type FoundationsEdit =
+    { Path: string
+      Sha256: string
+      Capability: string
+      FromVersion: string
+      ToVersion: string }
+
 type WebPackageTransition =
     { Id: string
       FromVersion: string
       SourcePackage: string
       Target: WebPackageRelease
-      Bindings: WebPackageBinding list }
+      Bindings: WebPackageBinding list
+      /// The foundations capability version this transition also moves.
+      Foundations: FoundationsEdit option
+      /// True when the component is being declared to Conditor by this
+      /// upgrade (CON-332): its source is proven by the repository's pins and
+      /// lockfile, not by a recorded Registry authority.
+      OptIn: bool }
 
 module DependencySection =
     let all = [ Dependencies; DevDependencies; OptionalDependencies; PeerDependencies ]
@@ -110,10 +126,21 @@ module WebPackageTransition =
         let header =
             $"web|{transition.Id}|{transition.FromVersion}|{transition.SourcePackage}|{target.Version}|{target.Package}|{target.Specifier}|package=sha256:{target.ArtifactSha256}|release=sha256:{target.ReleaseManifestSha256}"
 
+        // Only a transition that moves a foundations capability or opts a
+        // component in carries these lines, so every other plan's digest is
+        // unchanged.
+        let foundations =
+            transition.Foundations
+            |> Option.map (fun edit ->
+                $"  foundations|{edit.Path}|{edit.Capability}|{edit.FromVersion}->{edit.ToVersion}|sha256:{edit.Sha256}")
+            |> Option.toList
+
+        let optIn = if transition.OptIn then [ "  opt-in" ] else []
+
         transition.Bindings
         |> List.map (fun binding ->
             $"  {binding.PackageJsonPath}|{DependencySection.jsonName binding.Section}|{binding.Package}|{binding.Specifier}|sha256:{binding.PackageJsonSha256}|{binding.LockPath}|sha256:{binding.LockSha256}")
-        |> fun lines -> String.concat "\n" (header :: lines)
+        |> fun lines -> String.concat "\n" (header :: lines @ foundations @ optIn)
 
 module WebPackageBinding =
     [<Literal>]
@@ -422,6 +449,133 @@ module WebPackageBinding =
                 | Ok _, Error errors -> Error errors)
             (Ok [])
 
+    // ---- Foundations capability (CON-331) -----------------------------------
+
+    /// The repository-relative foundations declaration Praxis verifies.
+    [<Literal>]
+    let FoundationsPath = ".echelon/foundations.json"
+
+    /// Capability keys a version move leaves valid. Any other key (for example
+    /// a `sourceCommit` or a release-artifact URL) names one release, and
+    /// Conditor cannot prove its new value, so such a capability is refused.
+    let private versionNeutralKeys = set [ "required"; "version"; "boundaryManifest" ]
+
+    let private capabilityPattern (capability: string) (version: string) =
+        Regex(
+            "(\"" + Regex.Escape capability + "\"\\s*:\\s*\\{[^{}]*?\"version\"\\s*:\\s*\")"
+            + Regex.Escape version
+            + "(\")",
+            RegexOptions.CultureInvariant
+        )
+
+    let private capabilityVersionIn (text: string) (capability: string) =
+        try
+            JsonNode.Parse text
+            |> nodeObject
+            |> Option.bind (fun root -> nodeObject root["capabilities"])
+            |> Option.bind (fun capabilities -> nodeObject capabilities[capability])
+            |> Option.map (fun entry -> entry, nodeString entry["version"])
+        with :? JsonException ->
+            None
+
+    /// `text` with exactly one plain `version` value of `capability` moved
+    /// from `fromVersion` to `toVersion`, or None when that edit is not a
+    /// single, surgical replacement.
+    let private replaceCapabilityVersion (text: string) (capability: string) (fromVersion: string) (toVersion: string) =
+        match (capabilityPattern capability fromVersion).Matches text |> Seq.toList with
+        | [ single ] ->
+            Some(
+                text.Substring(0, single.Index)
+                + single.Groups[1].Value
+                + toVersion
+                + single.Groups[2].Value
+                + text.Substring(single.Index + single.Length)
+            )
+        | _ -> None
+
+    /// The foundations edit that moves `capability` from `fromVersion` to
+    /// `toVersion`, or None when the repository declares no such capability
+    /// or already declares the target. A declaration of any other version, a
+    /// capability that names one release by another key, or an edit Conditor
+    /// cannot make surgically is refused.
+    let foundationsEdit
+        (label: string)
+        (root: string)
+        (capability: string)
+        (fromVersion: string)
+        (toVersion: string)
+        : Result<FoundationsEdit option, string list> =
+        let path = Path.Combine(root, FoundationsPath)
+
+        if not (File.Exists path) then
+            Ok None
+        else
+            let text = File.ReadAllText path
+            let refuse (detail: string) = Error [ $"{label} {FoundationsPath} {detail}" ]
+
+            match (try Some(JsonNode.Parse text) with :? JsonException -> None) with
+            | None -> refuse "is not valid JSON."
+            | Some _ ->
+                match capabilityVersionIn text capability with
+                | None -> Ok None
+                | Some(_, Some declared) when declared = toVersion -> Ok None
+                | Some(_, None) -> Ok None
+                | Some(_, Some declared) when declared <> fromVersion ->
+                    refuse
+                        $"declares capability '{capability}' at {declared}, neither the source {fromVersion} nor the target {toVersion}; Conditor will not guess which pin is authoritative."
+                | Some(entry, Some _) ->
+                    let foreign =
+                        entry
+                        |> Seq.map (fun pair -> pair.Key)
+                        |> Seq.filter (fun key -> not (versionNeutralKeys.Contains key))
+                        |> Seq.sort
+                        |> Seq.toList
+
+                    if not foreign.IsEmpty then
+                        let keys = String.concat ", " foreign
+
+                        refuse
+                            $"capability '{capability}' also declares {keys}, which name one release; Conditor cannot prove their values for {toVersion}."
+                    else
+                        match replaceCapabilityVersion text capability fromVersion toVersion with
+                        | Some updated ->
+                            // The edit must change exactly the capability's
+                            // version and nothing else.
+                            let expected = JsonNode.Parse text
+
+                            match expected with
+                            | :? JsonObject as expectedRoot ->
+                                match nodeObject expectedRoot["capabilities"] |> Option.bind (fun caps -> nodeObject caps[capability]) with
+                                | Some expectedEntry ->
+                                    expectedEntry["version"] <- JsonValue.Create toVersion
+
+                                    let actual = JsonNode.Parse updated
+
+                                    if JsonNode.DeepEquals(expected, actual) then
+                                        Ok(
+                                            Some
+                                                { Path = path
+                                                  Sha256 = sha256Bytes (File.ReadAllBytes path)
+                                                  Capability = capability
+                                                  FromVersion = fromVersion
+                                                  ToVersion = toVersion }
+                                        )
+                                    else
+                                        refuse $"cannot be edited surgically for capability '{capability}'."
+                                | None -> refuse $"cannot be edited surgically for capability '{capability}'."
+                            | _ -> refuse "is not a JSON object."
+                        | None -> refuse $"cannot be edited surgically for capability '{capability}' (its version is not a single plain value)."
+
+    /// The capability version a repository's foundations declaration names,
+    /// when it declares one.
+    let foundationsVersion (root: string) (capability: string) =
+        let path = Path.Combine(root, FoundationsPath)
+
+        if File.Exists path then
+            capabilityVersionIn (File.ReadAllText path) capability |> Option.bind snd
+        else
+            None
+
     // ---- Source authority ----------------------------------------------------
 
     /// The source release as the repository's recorded Registry authority
@@ -447,7 +601,8 @@ module WebPackageBinding =
 
     // ---- Planning -------------------------------------------------------------
 
-    let plan
+    let private planWith
+        (optIn: bool)
         (target: string)
         (manifest: ProjectManifest)
         (request: ComponentRequest)
@@ -476,17 +631,20 @@ module WebPackageBinding =
 
                       if expected <> release.Package then
                           yield
-                              $"{label} Registry names package {release.Package}, but Conditor binds {request.Id}@{release.Version} as {expected}."
-                      if request.Required && manifest.Scaffold.IsNone then
-                          yield
-                              $"{label} the component is required but the manifest declares no scaffold; Conditor cannot plan or verify a required application dependency without an explicit scaffold target." ]
+                              $"{label} Registry names package {release.Package}, but Conditor binds {request.Id}@{release.Version} as {expected}." ]
 
                 if not descriptorProblems.IsEmpty then
                     Error descriptorProblems
                 else
                     let sourcePackage = ComponentDefinition.packageFor fromVersion definition
 
-                    sourceSelection target manifest request.Id fromVersion
+                    // An opt-in's source was never governed by a Registry
+                    // authority: its pins and lockfile are the only proof, so
+                    // they must name exactly the declared release (CON-332).
+                    let source =
+                        if optIn then Ok None else sourceSelection target manifest request.Id fromVersion
+
+                    source
                     |> Result.bind (fun source ->
                         match source with
                         | Some selected when selected.Package <> sourcePackage ->
@@ -495,12 +653,94 @@ module WebPackageBinding =
                         | _ -> Ok(source |> Option.map _.Specifier))
                     |> Result.bind (fun sourceSpecifier ->
                         observe label root fromVersion sourceSpecifier sourcePackage release)
-                    |> Result.map (fun bindings ->
-                        { Id = request.Id
-                          FromVersion = fromVersion
-                          SourcePackage = sourcePackage
-                          Target = release
-                          Bindings = bindings })
+                    |> Result.bind (fun bindings ->
+                        if request.Required && manifest.Scaffold.IsNone && bindings.IsEmpty then
+                            // CON-333: an observed package.json is an explicit
+                            // binding target; with none, Conditor would have to
+                            // guess one (CON-023).
+                            Error
+                                [ $"{label} the component is required, the manifest declares no scaffold, and no package.json declares it; Conditor cannot plan or verify a required application dependency without an explicit binding target." ]
+                        elif optIn && bindings.IsEmpty then
+                            Error
+                                [ $"{label} declaring it at {fromVersion} needs a package.json pin of exactly that release, but no package.json declares {sourcePackage}; declare it at the version the target set selects ({release.Version}) instead." ]
+                        else
+                            foundationsEdit label root request.Id fromVersion release.Version
+                            |> Result.map (fun foundations ->
+                                { Id = request.Id
+                                  FromVersion = fromVersion
+                                  SourcePackage = sourcePackage
+                                  Target = release
+                                  Bindings = bindings
+                                  Foundations = foundations
+                                  OptIn = optIn }))
+
+    /// Plans the move of a declared web-package binding to the target set's
+    /// selection.
+    let plan target manifest request fromVersion targetSetPath =
+        planWith false target manifest request fromVersion targetSetPath
+
+    /// Plans declaring a web package the repository already consumes
+    /// (CON-332) at `declaredVersion` and moving it to the target set's
+    /// selection, under one authorization.
+    let planOptIn target manifest request declaredVersion targetSetPath =
+        planWith true target manifest request declaredVersion targetSetPath
+
+    /// Proves that declaring a web package at exactly the version the target
+    /// set selects records what the repository already pins: every
+    /// package.json declaration is that release's exact pin, locked at that
+    /// version, and any foundations capability names it.
+    let verifyDeclaredAtTarget
+        (target: string)
+        (request: ComponentRequest)
+        (version: string)
+        (targetSetPath: string)
+        : Result<unit, string list> =
+        let root = Path.GetFullPath target
+        let label = $"'{request.Id}' declared at {version} web-package binding:"
+
+        match releaseIn targetSetPath request.Id with
+        | Error errors -> Error errors
+        | Ok release when release.Version <> version ->
+            Error [ $"{label} the target set selects {release.Version}, not {version}." ]
+        | Ok release ->
+            match Registry.tryFind request.Id, Registry.qualifiedVersions request.Id with
+            | Some definition, Some qualified when qualified.Contains version && ComponentDefinition.packageFor version definition = release.Package ->
+                let bindingProblems =
+                    packageJsonFiles root
+                    |> List.collect (fun path ->
+                        let shown = Path.GetRelativePath(root, path).Replace('\\', '/')
+
+                        match parseObject path with
+                        | None -> [ $"{label} {shown} is not a valid JSON object." ]
+                        | Some manifest ->
+                            DependencySection.all
+                            |> List.collect (fun section ->
+                                match nodeObject manifest[DependencySection.jsonName section] |> Option.bind (fun values -> nodeString values[release.Package]) with
+                                | None -> []
+                                | Some specifier when specifier <> release.Specifier ->
+                                    [ $"{label} {shown} declares {release.Package}@\"{specifier}\", not the exact pin {release.Specifier}." ]
+                                | Some _ ->
+                                    let directory = Path.GetDirectoryName path |> Option.ofObj |> Option.defaultValue root
+
+                                    match nearestLocks root directory with
+                                    | [ lockPath, "npm" ] ->
+                                        match lockEntry lockPath directory release.Package |> Option.bind (fun entry -> nodeString entry["version"]) with
+                                        | Some locked when locked = version -> []
+                                        | locked ->
+                                            let shownLock = locked |> Option.defaultValue "<absent>"
+                                            [ $"{label} {shown} is locked at {shownLock}, not {version}." ]
+                                    | _ -> [ $"{label} {shown} has no single npm lockfile proving its resolution." ]))
+
+                let foundationsProblems =
+                    match foundationsVersion root request.Id with
+                    | Some declared when declared <> version ->
+                        [ $"{label} {FoundationsPath} declares capability '{request.Id}' at {declared}, not {version}." ]
+                    | _ -> []
+
+                match bindingProblems @ foundationsProblems with
+                | [] -> Ok()
+                | problems -> Error problems
+            | _ -> Error [ $"{label} {version} is not a version this Conditor build qualifies as {release.Package}." ]
 
     // ---- Execution ------------------------------------------------------------
 
@@ -595,6 +835,21 @@ module WebPackageBinding =
                 [ $"{label} package artifact {target.ArtifactName} has sha256:{sha256Bytes bytes}, not the Registry-selected sha256:{target.ArtifactSha256}." ]
         | Ok bytes -> Ok(transition, integrityOf bytes)
 
+    /// Moves one foundations capability version in place (the plan proved the
+    /// edit surgical) and checks the post-condition. Two transitions may edit
+    /// the same file, so the edit is recomputed from the file's current text.
+    let private applyFoundations (edit: FoundationsEdit) : Result<unit, string> =
+        let text = File.ReadAllText edit.Path
+
+        match replaceCapabilityVersion text edit.Capability edit.FromVersion edit.ToVersion with
+        | None -> Error $"{FoundationsPath} no longer declares capability '{edit.Capability}' at {edit.FromVersion} as one plain value."
+        | Some updated ->
+            File.WriteAllText(edit.Path, updated)
+
+            match capabilityVersionIn (File.ReadAllText edit.Path) edit.Capability with
+            | Some(_, Some version) when version = edit.ToVersion -> Ok()
+            | _ -> Error $"{FoundationsPath} does not declare capability '{edit.Capability}' at {edit.ToVersion} after the edit."
+
     /// Apply every planned web-package transition through npm as one unit.
     /// Every Registry package artifact is fetched and digest-checked before
     /// anything changes; package.json and lockfiles are restored byte-for-byte
@@ -604,11 +859,14 @@ module WebPackageBinding =
         (run: string -> string -> string list -> ProcessResult)
         (transitions: WebPackageTransition list)
         : Result<unit, string list> =
-        let bound = transitions |> List.filter (fun transition -> not transition.Bindings.IsEmpty)
+        let bound =
+            transitions
+            |> List.filter (fun transition -> not transition.Bindings.IsEmpty || transition.Foundations.IsSome)
 
         let artifacts =
             bound
-            |> List.map (verifiedArtifact fetch)
+            |> List.map (fun transition ->
+                if transition.Bindings.IsEmpty then Ok(transition, String.Empty) else verifiedArtifact fetch transition)
             |> List.fold
                 (fun state item ->
                     match state, item with
@@ -626,6 +884,7 @@ module WebPackageBinding =
                 bound
                 |> List.collect (fun transition -> transition.Bindings)
                 |> List.collect (fun binding -> [ binding.PackageJsonPath; binding.LockPath ])
+                |> List.append (bound |> List.choose (fun transition -> transition.Foundations |> Option.map _.Path))
                 |> List.distinct
                 |> List.map (fun path -> path, File.ReadAllBytes path)
 
@@ -652,7 +911,13 @@ module WebPackageBinding =
                                 |> List.distinct
                             with
                             | [] -> Ok()
-                            | problems -> Error(problems |> List.map (fun problem -> $"{label} {problem}"))))
+                            | problems -> Error(problems |> List.map (fun problem -> $"{label} {problem}")))
+                        |> Result.bind (fun () ->
+                            let label = prefix transition.Id transition.FromVersion transition.Target.Version
+
+                            match transition.Foundations with
+                            | None -> Ok()
+                            | Some edit -> applyFoundations edit |> Result.mapError (fun problem -> [ $"{label} {problem}" ])))
                     (Ok())
 
             match applied with

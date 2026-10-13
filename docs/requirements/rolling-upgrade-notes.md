@@ -2,8 +2,8 @@
 
 Status: proposed (for routing by the program lead)
 Owner of this note: Conditor
-Decisions: `DF-CON-2026-A003` (accepted), `DF-CON-2026-A004` (proposed)
-Conditor requirements: CON-300..CON-320, CON-330..CON-345 (proposed) (`requirements/CONDITOR-REQUIREMENTS.md`)
+Decisions: `DF-CON-2026-A003` (accepted), `DF-CON-2026-A004` (accepted 2026-10-13; decision 2 conditional on signing)
+Conditor requirements: CON-300..CON-320, CON-330..CON-346 (`requirements/CONDITOR-REQUIREMENTS.md`)
 
 Conditor reports version drift (`conditor drift`) and plans stepwise current
 upgrades. Several needs fall outside Conditor's authority. This note records
@@ -67,14 +67,79 @@ does not implement them, and does not edit those repositories.
   bounds deliberately, as releases leave support, and record each change in
   the profile's version history.
 
-- **REG-RU-006** (needed only if `DF-CON-2026-A004` decision 2 is accepted)
+- **REG-RU-006** (`DF-CON-2026-A004` decision 2, accepted)
   Release manifests of project-binding systems SHOULD declare the consumer
   contract they honour, for example
   `consumerContracts: ["echelon.web-package-binding/v1"]`. Registry review
   SHALL check the claim when it records the release, and SHALL backfill the
-  claim on active web-package and NuGet-library releases. If the lead
-  requires authenticity rather than digest integrity, the Registry SHALL also
-  sign release records (a separate requirement).
+  claim on active web-package and NuGet-library releases. The claim takes
+  effect in Conditor only inside a signed release record (REG-SIG-001..008).
+
+## Echelon Registry: signed release records (precondition of DF-CON-2026-A004 decision 2)
+
+The user accepted contract-and-line qualification only behind signed release
+records. Until these requirements are met, Conditor keeps exact per-version
+qualification (CON-346).
+
+- **REG-SIG-001 (key).** The Registry SHALL hold a dedicated release-record
+  signing key, used only to sign release records. It SHALL be an Ed25519 key
+  or an equivalent asymmetric key. The private key SHALL be kept outside the
+  repository and outside agent sessions: in a GitHub Actions environment
+  secret protected by required reviewers, or in a KMS/HSM. Each public key
+  SHALL be published with a stable key id in a Registry trust document, for
+  example `trust/release-signing-keys.json` (`echelon.registry-keys/v1`), and
+  SHALL also be pinned in Conditor's build. A key or trust document fetched
+  over the network is never trusted on its own.
+- **REG-SIG-002 (what is signed).** The signature SHALL cover the canonical
+  bytes of one release manifest (`echelon.release/v2`, or a successor that
+  carries `consumerContracts`). Those bytes are the exact file whose SHA-256
+  the catalog snapshot records. The signature SHALL be detached, for example
+  in `releases/<system>/<version>.release.sig.json`, and SHALL contain:
+  - the key id;
+  - the algorithm;
+  - the signed manifest's SHA-256;
+  - the system id and version;
+  - the signing time;
+  - the signature.
+
+  Signing a manifest SHALL NOT change its bytes, so existing digests and
+  resolved sets stay valid.
+- **REG-SIG-003 (signing workflow).** Only the Registry's protected release
+  registration workflow SHALL sign. It SHALL sign after the registration pull
+  request has been reviewed and merged (REG-RU-001), on the default branch,
+  in an environment that requires approval. Agents and pull-request
+  workflows SHALL NOT have access to the key. The workflow SHALL be able to
+  backfill signatures for the active releases that need them.
+- **REG-SIG-004 (resolved sets carry the signature).** A resolved-set
+  component entry SHALL carry its release signature, or a digest-bound
+  reference to it, next to `releaseManifest.sha256`. Conditor can then
+  verify a selection from the supplied set without fetching anything, and
+  the user-supplied set digest still binds the claim.
+- **REG-SIG-005 (how Conditor verifies).** Conditor SHALL treat a contract
+  claim as qualifying only when all of these hold:
+  - the signature verifies over the exact release-manifest bytes;
+  - the signed SHA-256 equals the manifest digest the set records;
+  - the key id is in Conditor's pinned trust set and not revoked;
+  - the signed system and version equal the selection.
+
+  Any other outcome SHALL leave the release under exact qualification, and
+  the plan SHALL disclose the reason.
+- **REG-SIG-006 (rotation).** A new key SHALL be introduced by publishing
+  it in the trust document, signed by the current key, before it signs
+  anything. Releases signed by the previous key SHALL remain valid until that
+  key is retired or revoked. Conditor builds SHALL pin the new key before the
+  Registry starts relying on it. Overlapping validity windows SHALL be
+  recorded.
+- **REG-SIG-007 (revocation).** The Registry SHALL publish revocations
+  (key id, revocation time and reason) in the signed trust document. A
+  compromise SHALL trigger a Conditor release that removes the key from the
+  pinned trust set. Releases signed only by a revoked key SHALL fall back to
+  exact qualification until they are re-signed by a valid key.
+- **REG-SIG-008 (audit).** Every signature SHALL be traceable to the
+  workflow run that produced it, for example through a GitHub artifact
+  attestation or the run id recorded in the signature file. A conformance
+  check (`conformance/validate-release-signatures.fsx`) SHALL verify every
+  active release's signature on every Registry pull request.
 
 ## Weekly cross-repository drift report (owner to be decided by the lead)
 
