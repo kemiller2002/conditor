@@ -75,7 +75,7 @@ Anything else is reported verbatim with `version: null` and level at least
 |---|---|
 | `declared` | true when `conditor.json` declares the component |
 | `pins[]` | `source`, `path`, `line`, `specifier`, `version`, `pinnedSince` (committer time of the Git commit that last changed that line; `null` when unavailable or uncommitted) |
-| `pinnedVersion` | the oldest resolved pin (CON-305) |
+| `pinnedVersion` | the `conditor.json` version for a declared component, else the oldest resolved pin (CON-305) |
 | `consistent` | false when the resolved pins disagree |
 | `channelSelected` | the version the channel's resolved set selects, or `null` |
 | `latestRegistered` | the newest registered release |
@@ -213,3 +213,39 @@ The Praxis-side requirements are in
 needs a checkout of `kemiller2002/echelon-registry`, fetched with
 `fetch-depth: 0` so that registration times and historical sets are
 available. With a shallow checkout, those fields are reported as unavailable.
+
+## Pin consistency (CON-350..354)
+
+Drift and `upgrade --current` read the same pins (CON-301). They must never
+disagree about whether a component is current.
+
+- **Moves:** every version transition also moves the component's
+  `.echelon/foundations.json` capability, when one exists. This covers Ordo
+  and Praxis (embedded-qualified), repository-lifecycle tools, package
+  lifecycle tools, NuGet feeds and web packages. The edit is surgical,
+  digest-bound, backed up and post-checked. A missing capability is never
+  created.
+- **Invariant:** before governance is committed, every pin of every declared
+  component must name the version the upgrade leaves declared. Otherwise
+  the upgrade fails. Conditor restores the files it edited
+  (`foundations.json`, `package.json`, lockfiles) and leaves `conditor.json`,
+  the authority and the lock unchanged.
+- **Repairs:** `upgrade --current --check` plans a *pin repair* for a declared
+  component whose `foundations.json` capability disagrees with
+  `conditor.json`. The repair aligns the capability to the declared version
+  with no version change. Any other disagreeing pin kind is refused by name.
+  When a moving component has a stale capability, the plan refuses it and
+  names the repair, which is a check against the recorded authority.
+- **Stepwise:** `--stepwise` puts a pending repair first, as step 1 against
+  the recorded authority.
+- **Drift:** for a declared component, `drift` treats the `conditor.json`
+  version as effective, and points a stale pin at the repair.
+
+To repair a half-applied repository, check against its recorded authority:
+
+```text
+conditor upgrade --current --check --resolved-set .conditor/authority/resolved-release-set.json \
+  --resolved-set-sha256 <registryAuthority.sha256 from conditor.json>
+```
+
+Then authorize the printed digest.

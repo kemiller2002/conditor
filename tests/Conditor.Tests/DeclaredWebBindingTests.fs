@@ -793,6 +793,53 @@ let private stepwise check =
          |> List.map string
          |> List.sort = [ "1.18.0"; "1.20.0" ])
 
+// CON-353: a repository whose declared Forma 0.5.0 has a stale foundations
+// pin (0.4.1) gets a pin repair against its recorded authority as step 1,
+// never "nothing behind".
+let private stepwiseRepairFirst check =
+    let registry = stepRegistry [ "1.19.0", "0.9.0", "0.5.0"; "1.20.0", "0.9.0", "0.6.1" ] None
+    let repo = chronaShaped "stepwise-repair" "0.5.0" "0.4.1" "0.5.0"
+    declare repo "0.5.0"
+
+    LockFile.write
+        repo.Target
+        repo.ManifestPath
+        { ProjectName = "chrona-shaped"
+          Operation = Init
+          Components =
+            [ { Id = "limen"
+                Version = "0.9.0"
+                Distribution = NpmPackage
+                Package = LimenPackage
+                SourceReference = Some $"npm:{LimenPackage}@0.9.0" }
+              { Id = "forma"
+                Version = "0.5.0"
+                Distribution = NpmPackage
+                Package = FormaPackage
+                SourceReference = Some $"npm:{FormaPackage}@0.5.0" } ]
+          Actions = [] }
+    |> ignore
+
+    match stepwisePreview repo registry with
+    | Error errors -> check $"stepwise repair plan is produced: {joined errors}" false
+    | Ok plan ->
+        check
+            "a pending pin repair is stepwise step 1, against the recorded authority (CON-353)"
+            (match plan.Steps with
+             | first :: second :: _ ->
+                 first.Moves.IsEmpty
+                 && first.Candidate.Path = Path.Combine(repo.Target, ".conditor", "authority", "resolved-release-set.json")
+                 && movesOf second = [ "forma", "0.5.0", "0.6.1" ]
+             | _ -> false)
+
+        check
+            "step 1's checked plan repairs the stale foundations pin with no transition"
+            (plan.FirstStepPlan
+             |> Option.exists (fun first ->
+                 first.Refusals.IsEmpty
+                 && first.Transitions.IsEmpty
+                 && first.PinRepairs |> List.map (fun edit -> edit.Capability, edit.FromVersion, edit.ToVersion) = [ "forma", "0.4.1", "0.5.0" ]))
+
 // ---- Attested qualification (CON-340..346, DF-CON-2026-A004 decision 2) ------
 // A web-package release outside this build's exact qualifiedVersions (Forma
 // 0.7.0) is qualified only by a Registry release attestation whose ECDSA
@@ -1043,4 +1090,5 @@ let run (check: string -> bool -> unit) =
         stepwiseAdoption check
         refusals check
         stepwise check
+        stepwiseRepairFirst check
         attested check

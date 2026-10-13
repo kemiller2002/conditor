@@ -719,9 +719,10 @@ module Drift =
                         else
                             None)
 
-    /// Every pin of a Registry component in the target repository.
-    let discover (registry: DriftRegistry) (root: string) : DriftPin list =
-        let all = registry.Releases |> Map.toList |> List.collect snd
+    /// Every pin of a component that `releases` describes, in the repository
+    /// at `root`.
+    let discoverWith (releases: Map<string, RegisteredRelease list>) (root: string) : DriftPin list =
+        let all = releases |> Map.toList |> List.collect snd
 
         let packages =
             all
@@ -740,13 +741,79 @@ module Drift =
             |> List.distinctBy fst
             |> Map.ofList
 
-        let systems = registry.Releases |> Map.keys |> Set.ofSeq
+        let systems = releases |> Map.keys |> Set.ofSeq
 
         conditorPins root
         @ packageJsonPins root packages tarballs
         @ foundationsPins root systems
         @ nugetLockPins root
         @ msbuildPins root nugetIds
+
+    /// Every pin of a Registry component in the target repository.
+    let discover (registry: DriftRegistry) (root: string) : DriftPin list =
+        discoverWith registry.Releases root
+
+    /// The releases a resolved set selects, one per system, described as
+    /// drift describes registered releases. They are used to read a
+    /// repository's pins against exactly the versions that set governs.
+    let releasesFromSet (bytes: byte array) : Map<string, RegisteredRelease list> =
+        try
+            use document = JsonDocument.Parse bytes
+
+            objects "components" document.RootElement
+            |> List.choose (fun entry ->
+                match str "systemId" entry, str "version" entry |> Option.bind SemanticVersion.tryParse, str "repository" entry, str "tag" entry with
+                | Some id, Some version, Some repository, Some tag ->
+                    let distribution = tryProperty "distribution" entry
+                    let mechanism = distribution |> Option.bind (str "mechanism")
+                    let package = distribution |> Option.bind (str "package")
+                    let distributionClass = str "distributionClass" entry |> Option.defaultValue ""
+                    let isNuget = distributionClass = "nuget-library" || mechanism = Some "nuget"
+                    let versionText = version.ToString()
+
+                    let artifactNames =
+                        objects "artifacts" entry
+                        |> List.filter (fun artifact -> str "purpose" artifact = Some "package")
+                        |> List.choose (str "name")
+
+                    let nugetFromArtifacts =
+                        artifactNames
+                        |> List.filter (fun name -> name.EndsWith($".{versionText}.nupkg", StringComparison.OrdinalIgnoreCase))
+                        |> List.map (fun name -> name.Substring(0, name.Length - $".{versionText}.nupkg".Length))
+
+                    Some(
+                        id,
+                        [ { SystemId = id
+                            Version = version
+                            Repository = repository
+                            Tag = tag
+                            ReleaseStage = str "releaseStage" entry |> Option.defaultValue ""
+                            LifecycleState = str "lifecycleState" entry |> Option.defaultValue ""
+                            DistributionClass = distributionClass
+                            NpmPackages = if isNuget then [] else package |> Option.toList
+                            NugetPackages = if isNuget then (package |> Option.toList) @ nugetFromArtifacts |> List.distinct else []
+                            TarballUrls =
+                              artifactNames
+                              |> List.filter (fun name -> name.EndsWith(".tgz", StringComparison.Ordinal))
+                              |> List.map (fun name -> $"https://github.com/{repository}/releases/download/{tag}/{name}")
+                            MigrationNotes = $"https://github.com/{repository}/releases/tag/{tag}"
+                            ManifestPath = "" } ]
+                    )
+                | _ -> None)
+            |> Map.ofList
+        with :? JsonException ->
+            Map.empty
+
+    /// The pins (other than conditor.json itself) of the `expected`
+    /// components that do not name exactly the expected version (CON-351,
+    /// CON-352). A pin whose version Conditor cannot read is a disagreement.
+    let pinDisagreements (releases: Map<string, RegisteredRelease list>) (root: string) (expected: Map<string, string>) : DriftPin list =
+        discoverWith releases root
+        |> List.filter (fun pin ->
+            pin.Source <> "conditor.json"
+            && (match expected |> Map.tryFind pin.SystemId with
+                | Some version -> pin.Version <> Some version
+                | None -> false))
 
     // ---- Assessment (pure) ------------------------------------------------------
 
@@ -787,7 +854,16 @@ module Drift =
             pins |> List.choose (fun pin -> pin.Version |> Option.bind SemanticVersion.tryParse |> Option.map (fun v -> pin, v))
 
         let unresolved = pins |> List.filter (fun pin -> pin.Version |> Option.bind SemanticVersion.tryParse |> Option.isNone)
-        let pinned = resolved |> List.map snd |> List.sort |> List.tryHead
+        // CON-305: Conditor governs a declared component, so its declared
+        // version is effective and other pins that disagree are a repair;
+        // for an undeclared component the oldest pin is effective.
+        let declaredVersion =
+            resolved |> List.tryFind (fun (pin, _) -> pin.Source = "conditor.json") |> Option.map snd
+
+        let pinned =
+            match declaredVersion with
+            | Some version -> Some version
+            | None -> resolved |> List.map snd |> List.sort |> List.tryHead
         let consistent = (resolved |> List.map snd |> List.distinct |> List.length) <= 1
         let selected = registry.Selected |> Map.tryFind id
         let selectedVersion = selected |> Option.bind SemanticVersion.tryParse
@@ -895,7 +971,12 @@ module Drift =
                   let versions =
                       resolved |> List.map (fun (pin, v) -> $"{pin.Path} {v}") |> String.concat ", "
 
-                  yield DriftWarn, $"pins disagree ({versions}); the oldest is the effective pin."
+                  if declaredVersion.IsSome then
+                      yield
+                          DriftWarn,
+                          $"pins disagree ({versions}); conditor.json declares {declaredVersion.Value}, so the stale pins are a pin repair: run upgrade --current --check against the recorded authority (CON-352)."
+                  else
+                      yield DriftWarn, $"pins disagree ({versions}); the oldest is the effective pin."
               if pinned.IsSome && not registered.IsEmpty && not isRegistered then
                   yield DriftWarn, $"the pinned {pinned.Value} is not a registered release."
               if policy.FailBelowSupportedRange && below = Some true then

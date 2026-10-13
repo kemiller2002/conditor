@@ -465,7 +465,10 @@ Registry-produced steps, one release line at a time. Decision:
   read-only Git queries. When they are unavailable, the field SHALL be
   reported as unavailable, never as zero.
 - **CON-305** When pins of the same component disagree, drift SHALL report
-  every pin, treat the oldest as the effective pin, and raise a warning.
+  every pin and raise a warning. For a component that `conditor.json`
+  declares, the declared version is the effective pin, and the next step is
+  the pin repair of CON-352. For an undeclared component, the oldest pin is
+  effective.
 - **CON-306** Drift SHALL emit a machine-readable JSON document
   (`conditor.drift-report/v1`, `schemas/conditor-drift-report.schema.json`)
   with `--json`, and human-readable text otherwise. Both SHALL carry the same
@@ -625,3 +628,53 @@ CON-300 reports.
   the release SHALL fall under exact per-version qualification. Conditor
   SHALL NOT fall back to an unsigned contract claim, and the plan SHALL
   disclose which rule qualified each project-binding transition.
+
+### Pin consistency across every pin kind (WI-0039)
+
+Found by Summa's step 3 with Conditor 0.10.0. An authorized Ordo 1.5.0 →
+1.6.0 upgrade moved `conditor.json`, `.sde/`, `.echelon/sde.json` and
+`.echelon/toolchain.json`, but left the Ordo entry in
+`.echelon/foundations.json` at 1.5.0. `upgrade --check --stepwise` then
+reported nothing behind, while `drift` reported disagreeing pins and
+recommended 1.5.0 → 1.6.0.
+
+- **CON-350** Every version transition that `upgrade --current` applies SHALL
+  also move that component's `.echelon/foundations.json` capability version,
+  when the capability exists. This covers embedded-qualified and
+  repository-lifecycle tools such as Ordo and Praxis, package lifecycle
+  tools, NuGet feeds and web packages. The edit SHALL have the same
+  guarantees as CON-331:
+  - surgical and proven at plan time;
+  - bound into the digest;
+  - backed up and restored on failure;
+  - its post-condition checked.
+
+  A missing capability SHALL never be created.
+- **CON-351** Before committing governance, `upgrade --current` SHALL check a
+  consistency invariant. Every pin kind that `conditor drift` reads (CON-301)
+  for every declared component SHALL name exactly the version the upgrade
+  leaves declared. A violation SHALL fail verification, restore every file
+  Conditor itself edited (`foundations.json`, `package.json` and lockfiles),
+  and leave `conditor.json`, the authority and the lock unchanged. This
+  makes the CON-305 disagreement an impossible outcome of an authorized
+  upgrade.
+- **CON-352** `upgrade --current --check` SHALL treat a declared component
+  whose pins disagree with its declared version as not current.
+  - **Repairable pins:** the plan SHALL include a pin repair. The repair
+    aligns each stale `foundations.json` capability to the declared version
+    by the CON-331 surgical edit, with no version change. Repairs are bound
+    into the digest and applied under the CON-351 invariant.
+  - **Unrepairable pins:** a disagreeing pin Conditor cannot align by itself
+    (`package.json`, NuGet feed lock, MSBuild) SHALL be a refusal that names
+    the pin.
+  - **Stale pin on a moving component:** when a component that moves has a
+    stale `foundations.json` capability (neither its source nor its target),
+    the plan SHALL refuse it. The refusal names the repair command, which is
+    a check against the recorded authority.
+- **CON-353** `upgrade --current --check --stepwise` SHALL plan a pin repair
+  against the repository's recorded authority as its first step whenever one
+  is needed. It SHALL never report "no declared component is behind" while a
+  repair is pending.
+- **CON-354** A successful current upgrade's idempotency proof (CON-289)
+  SHALL require no remaining transitions and no remaining pin repairs.
+

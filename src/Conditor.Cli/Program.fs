@@ -571,7 +571,19 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
             for package in release.Packages do
                 Console.WriteLine $"      {package.PackageId} {package.Version} (sha256:{package.Sha256})"
 
-    Console.WriteLine "  final verification: complete repository verify, then authority + lock commit"
+    if not plan.FoundationsEdits.IsEmpty then
+        Console.WriteLine "  foundations capabilities moved with their transitions:"
+
+        for edit in plan.FoundationsEdits do
+            Console.WriteLine $"    {WebPackageBinding.FoundationsPath}: {edit.Capability} {edit.FromVersion} -> {edit.ToVersion} (sha256:{edit.Sha256})"
+
+    if not plan.PinRepairs.IsEmpty then
+        Console.WriteLine "  pin repairs (no version change; stale pins aligned to conditor.json):"
+
+        for edit in plan.PinRepairs do
+            Console.WriteLine $"    {WebPackageBinding.FoundationsPath}: {edit.Capability} {edit.FromVersion} -> {edit.ToVersion} (sha256:{edit.Sha256})"
+
+    Console.WriteLine "  final verification: pin consistency across every pin kind, complete repository verify, then authority + lock commit"
 
     for refusal in plan.Refusals do
         Console.WriteLine $"  REFUSED {refusal}"
@@ -621,7 +633,7 @@ let private runStepwiseUpgrade (args: string array) checkOnly target manifestPat
                 writeErrors errors
                 2
             | Ok plan when plan.Steps.IsEmpty ->
-                Console.WriteLine "Stepwise current upgrade: no declared component is behind the target set."
+                Console.WriteLine "Stepwise current upgrade: no declared component is behind the target set, and every pin agrees."
                 0
             | Ok plan ->
                 Console.WriteLine $"Stepwise current upgrade: {plan.Steps.Length} step(s) to sha256:{resolvedSetDigest}"
@@ -631,6 +643,9 @@ let private runStepwiseUpgrade (args: string array) checkOnly target manifestPat
                     Console.WriteLine $"Step {step.Index}: {step.Candidate.Label}"
                     Console.WriteLine $"  set: {step.Candidate.Path}"
                     Console.WriteLine $"  sha256: {step.Candidate.Sha256}"
+
+                    if step.Moves.IsEmpty then
+                        Console.WriteLine "  pin repair: no version changes; stale pins are aligned to the versions already applied (CON-352)"
 
                     for move in step.Moves do
                         Console.WriteLine $"  {move.Id}: {move.FromVersion} -> {move.ToVersion}"

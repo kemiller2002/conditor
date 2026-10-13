@@ -932,7 +932,7 @@ module WebPackageBinding =
     /// Moves one foundations capability version in place (the plan proved the
     /// edit surgical) and checks the post-condition. Two transitions may edit
     /// the same file, so the edit is recomputed from the file's current text.
-    let private applyFoundations (edit: FoundationsEdit) : Result<unit, string> =
+    let applyFoundations (edit: FoundationsEdit) : Result<unit, string> =
         let text = File.ReadAllText edit.Path
 
         match replaceCapabilityVersion text edit.Capability edit.FromVersion edit.ToVersion with

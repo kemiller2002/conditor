@@ -40,9 +40,9 @@
     <Compile Include="Workstation/OfflineBundle.fs" />
     <Compile Include="Workstation/Engine.fs" />
     <Compile Include="Workstation/Lifecycle.fs" />
+    <Compile Include="Drift.fs" />
     <Compile Include="WebPackageBinding.fs" />
     <Compile Include="CurrentUpgrade.fs" />
-    <Compile Include="Drift.fs" />
     <Compile Include="StepwiseUpgrade.fs" />
   </ItemGroup>
   <ItemGroup>

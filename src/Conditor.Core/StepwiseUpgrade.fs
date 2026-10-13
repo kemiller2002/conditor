@@ -356,20 +356,54 @@ module StepwiseUpgrade =
                             |> List.choose (fun request -> request.Version |> Option.map (fun version -> request.Id, version))
                             |> Map.ofList
 
+                        // CON-353: a pending pin repair comes first, against
+                        // the set the repository was last applied from.
+                        let repair =
+                            manifest.RegistryAuthority
+                            |> Option.bind (fun authority ->
+                                let path = Path.Combine(Path.GetFullPath target, authority.Path)
+
+                                if File.Exists path && sha256Bytes (File.ReadAllBytes path) = authority.Sha256 then
+                                    match CurrentUpgrade.preview target manifestPath manifest path authority.Sha256 ctx probe with
+                                    | Ok repairPlan when repairPlan.Transitions.IsEmpty && not repairPlan.PinRepairs.IsEmpty ->
+                                        let selections, profileVersion =
+                                            describeSet (File.ReadAllBytes path) |> Option.defaultValue (Map.empty, None)
+
+                                        Some(
+                                            { Label = "recorded Registry authority (pin repair)"
+                                              Path = path
+                                              Sha256 = authority.Sha256
+                                              ProfileVersion = profileVersion
+                                              Selections = selections
+                                              IsFinal = false
+                                              PendingBytes = None },
+                                            repairPlan
+                                        )
+                                    | _ -> None
+                                else
+                                    None)
+
                         plan registry.Releases declared final candidates
                         |> Result.mapError List.singleton
                         |> Result.bind (fun steps ->
+                            let offset = if repair.IsSome then 1 else 0
+
                             let steps =
                                 steps
                                 |> List.mapi (fun index (candidate, moves, gaps) ->
-                                    { Index = index + 1
+                                    { Index = index + 1 + offset
                                       Candidate = materialize ctx candidate
                                       Moves = moves
                                       Gaps = gaps })
 
-                            match steps with
-                            | [] -> Ok { Steps = []; FirstStepPlan = None; Registry = registry }
-                            | first :: _ ->
+                            match repair, steps with
+                            | Some(candidate, repairPlan), _ ->
+                                Ok
+                                    { Steps = { Index = 1; Candidate = candidate; Moves = []; Gaps = [] } :: steps
+                                      FirstStepPlan = Some repairPlan
+                                      Registry = registry }
+                            | None, [] -> Ok { Steps = []; FirstStepPlan = None; Registry = registry }
+                            | None, first :: _ ->
                                 CurrentUpgrade.preview target manifestPath manifest first.Candidate.Path first.Candidate.Sha256 ctx probe
                                 |> Result.map (fun firstPlan ->
                                     { Steps = steps
