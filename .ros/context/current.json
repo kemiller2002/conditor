@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-14T00:15:35Z",
+  "updatedAt": "2026-10-14T00:44:25Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2035,13 +2035,44 @@
     {
       "id": "WI-0044",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-14T00:15:35Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/RepositorySnapshot.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/LifecycleRollbackTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-14T00:44:25Z",
       "telemetryExecutionIds": [
         "EXE-20261014T001536164Z-8e0c139e"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "52ee74b154a53b9994817184",
+        "recordedAt": "2026-10-14T00:44:12Z",
+        "executionId": "EXE-20261014T001536164Z-8e0c139e",
+        "repository": "conditor",
+        "branch": "wi-0044-release-0.10.5",
+        "commit": "394690e416a202291d5887ca117a32d37a8de294",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "wi-0044-release-0.10.5",
+        "remoteCommit": "394690e416a202291d5887ca117a32d37a8de294",
+        "summary": "#101 merged at e55f5096 (CON-356/357, real-lifecycle regression tests, Chrona CI job green); 0.10.5 requested",
+        "nextAction": "Gate-merge the request, verify 0.10.5, record it in the registry",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-14T00:44:25Z",
+      "conclusion": "P1 fixed (CON-356, CON-357); 0.10.5 requested"
     }
   ]
 }
