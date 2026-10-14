@@ -162,6 +162,67 @@ jobs:
           grep -F "managed-file-modified" "$RUNNER_TEMP/gate-damaged.json"
           test ! -e "$damaged/conditor.json"
 
+  # WI-0044: Conditor 0.10.4 refused Chrona's echelon-current 1.22.0 -> 1.23.0
+  # upgrade (exit 9) because Praxis 3.12.0's own lifecycle moves the
+  # foundations praxis pin, and then left everything that lifecycle wrote.
+  # This runs that exact upgrade on Chrona at a pinned 1.22.0 commit, with
+  # the real Registry set and the real Praxis 3.12.0 release, in an isolated
+  # home.
+  chrona-praxis-lifecycle-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      CHRONA_COMMIT: 1bfcae37ba20827009df1b1667bc55b2f2dd1746
+      SET_123_COMMIT: 29aa5ed9fcda2401a80ff22c498263f53c0c0eb1
+      SET_123_SHA256: fd7006ea1ad6a8d37a565b6beea7528ff9af494c97366ac17a9c21ac6ac76a91
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Chrona 1.22.0 -> 1.23.0 moves Praxis through its own lifecycle without a double pin move
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          git init -q "$repo"
+          git -C "$repo" fetch -q --depth 1 https://github.com/kemiller2002/chrona "$CHRONA_COMMIT"
+          git -C "$repo" checkout -q FETCH_HEAD
+          python3 - "$repo/.echelon/foundations.json" <<'PY'
+          import json, sys
+          capabilities = json.load(open(sys.argv[1]))["capabilities"]
+          assert capabilities["praxis"] == {"required": True, "version": "3.11.0"}, capabilities["praxis"]
+          PY
+          set="$RUNNER_TEMP/set-1.23.0.json"
+          curl -fsSL "https://raw.githubusercontent.com/kemiller2002/echelon-registry/$SET_123_COMMIT/channels/echelon-current/linux-x64.json" -o "$set"
+          echo "$SET_123_SHA256  $set" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$set" --resolved-set-sha256 "$SET_123_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan.txt"
+          grep -F "praxis: 3.11.0 -> 3.12.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/chrona-plan.txt"
+          grep -F ".echelon/foundations.json: praxis 3.11.0 -> 3.12.0" "$RUNNER_TEMP/chrona-plan.txt"
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/chrona-plan.txt" | cut -d' ' -f2)
+          conditor upgrade --current "${args[@]}" --authorize "$authorization"
+          python3 - "$repo" <<'PY'
+          import json, sys, pathlib
+          repo = pathlib.Path(sys.argv[1])
+          foundations = (repo / ".echelon/foundations.json").read_text()
+          assert json.loads(foundations)["capabilities"]["praxis"] == {"required": True, "version": "3.12.0"}
+          assert foundations.count('"version": "3.12.0"') == 1, foundations
+          versions = {c["id"]: c["version"] for c in json.loads((repo / "conditor.json").read_text())["components"]}
+          assert versions["praxis"] == "3.12.0", versions
+          assert json.loads((repo / ".echelon/toolchain.json").read_text())["praxis"] == "3.12.0"
+          PY
+          conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.12.0"
+          ( cd "$repo" && "$home/.local/bin/praxis" validate )
+
   echelon-current-sweep-qualification:
     needs: build-test
     runs-on: ubuntu-latest

@@ -834,12 +834,29 @@ module CurrentUpgrade =
 
             let restoreEdited (errors: string list) =
                 edited |> List.iter (fun (path: string, bytes: byte array) -> File.WriteAllBytes(path, bytes))
-
                 errors
-                @ (if edited.IsEmpty then
-                       []
-                   else
-                       [ "Every file Conditor edited (foundations.json, package.json, lockfiles) was restored; conditor.json, the authority and the lock are unchanged." ])
+
+            // CON-356: the repository before this run's first effect. Any
+            // refusal or failure from here on returns every repository file
+            // to exactly this state, including files a component's own
+            // lifecycle wrote (docs, .echelon/ros.json, new schemas), not only
+            // the files Conditor edits itself.
+            let snapshot = RepositorySnapshot.take target
+
+            let rollbackOnError (result: Result<CurrentUpgradeResult, string list>) =
+                match result with
+                | Ok value -> Ok value
+                | Error errors ->
+                    let restored = RepositorySnapshot.restore snapshot
+
+                    let summary =
+                        match restored with
+                        | [] -> "No repository file had changed; conditor.json, the authority and the lock are unchanged."
+                        | paths ->
+                            let shown = String.concat ", " paths
+                            $"Every repository file this run changed was restored to its state before the run ({paths.Length}: {shown}); conditor.json, the authority and the lock are unchanged."
+
+                    Error(errors @ [ summary ])
 
             let workstationResult =
                 match plan.WorkstationPlan with
@@ -1074,6 +1091,7 @@ module CurrentUpgrade =
 
                                 Error("Committing the current upgrade failed; the previous authority and conditor.json were restored." :: errors)
                             | Ok _ -> commitResult)
+            |> rollbackOnError
 
     let apply target manifestPath manifest targetSetPath targetDigest ctx probe authorization =
         applyTrusting ReleaseAttestation.embedded.Value target manifestPath manifest targetSetPath targetDigest ctx probe authorization

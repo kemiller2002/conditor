@@ -687,6 +687,30 @@ recommended 1.5.0 → 1.6.0.
   forward. Outside a Git work tree, signals are recorded unchanged. The
   scanner-side defect is kemiller2002/ordo#75: Ordo's structural review
   scans gitignored build output, for example `bin/`.
+- **CON-356** When an authorized `upgrade --current` fails or is refused after
+  it starts changing the repository, every repository file SHALL return to its
+  state before the run. That includes files a component's own lifecycle
+  wrote, such as managed docs, `.echelon/ros.json`, `.echelon/toolchain.json`
+  and new schemas, not only the files Conditor edits itself.
+  - **Scope:** in a Git work tree, the snapshot covers every tracked file and
+    every untracked file that is not ignored. Outside Git, it covers every
+    file except `.git/` and `node_modules/`.
+  - **Restore:** changed and removed files are restored byte for byte, files
+    the run created are deleted, and directories it created are removed.
+  - **Report:** the refusal names every restored file.
+  - **Out of scope:** ignored build output and installed packages, which are
+    not repository state, and workstation effects in the home (CON-190..198
+    govern those).
+
+  The defect this fixes: Conditor 0.10.4 on Chrona restored only
+  `foundations.json`, `package.json` and lockfiles, and left everything
+  Praxis 3.12.0's lifecycle wrote.
+- **CON-357** A foundations capability move SHALL be idempotent. When a
+  component's own lifecycle has already moved its capability in
+  `.echelon/foundations.json` to exactly the target version, as one plain
+  value (Praxis 3.12.0's upgrade moves `praxis`), Conditor SHALL verify the
+  value and continue. It SHALL NOT refuse the run. A capability at any other
+  version is still refused.
 
 ### Workstation host-tool selection (WI-0040, `DF-CON-2026-A005`)
 

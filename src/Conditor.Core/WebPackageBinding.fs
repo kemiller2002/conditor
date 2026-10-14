@@ -932,10 +932,17 @@ module WebPackageBinding =
     /// Moves one foundations capability version in place (the plan proved the
     /// edit surgical) and checks the post-condition. Two transitions may edit
     /// the same file, so the edit is recomputed from the file's current text.
+    ///
+    /// A component's own lifecycle may already have moved its capability (the
+    /// Praxis upgrade moves `praxis`): a capability already declared at exactly
+    /// the target as one plain value is verified, not moved again and not
+    /// refused (CON-357).
     let applyFoundations (edit: FoundationsEdit) : Result<unit, string> =
         let text = File.ReadAllText edit.Path
 
         match replaceCapabilityVersion text edit.Capability edit.FromVersion edit.ToVersion with
+        | None when edit.FromVersion <> edit.ToVersion && (replaceCapabilityVersion text edit.Capability edit.ToVersion edit.ToVersion).IsSome ->
+            Ok()
         | None -> Error $"{FoundationsPath} no longer declares capability '{edit.Capability}' at {edit.FromVersion} as one plain value."
         | Some updated ->
             File.WriteAllText(edit.Path, updated)
