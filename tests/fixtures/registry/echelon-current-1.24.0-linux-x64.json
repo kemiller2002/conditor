@@ -2,8 +2,8 @@
   "schema": "echelon.resolved-release-set/v1",
   "profile": {
     "id": "echelon-current",
-    "version": "1.23.0",
-    "sha256": "36c0273206e5df6306e356d4d0428eaa13008120fdac67c3e9b3bf34b6da48b1"
+    "version": "1.24.0",
+    "sha256": "efe437489cc2b741cacc756b2c9b11f119627cc5aaf25c917933884a47b39c53"
   },
   "platform": "linux-x64",
   "resolver": {
@@ -11,7 +11,7 @@
     "version": "0.1.0"
   },
   "catalogSnapshot": {
-    "sha256": "07a35585d9fc32f62b61c8cde9b82524ff77820b683b7eb8873a377216da82be"
+    "sha256": "b0b299e9410fbdf7be7d44910b89d7d43eeb49ed40fa814ad678ebb3d1f5ffa8"
   },
   "components": [
     {
@@ -54,35 +54,35 @@
       "systemId": "ordo",
       "role": "host-tool",
       "required": true,
-      "version": "1.7.0",
+      "version": "1.8.2",
       "repository": "kemiller2002/ordo",
-      "tag": "v1.7.0",
-      "commit": "e6cbeff8876f870b2636715735bb79041a9a06a0",
+      "tag": "v1.8.2",
+      "commit": "907a38951a0018c493050be5ded2158d5b17733b",
       "releaseStage": "stable",
       "lifecycleState": "active",
       "distributionClass": "self-contained-native-cli",
       "executable": "ordo",
       "releaseManifest": {
         "schema": "echelon.release/v2",
-        "sha256": "5261ec97e76008c64553f35719d961019a7d89a803bfb6a4bd1de70a9bc0bcba"
+        "sha256": "272bcc4dff151d26aac5212e26421aa60026e91ced625967d186c3be10240c38"
       },
       "distribution": {
         "mechanism": "github-release",
         "package": null,
-        "url": "https://github.com/kemiller2002/ordo/releases/tag/v1.7.0"
+        "url": "https://github.com/kemiller2002/ordo/releases/tag/v1.8.2"
       },
       "artifacts": [
         {
           "name": "ordo-linux-x64.tar.gz",
           "purpose": "executable",
           "platform": "linux-x64",
-          "sha256": "3b11f7b8218678fce0bce124bf1d8ad5875992b970c4c915ac40633687a46e74"
+          "sha256": "dbaf419a43228289e88d5d639c36adf531832055445420074e5944c3a7ce8106"
         },
         {
           "name": "native-checksums.txt",
           "purpose": "checksums",
           "platform": null,
-          "sha256": "2b48abc9f87961c08b8a7ca3a3dc4c85053b58236958006b6fe7cb6d4f0718a6"
+          "sha256": "d9b3ff8f9e3b488ecd2b372bb95b764479e15a6b9bbe55eab55c93e9ae823b67"
         }
       ]
     },

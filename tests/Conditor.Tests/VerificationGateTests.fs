@@ -141,10 +141,10 @@ let private gateSelection check =
         (Registry.qualifiedVersions "ordo" |> Option.exists (Set.contains "1.5.0")
          && VerificationGate.argumentsFor "1.5.0" ordo = gateArguments)
 
-    // Ordo 1.6.0 and 1.7.0 are the next registered steps. They keep the
-    // ordo.verify-json/v1 integrity-only report; CI's integrity-gate matrix
-    // runs both released binaries through adoption.
-    for version in [ "1.6.0"; "1.7.0" ] do
+    // Ordo 1.6.0, 1.7.0 and 1.8.2 (echelon-current 1.24.0, the Ordo that
+    // Praxis 3.13.0 pins) keep the ordo.verify-json/v1 integrity-only report;
+    // CI's integrity-gate matrix runs each released binary through adoption.
+    for version in [ "1.6.0"; "1.7.0"; "1.8.2" ] do
         check
             $"Ordo {version} is qualified and verified through the integrity-only gate"
             (Registry.qualifiedVersions "ordo" |> Option.exists (Set.contains version)
