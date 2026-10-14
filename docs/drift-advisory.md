@@ -259,3 +259,20 @@ After every authorized current upgrade it checks the written lock, so a lock
 that names an untracked path fails the upgrade and the previous lock is
 restored. To drop a stale entry from an existing lock, re-run the current
 upgrade on a clean tree against the recorded authority.
+
+## A component's lifecycle may move its own pin; failures roll back everything (CON-356, CON-357)
+
+Praxis's own `upgrade` moves the `praxis` capability in
+`.echelon/foundations.json`. When Conditor then applies its planned
+foundations edit and finds the capability already at exactly the target
+version, it verifies the value and continues. Before 0.10.5 it refused,
+because the pin no longer showed the source version: this was the exit 9 on
+Chrona's 1.22.0 to 1.23.0 upgrade.
+
+If an authorized upgrade fails or is refused after it starts, Conditor now
+restores every repository file to its state before the run, from a snapshot
+taken before the first effect. That includes what a component's lifecycle
+wrote: managed docs, `.echelon/ros.json`, toolchain pins and new files. The
+refusal lists the restored files. Ignored build output and installed
+packages are not part of the snapshot.
+

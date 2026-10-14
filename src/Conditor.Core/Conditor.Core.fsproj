@@ -42,6 +42,7 @@
     <Compile Include="Workstation/Lifecycle.fs" />
     <Compile Include="Drift.fs" />
     <Compile Include="WebPackageBinding.fs" />
+    <Compile Include="RepositorySnapshot.fs" />
     <Compile Include="CurrentUpgrade.fs" />
     <Compile Include="StepwiseUpgrade.fs" />
   </ItemGroup>

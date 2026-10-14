@@ -1194,6 +1194,7 @@ withTarget
 WorkstationTests.run check
 WorkstationSelectionTests.run check
 RegistrationBackfillTests.run check
+LifecycleRollbackTests.run check
 RepositoryLifecycleTests.run check
 AdoptionTests.run check
 CurrentUpgradeTests.run check
