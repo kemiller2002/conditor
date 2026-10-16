@@ -356,3 +356,9 @@ carries its reason; `workstation register` backfills missed registrations
 through a reviewed plan). See
 [`docs/workstation.md`](docs/workstation.md). Release an operator build with
 `gh workflow run release-orchestrator.yml -f bump=patch`.
+
+## License
+
+Source available under PolyForm Noncommercial 1.0.0 for permitted noncommercial uses. Commercial use requires a separate license from Echelon Foundry. Previously distributed versions remain subject to the licenses under which they were released.
+
+Commercial licensing information is forthcoming.
