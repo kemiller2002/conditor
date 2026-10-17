@@ -685,8 +685,9 @@ let private echelonCurrent120 check =
 
 let run (check: string -> bool -> unit) =
     check
-        "Conditor qualifies the echelon-current 1.20.0 Forma 0.6.1 and Folio 0.4.0 web packages"
-        (Registry.qualifiedVersions "forma" |> Option.exists (Set.contains "0.6.1")
+        "Conditor qualifies released Forma web-package upgrade boundaries"
+        (Registry.qualifiedVersions "forma"
+         |> Option.exists (fun versions -> Set.contains "0.6.1" versions && Set.contains "0.9.0" versions)
          && Registry.qualifiedVersions "folio" |> Option.exists (Set.contains "0.4.0"))
 
     if OperatingSystem.IsWindows() then
