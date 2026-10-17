@@ -2094,7 +2094,27 @@
       "updatedAt": "2026-10-17T16:44:26.000Z",
       "telemetryExecutionIds": [
         "EXE-20261017T164428101Z-40caa4c0"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "971fdf81cba411af057b6647",
+        "recordedAt": "2026-10-17T16:47:51.000Z",
+        "executionId": "EXE-20261017T164428101Z-40caa4c0",
+        "repository": "conditor",
+        "branch": "codex/qualify-forma-090",
+        "commit": "e8fcee005ff0870d6fd568ed56e0e57eee5ce692",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "codex/qualify-forma-090",
+        "remoteCommit": "e8fcee005ff0870d6fd568ed56e0e57eee5ce692",
+        "summary": "Forma 0.9.0 is qualified, regression assertions are updated, and Conditor 0.10.6 is requested; local build and descriptor checks pass with no change-specific regression.",
+        "nextAction": "Open the pull request, require green CI, merge, and verify the automated Conditor 0.10.6 release.",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
