@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-17T16:44:26.000Z",
+  "updatedAt": "2026-10-17T16:48:34.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2088,33 +2088,47 @@
     {
       "id": "WI-0046",
       "type": "implementation",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-17T16:44:26.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/forma.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebPackageUpgradeTests.fs"
+        },
+        {
+          "type": "release-request",
+          "path": "release/requested-version.txt"
+        }
+      ],
+      "updatedAt": "2026-10-17T16:48:34.000Z",
       "telemetryExecutionIds": [
         "EXE-20261017T164428101Z-40caa4c0"
       ],
       "latestCheckpoint": {
-        "id": "971fdf81cba411af057b6647",
-        "recordedAt": "2026-10-17T16:47:51.000Z",
+        "id": "4b8c8bcb77d3c1e995ec62fe",
+        "recordedAt": "2026-10-17T16:48:14.000Z",
         "executionId": "EXE-20261017T164428101Z-40caa4c0",
         "repository": "conditor",
         "branch": "codex/qualify-forma-090",
-        "commit": "e8fcee005ff0870d6fd568ed56e0e57eee5ce692",
+        "commit": "aaa49a1c196e4bcf07a620fba8b50ae1ccdee189",
         "remote": {
           "name": "origin",
           "url": "https://github.com/kemiller2002/conditor.git"
         },
         "remoteBranch": "codex/qualify-forma-090",
-        "remoteCommit": "e8fcee005ff0870d6fd568ed56e0e57eee5ce692",
-        "summary": "Forma 0.9.0 is qualified, regression assertions are updated, and Conditor 0.10.6 is requested; local build and descriptor checks pass with no change-specific regression.",
+        "remoteCommit": "aaa49a1c196e4bcf07a620fba8b50ae1ccdee189",
+        "summary": "Forma 0.9.0 qualification and the Conditor 0.10.6 release request are committed and remotely recoverable.",
         "nextAction": "Open the pull request, require green CI, merge, and verify the automated Conditor 0.10.6 release.",
         "verification": {
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
-      }
+      },
+      "completedAt": "2026-10-17T16:48:34.000Z"
     }
   ]
 }

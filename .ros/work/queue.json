@@ -1079,10 +1079,10 @@
         "release"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-17T16:44:23.533Z",
-      "updatedAt": "2026-10-17T16:44:25.000Z",
+      "updatedAt": "2026-10-17T16:48:34.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
