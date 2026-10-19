@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 47,
+  "nextSeq": 48,
   "items": [
     {
       "id": "WI-0001",
@@ -1093,6 +1093,27 @@
       },
       "source": "release",
       "sourceReference": "https://github.com/kemiller2002/forma/releases/tag/v0.9.0"
+    },
+    {
+      "id": "WI-0047",
+      "title": "Qualify Praxis 3.14.0 for upgrade --current on echelon-current 1.25.0",
+      "description": "Qualify the published Praxis 3.14.0 as an embedded upgrade --current target from 3.12.0 so the Registry's REG-RU-007 gate admits echelon-current 1.25.0 (Praxis 3.12.0 -> 3.14.0, Dokimos 0.2.0 -> 0.6.0). Dokimos declares echelon.repository-lifecycle and needs no Conditor qualification.",
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-19T18:22:22.000Z",
+      "updatedAt": "2026-10-19T18:22:27.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

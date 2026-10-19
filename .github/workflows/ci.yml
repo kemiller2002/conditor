@@ -256,6 +256,49 @@ jobs:
           conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
           "$home/.local/bin/ordo" --version | grep -Fx "1.8.2"
           ( cd "$repo" && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" validate )
+      - name: Chrona 1.24.0 -> 1.25.0 moves Praxis 3.12.0 -> 3.14.0 through its own lifecycle with the real Praxis release
+        shell: bash
+        env:
+          # The Registry's prepared 1.25.0 cut (echelon-registry WI-0058),
+          # vendored byte-for-byte as the Registry tools generate it; the
+          # sha256 is its channel identity. It also carries the Forma 0.9.0
+          # that the Registry's 1.24.0 selected (the vendored 1.24.0 above is
+          # the Ordo-only cut), and Chrona declares Forma, so Forma moves too.
+          # Dokimos 0.6.0 is selected but Chrona does not declare it.
+          SET_125_PATH: tests/fixtures/registry/echelon-current-1.25.0-linux-x64.json
+          SET_125_SHA256: e28fd3ccb7728ac5c23a6c329fa2db234ba6776cf259ec5a7b5e0b307265078e
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          git -C "$repo" add -A
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current 1.24.0"
+          echo "$SET_125_SHA256  $SET_125_PATH" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$SET_125_PATH" --resolved-set-sha256 "$SET_125_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-125.txt"
+          actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-125.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
+          test "$actual" = "forma: 0.6.1 -> 0.9.0;praxis: 3.12.0 -> 3.14.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          grep -F "praxis: 3.12.0 -> 3.14.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/chrona-plan-125.txt"
+          grep -F ".echelon/foundations.json: praxis 3.12.0 -> 3.14.0" "$RUNNER_TEMP/chrona-plan-125.txt"
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/chrona-plan-125.txt" | cut -d' ' -f2)
+          conditor upgrade --current "${args[@]}" --authorize "$authorization"
+          python3 - "$repo" <<'PY'
+          import json, sys, pathlib
+          repo = pathlib.Path(sys.argv[1])
+          foundations = (repo / ".echelon/foundations.json").read_text()
+          capabilities = json.loads(foundations)["capabilities"]
+          assert capabilities["praxis"] == {"required": True, "version": "3.14.0"}, capabilities["praxis"]
+          assert foundations.count('"version": "3.14.0"') == 1, foundations
+          assert capabilities["ordo"]["version"] == "1.8.2" and capabilities["forma"]["version"] == "0.9.0", capabilities
+          versions = {c["id"]: c["version"] for c in json.loads((repo / "conditor.json").read_text())["components"]}
+          assert versions["praxis"] == "3.14.0" and versions["ordo"] == "1.8.2" and versions["forma"] == "0.9.0", versions
+          assert "dokimos" not in versions, versions
+          assert json.loads((repo / ".echelon/toolchain.json").read_text())["praxis"] == "3.14.0"
+          PY
+          conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.14.0"
+          ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
 
   echelon-current-sweep-qualification:
     needs: build-test
@@ -492,7 +535,7 @@ jobs:
           }
           sweep 1.16.0 "$SET_116_COMMIT" "$SET_116_SHA256" 3.7.2 3.10.0
           sweep 1.17.0 "$SET_117_COMMIT" "$SET_117_SHA256" 3.10.0 3.11.0
-      - name: Sweep to echelon-current 1.22.0, 1.23.0 and 1.24.0 - Ordo 1.5.0 -> 1.7.0, then only Praxis 3.11.0 -> 3.12.0, then only Ordo 1.7.0 -> 1.8.2
+      - name: Sweep to echelon-current 1.22.0, 1.23.0, 1.24.0 and 1.25.0 - Ordo 1.5.0 -> 1.7.0, then only Praxis 3.11.0 -> 3.12.0, then only Ordo 1.7.0 -> 1.8.2, then only Praxis 3.12.0 -> 3.14.0
         shell: bash
         env:
           # 1.22.0 is echelon-registry main at merge 0bf2633 (Ordo 1.7.0, Praxis
@@ -509,6 +552,13 @@ jobs:
           SET_123_SHA256: fd7006ea1ad6a8d37a565b6beea7528ff9af494c97366ac17a9c21ac6ac76a91
           SET_124_PATH: tests/fixtures/registry/echelon-current-1.24.0-linux-x64.json
           SET_124_SHA256: 76b1a39cb800c2f1c2896a2d4493311a8f419e382b1a337405ac1779f0d2c136
+          # 1.25.0 is the Registry's prepared cut (echelon-registry WI-0058):
+          # Praxis 3.12.0 -> 3.14.0 and Dokimos 0.2.0 -> 0.6.0. Its linux-x64
+          # set is vendored byte-for-byte as the Registry tools generate it,
+          # for the same REG-RU-007 reason. This repository declares neither
+          # Dokimos nor Forma, so only Praxis moves.
+          SET_125_PATH: tests/fixtures/registry/echelon-current-1.25.0-linux-x64.json
+          SET_125_SHA256: e28fd3ccb7728ac5c23a6c329fa2db234ba6776cf259ec5a7b5e0b307265078e
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -560,6 +610,11 @@ jobs:
           "$home/.local/bin/ordo" --version | grep -Fx "1.8.2"
           ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
           "$home/.local/bin/praxis" --root "$repo" verify --strict
+          step 1.25.0 "$SET_125_PATH" "$SET_125_SHA256" "praxis: 3.12.0 -> 3.14.0" 1.8.2 3.14.0
+          # The installed Praxis 3.14.0 verifies the swept repository, and Ordo
+          # 1.8.2 still verifies it under Praxis 3.14.0.
+          "$home/.local/bin/praxis" --root "$repo" verify --strict
+          ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
 
   host-tool-upgrade-boundary:
     needs: build-test
