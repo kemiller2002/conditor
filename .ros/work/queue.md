@@ -52,4 +52,4 @@
 | WI-0044 | P1: current upgrade double-moves a lifecycle-owned foundations pin and leaves lifecycle-written files after refusal (0.10.4) | complete |  | medium |
 | WI-0045 | Qualify Ordo 1.8.2 for upgrade --current (echelon-current 1.24.0) and release Conditor 0.10.6 | active |  | medium |
 | WI-0046 | Qualify Forma 0.9.0 and release Conditor 0.10.6 | complete | forma, compatibility, release | high |
-| WI-0047 | Qualify Praxis 3.14.0 for upgrade --current on echelon-current 1.25.0 | ready |  | medium |
+| WI-0047 | Qualify Praxis 3.14.0 for upgrade --current on echelon-current 1.25.0 | complete |  | medium |

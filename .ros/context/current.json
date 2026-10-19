@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-19T18:22:28.000Z",
+  "updatedAt": "2026-10-19T18:31:14.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2133,13 +2133,43 @@
     {
       "id": "WI-0047",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-19T18:22:28.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/praxis.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-19T18:31:14.000Z",
       "telemetryExecutionIds": [
         "EXE-20261019T182228911Z-c2a17b23"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "be80985c3d6693d5473b8010",
+        "recordedAt": "2026-10-19T18:31:12.000Z",
+        "executionId": "EXE-20261019T182228911Z-c2a17b23",
+        "repository": "conditor",
+        "branch": "claude/echelon-reliability-integration-g8x7vn",
+        "commit": "9851505a505b64fc05db4ff9d2b0e332c969960d",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/echelon-reliability-integration-g8x7vn",
+        "remoteCommit": "9851505a505b64fc05db4ff9d2b0e332c969960d",
+        "summary": "Praxis 3.14.0 qualified for upgrade --current; CI extended to echelon-current 1.25.0; 0.10.7 requested",
+        "nextAction": "Merge the PR so the orchestrator releases Conditor 0.10.7; then the Registry cuts echelon-current 1.25.0",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-19T18:31:14.000Z"
     }
   ]
 }
