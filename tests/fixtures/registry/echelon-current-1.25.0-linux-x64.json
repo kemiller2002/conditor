@@ -11,42 +11,42 @@
     "version": "0.1.0"
   },
   "catalogSnapshot": {
-    "sha256": "c1a2260acc0998d86f197d2b872711475e20e46aaa5cc70af02f2dc2f439763d"
+    "sha256": "7a394e98a2b5dbb7dc3d96b7469f543e013959f220648dd5b752b519a413945d"
   },
   "components": [
     {
       "systemId": "praxis",
       "role": "host-tool",
       "required": true,
-      "version": "3.14.0",
+      "version": "3.16.0",
       "repository": "kemiller2002/praxis",
-      "tag": "v3.14.0",
-      "commit": "59223f514dfb7429b699350bb20e6e3572a81e7f",
+      "tag": "v3.16.0",
+      "commit": "bb8fbad82c3266520297f345e0874f5048704bf4",
       "releaseStage": "stable",
       "lifecycleState": "active",
       "distributionClass": "self-contained-native-cli",
       "executable": "praxis",
       "releaseManifest": {
         "schema": "echelon.release/v2",
-        "sha256": "5d48dee2a5ad7a76d4173ef34a45b5ee626e56f4595cd91538fc2e10a5f80156"
+        "sha256": "53b4eb6e9a1b22cd76e86af741e84308444d96c244e1f3a52be1f1de2609cf12"
       },
       "distribution": {
         "mechanism": "github-release",
         "package": null,
-        "url": "https://github.com/kemiller2002/praxis/releases/tag/v3.14.0"
+        "url": "https://github.com/kemiller2002/praxis/releases/tag/v3.16.0"
       },
       "artifacts": [
         {
           "name": "praxis-linux-x64.tar.gz",
           "purpose": "executable",
           "platform": "linux-x64",
-          "sha256": "e6a875e8d34ed8d17f2ca72395c82dd154ff9fc1865a8ce54160e9953b29835f"
+          "sha256": "1dc197367297526e911a8e42e08854f9cc0aa96cf1733414382b1069fafe5bb2"
         },
         {
           "name": "native-checksums.txt",
           "purpose": "checksums",
           "platform": null,
-          "sha256": "20ff9684ec9b483e255e530809b47007683e4e175f1e447d10ef1da56bbe4aed"
+          "sha256": "02d5b2e66ab71b31c252871027a7e0f3534b1c96547deea102605443afeeef09"
         }
       ]
     },
@@ -54,35 +54,35 @@
       "systemId": "ordo",
       "role": "host-tool",
       "required": true,
-      "version": "1.8.2",
+      "version": "1.17.0",
       "repository": "kemiller2002/ordo",
-      "tag": "v1.8.2",
-      "commit": "907a38951a0018c493050be5ded2158d5b17733b",
+      "tag": "v1.17.0",
+      "commit": "bb43c26c106f4cbe972234636c5c67edc235c188",
       "releaseStage": "stable",
       "lifecycleState": "active",
       "distributionClass": "self-contained-native-cli",
       "executable": "ordo",
       "releaseManifest": {
         "schema": "echelon.release/v2",
-        "sha256": "272bcc4dff151d26aac5212e26421aa60026e91ced625967d186c3be10240c38"
+        "sha256": "d9ee8be3b8723582389bcade5a969827f92a89266aab801c7e6b6e3bc224e0e8"
       },
       "distribution": {
         "mechanism": "github-release",
         "package": null,
-        "url": "https://github.com/kemiller2002/ordo/releases/tag/v1.8.2"
+        "url": "https://github.com/kemiller2002/ordo/releases/tag/v1.17.0"
       },
       "artifacts": [
         {
           "name": "ordo-linux-x64.tar.gz",
           "purpose": "executable",
           "platform": "linux-x64",
-          "sha256": "dbaf419a43228289e88d5d639c36adf531832055445420074e5944c3a7ce8106"
+          "sha256": "ab9437f5b4c72e86eaf1a25bfa7dc167e548be91ff9112df65bee678c5fb1b5d"
         },
         {
           "name": "native-checksums.txt",
           "purpose": "checksums",
           "platform": null,
-          "sha256": "d9b3ff8f9e3b488ecd2b372bb95b764479e15a6b9bbe55eab55c93e9ae823b67"
+          "sha256": "01d55b4b897f729d025e8107a67e5d8d41e7aa9ed8a98bbe5954871df7911b11"
         }
       ]
     },

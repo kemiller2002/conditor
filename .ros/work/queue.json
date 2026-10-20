@@ -1114,6 +1114,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0048",
+      "title": "Qualify Praxis 3.16.0 and Ordo 1.17.0 for upgrade --current on echelon-current 1.25.0 and request Conditor 0.10.8",
+      "description": null,
+      "tags": [
+        "compatibility",
+        "release"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-20T07:48:44.000Z",
+      "updatedAt": "2026-10-20T07:59:55.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "Echelon release qualification",
+      "sourceReference": "echelon-registry echelon-current 1.25.0 (Praxis 3.16.0, Dokimos 0.6.0, Ordo 1.17.0)"
     }
   ]
 }
