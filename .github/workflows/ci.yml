@@ -51,7 +51,7 @@ jobs:
           assert folio["package"] == "@echelon-foundry/print-components", folio
           assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0"], folio
           ordo = inventory["ordo"]
-          assert ordo["qualifiedVersions"] == ["1.3.0", "1.4.0", "1.4.1", "1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2", "1.17.0"], ordo
+          assert ordo["qualifiedVersions"] == ["1.17.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2"], ordo
           PY
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility --json > "$RUNNER_TEMP/conditor-compatibility.json"
