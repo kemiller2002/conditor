@@ -829,7 +829,8 @@ let runOptIn (check: string -> bool -> unit) =
 /// `upgrade --current` moves Praxis only between versions this Conditor build
 /// qualifies (components/praxis.component.json). echelon-current 1.16.0
 /// selects 3.10.0, 1.17.0 selects 3.11.0, 1.23.0 selects 3.12.0 and 1.25.0
-/// selects 3.14.0 (skipping the unreviewed 3.13.0): each is
+/// selects 3.16.0 (skipping the unreviewed 3.13.0 and 3.15.0; 3.14.0, which
+/// Conditor 0.10.7 qualified, stays qualified): each is
 /// planned as an embedded-qualified-lifecycle transition from the 3.7.2 that
 /// 1.13.0 selected and from its predecessor, through the real planner over a resolved
 /// set shaped like the Registry's praxis entry. A version Conditor has not
@@ -891,7 +892,7 @@ let runPraxisQualification (check: string -> bool -> unit) =
             | Error errors -> Error errors
             | Ok manifest -> CurrentUpgrade.preview target manifestPath manifest resolvedPath (sha256File resolvedPath) (context home mirror) probe
 
-        for fromVersion, toVersion in [ "3.7.2", "3.10.0"; "3.10.0", "3.11.0"; "3.7.2", "3.11.0"; "3.11.0", "3.12.0"; "3.12.0", "3.14.0" ] do
+        for fromVersion, toVersion in [ "3.7.2", "3.10.0"; "3.10.0", "3.11.0"; "3.7.2", "3.11.0"; "3.11.0", "3.12.0"; "3.12.0", "3.14.0"; "3.12.0", "3.16.0"; "3.14.0", "3.16.0" ] do
             match preview fromVersion toVersion with
             | Error errors ->
                 let details = String.concat "; " errors
@@ -903,11 +904,12 @@ let runPraxisQualification (check: string -> bool -> unit) =
                      && plan.Transitions
                      |> List.map (fun item -> item.Id, item.FromVersion, item.ToVersion, item.Mode) = [ "praxis", fromVersion, toVersion, "embedded-qualified-lifecycle" ])
 
-        // 3.13.0 exists but has not been reviewed for qualification; 1.25.0
-        // moves 3.12.0 straight to 3.14.0.
-        let refused = preview "3.12.0" "3.13.0"
+        // 3.13.0 and 3.15.0 exist but have not been reviewed for
+        // qualification; 1.25.0 moves 3.12.0 straight to 3.16.0.
+        for unreviewed in [ "3.13.0"; "3.15.0" ] do
+            let refused = preview "3.12.0" unreviewed
 
-        check
-            "--current still refuses a Praxis version this Conditor build has not qualified"
-            (let refusals = match refused with | Error errors -> errors | Ok plan -> plan.Refusals
-             refusals |> List.exists (fun error -> error.Contains "'praxis' 3.12.0 -> 3.13.0 is a native change" && error.Contains "has not qualified that exact lifecycle version"))
+            check
+                $"--current still refuses Praxis {unreviewed}, which this Conditor build has not qualified"
+                (let refusals = match refused with | Error errors -> errors | Ok plan -> plan.Refusals
+                 refusals |> List.exists (fun error -> error.Contains $"'praxis' 3.12.0 -> {unreviewed} is a native change" && error.Contains "has not qualified that exact lifecycle version"))

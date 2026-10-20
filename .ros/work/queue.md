@@ -53,3 +53,4 @@
 | WI-0045 | Qualify Ordo 1.8.2 for upgrade --current (echelon-current 1.24.0) and release Conditor 0.10.6 | active |  | medium |
 | WI-0046 | Qualify Forma 0.9.0 and release Conditor 0.10.6 | complete | forma, compatibility, release | high |
 | WI-0047 | Qualify Praxis 3.14.0 for upgrade --current on echelon-current 1.25.0 | complete |  | medium |
+| WI-0048 | Qualify Praxis 3.16.0 and Ordo 1.17.0 for upgrade --current on echelon-current 1.25.0 and request Conditor 0.10.8 | ready | compatibility, release | high |
