@@ -317,3 +317,15 @@ Conditor is infrastructure that can mutate otherwise empty repositories. Treat i
 8. Keep external dependencies minimal; the F# core should prefer the BCL.
 9. Tests must cover manifest validation, deterministic planning, refusal behavior, and failure boundaries.
 10. Agent completion claims are not evidence. Use component and project verification commands.
+
+## CI observation discipline
+
+Keep incremental commits, pushes, and durable checkpoints at coherent recovery
+boundaries, but do not wait for remote CI after every push. Continue the next
+independent in-scope slice while debounced CI batches or runs. Run local checks
+when they inform implementation; inspect remote build/CI status at the final
+implementation boundary by default. Inspect it earlier only when its result
+gates the next action, protects a high-risk boundary, or is required for
+merge/release/publication. Never treat queued, cancelled, unavailable, or
+unobserved CI as passing.
+
