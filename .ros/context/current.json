@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-24T12:27:24.375Z",
+  "updatedAt": "2026-10-24T12:54:29.212Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2262,6 +2262,56 @@
       },
       "completedAt": "2026-10-24T12:27:24.375Z",
       "conclusion": "Praxis 3.20.0 qualified for upgrade --current on echelon-current 1.26.0; Conditor 0.10.9 requested; all Conditor tests pass locally"
+    },
+    {
+      "id": "WI-0050",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Scaffolding.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/WebPackageRelease.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/ComponentSchemaTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-24T12:54:29.212Z",
+      "telemetryExecutionIds": [
+        "EXE-20261024T125143014Z-0f7d273a"
+      ],
+      "latestCheckpoint": {
+        "id": "a04879e7d0ffdd3a16695370",
+        "recordedAt": "2026-10-24T12:54:21.880Z",
+        "executionId": "EXE-20261024T125143014Z-0f7d273a",
+        "repository": "conditor",
+        "branch": "claude/sd1-registry-distribution",
+        "commit": "54254aa3e87e22960aa0ede79824f3a18c95d968",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/sd1-registry-distribution",
+        "remoteCommit": "54254aa3e87e22960aa0ede79824f3a18c95d968",
+        "summary": "SD-1 fixed: scaffold npm pins come from each component's declared distribution (Registry authority web-package entry; descriptor releaseArtifacts without one). Regression tests 0db8419 fail 7 on base, pass after 54254aa; suite 1125/0; e2e bootstrap from source: init, npm install, npm ci, dotnet build/test, tsc, Playwright smoke, conditor verify all exit 0. Work was first done under a local WI-0049 that collided with upstream's WI-0049 and was discarded before integration.",
+        "nextAction": "Review draft PR; decide whether Forma 0.9.0 should be pinned to its GitHub release asset as the Registry declares (current behaviour) and whether the Registry should declare asset URLs explicitly.",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-24T12:54:29.212Z",
+      "conclusion": "Scaffold npm dependencies are rendered from declared distributions (CON-367); Folio 0.4.0 pins its Registry release asset."
     }
   ]
 }

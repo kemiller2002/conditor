@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 50,
+  "nextSeq": 51,
   "items": [
     {
       "id": "WI-0001",
@@ -1149,6 +1149,31 @@
       "attachments": [],
       "createdAt": "2026-10-24T12:26:35.189Z",
       "updatedAt": "2026-10-24T12:27:24.375Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0050",
+      "title": "SD-1: scaffold npm dependencies rendered from each component's declared Registry distribution (Folio 0.4.0 release tarball, not an npm ref)",
+      "description": null,
+      "tags": [
+        "scaffold",
+        "registry",
+        "defect"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-24T12:51:36.181Z",
+      "updatedAt": "2026-10-24T12:54:29.212Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
