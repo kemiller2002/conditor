@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-20T07:59:55.000Z",
+  "updatedAt": "2026-10-24T12:26:49.888Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2220,6 +2220,17 @@
       },
       "completedAt": "2026-10-20T07:59:55.000Z",
       "conclusion": "Praxis 3.16.0 and Ordo 1.17.0 qualified for upgrade --current on echelon-current 1.25.0; Conditor 0.10.8 requested."
+    },
+    {
+      "id": "WI-0049",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-24T12:26:49.888Z",
+      "telemetryExecutionIds": [
+        "EXE-20261024T122650210Z-c63fb81a"
+      ]
     }
   ]
 }
