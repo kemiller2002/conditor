@@ -110,6 +110,7 @@ module ComponentDescriptors =
               "distribution"
               "package"
               "historicalPackages"
+              "releaseArtifacts"
               "defaultVersion"
               "qualifiedVersions"
               "qualifiedRange"
@@ -311,6 +312,53 @@ module ComponentDescriptors =
             if errors.Count = 0 then Ok(List.ofSeq entries) else Error(List.ofSeq errors)
         | Some _ -> Error [ "'historicalPackages' must be an array." ]
 
+    /// One `releaseArtifacts` entry: a qualified version and the release
+    /// asset tarball that distributes it.
+    let private parseReleaseArtifact (entry: JsonElement) : Result<string * string, string list> =
+        let scoped (result: Result<string, string>) =
+            result |> Result.mapError (fun error -> error.Replace("'version'", "'releaseArtifacts.version'").Replace("'url'", "'releaseArtifacts.url'"))
+
+        if entry.ValueKind <> JsonValueKind.Object then
+            Error [ "'releaseArtifacts' entries must be objects." ]
+        else
+            let unknown =
+                entry.EnumerateObject()
+                |> Seq.map _.Name
+                |> Seq.filter (fun name -> name <> "version" && name <> "url")
+                |> Seq.map (fun name -> $"'releaseArtifacts' entries do not support property '{name}'.")
+                |> List.ofSeq
+
+            match unknown, scoped (requiredString "version" entry), scoped (requiredString "url" entry) with
+            | [], Ok version, Ok url when url.StartsWith("https://", StringComparison.Ordinal) && url.EndsWith(".tgz", StringComparison.Ordinal) ->
+                Ok(version, url)
+            | [], Ok version, Ok url ->
+                Error [ $"'releaseArtifacts.url' for version '{version}' must be an https package tarball (.tgz) URL, not '{url}'." ]
+            | _, version, url ->
+                Error(unknown @ ([ version; url ] |> List.choose (function Error error -> Some error | Ok _ -> None)))
+
+    /// Qualified versions an npm binding distributes as a release asset
+    /// tarball instead of through the npm registry, by version. Without a
+    /// Registry authority these are the declared distributions the scaffold
+    /// pins (CON-367); every other version is an npm registry version.
+    let private parseReleaseArtifacts (element: JsonElement) : Result<Map<string, string>, string list> =
+        match tryProperty "releaseArtifacts" element with
+        | None -> Ok Map.empty
+        | Some value when value.ValueKind = JsonValueKind.Array ->
+            let parsed = value.EnumerateArray() |> Seq.map parseReleaseArtifact |> List.ofSeq
+            let errors = parsed |> List.collect (function Error errors -> errors | Ok _ -> [])
+            let entries = parsed |> List.choose (function Ok entry -> Some entry | Error _ -> None)
+
+            let duplicates =
+                entries
+                |> List.countBy fst
+                |> List.filter (snd >> (<) 1)
+                |> List.map (fun (version, _) -> $"'releaseArtifacts' declares version '{version}' more than once.")
+
+            match errors @ duplicates with
+            | [] -> Ok(Map.ofList entries)
+            | problems -> Error problems
+        | Some _ -> Error [ "'releaseArtifacts' must be an array." ]
+
     /// Checks that historical package identities partition a subset of the
     /// qualified versions, never repeat the current identity, and leave the
     /// default version on the current identity.
@@ -445,6 +493,13 @@ module ComponentDescriptors =
                     historicalErrors |> List.iter errors.Add
                     []
 
+            let releaseArtifacts =
+                match parseReleaseArtifacts root with
+                | Ok value -> value
+                | Error artifactErrors ->
+                    artifactErrors |> List.iter errors.Add
+                    Map.empty
+
             let binding =
                 match parseBinding root with
                 | Ok value -> value
@@ -552,6 +607,13 @@ module ComponentDescriptors =
             validateHistoricalPackages id packageName defaultVersion qualifiedVersions historicalPackages
             |> List.iter errors.Add
 
+            for version in releaseArtifacts |> Map.keys do
+                if not (qualifiedVersions.Contains version) then
+                    errors.Add $"'releaseArtifacts' names version '{version}', which is not in qualifiedVersions for '{id}'."
+
+            if not releaseArtifacts.IsEmpty && distribution <> NpmPackage then
+                errors.Add $"Component '{id}' declares releaseArtifacts, which only an npm application binding may declare."
+
             match distribution with
             | HostTool ->
                 if lifecycleSource.IsSome then
@@ -594,6 +656,7 @@ module ComponentDescriptors =
                           Distribution = distribution
                           Package = packageName
                           HistoricalPackages = historicalPackages
+                          ReleaseArtifacts = releaseArtifacts
                           LifecycleSource = lifecycleSource
                           ApplicationBinding = binding
                           Command = command

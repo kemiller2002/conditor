@@ -268,6 +268,41 @@ let run (check: string -> bool -> unit) =
     check "loader accepts repository-relative installationMarkers" (loaderAccepts validMarkers)
     check "component schema accepts repository-relative installationMarkers" (schemaAccepts validMarkers)
 
+    // CON-367: releaseArtifacts declare which qualified versions of an npm
+    // binding are distributed as a release asset tarball.
+    let withArtifacts (fileName: string) (artifacts: string) =
+        mutateDescriptor fileName (fun d -> d["releaseArtifacts"] <- JsonNode.Parse artifacts)
+
+    let folioAsset = "https://github.com/kemiller2002/folio/releases/download/v0.4.0/echelon-foundry-print-components-0.4.0.tgz"
+
+    check "the built-in Folio descriptor declares its release-asset distributions"
+        (Registry.tryFind "folio"
+         |> Option.exists (fun folio -> folio.ReleaseArtifacts |> Map.tryFind "0.4.0" = Some folioAsset && folio.ReleaseArtifacts.Count = 2))
+
+    check "npm-registry-distributed Limen and Forma declare no release-asset distribution"
+        ([ "limen"; "forma" ] |> List.forall (fun id -> Registry.tryFind id |> Option.exists _.ReleaseArtifacts.IsEmpty))
+
+    for name, text, schemaRejects in
+        [ "a releaseArtifacts version that is not qualified",
+          withArtifacts "folio.component.json" $"""[{{"version":"9.9.9","url":"{folioAsset}"}}]""",
+          false
+          "a releaseArtifacts version declared twice",
+          withArtifacts "folio.component.json" $"""[{{"version":"0.4.0","url":"{folioAsset}"}},{{"version":"0.4.0","url":"{folioAsset}"}}]""",
+          false
+          "a releaseArtifacts url that is not an https tarball",
+          withArtifacts "folio.component.json" """[{"version":"0.4.0","url":"http://example.org/folio.zip"}]""",
+          true
+          "a releaseArtifacts entry with an unknown property",
+          withArtifacts "folio.component.json" $"""[{{"version":"0.4.0","url":"{folioAsset}","sha":"x"}}]""",
+          true
+          "releaseArtifacts on a component that is not an npm binding",
+          withArtifacts "praxis.component.json" """[{"version":"3.6.0","url":"https://example.org/praxis-3.6.0.tgz"}]""",
+          false ] do
+        check $"loader rejects {name}" (not (loaderAccepts text))
+
+        if schemaRejects then
+            check $"component schema rejects {name}" (not (schemaAccepts text))
+
     for id in [ "communication-engineering"; "visual-engineering" ] do
         check
             $"{id} declares where its repository installation lives"

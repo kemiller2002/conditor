@@ -801,3 +801,21 @@ was reported the same way.
     `unavailable`. A digest that is not the plan SHALL be refused.
   - **Evidence:** each registration SHALL cite the original install receipt
     and be recorded in the ledger with `trigger: backfill`.
+
+## Scaffold dependency distribution (SD-1)
+
+- **CON-367** A scaffold SHALL pin every npm-bound component in `package.json`
+  through the distribution declared for the exact release it binds, never
+  through a component-specific constant:
+  - under a declared Registry authority, the digest-verified resolved-set
+    entry's `distribution.mechanism`: `npm` pins the exact version; a
+    `github-release` pins
+    `https://github.com/<repository>/releases/download/<tag>/<artifact>` of the
+    entry's one `package` artifact;
+  - a selection that cannot be pinned exactly (no `web-package` entry, an
+    unsupported mechanism, `npm` without an npmjs.org tarball, or a version or
+    package identity that disagrees with the binding) SHALL be refused before
+    mutation;
+  - without an authority, the embedded descriptor's `releaseArtifacts` SHALL
+    name the versions distributed as release-asset tarballs; every other
+    version is pinned by its exact npm registry version.
