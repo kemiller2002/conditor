@@ -50,46 +50,77 @@ module Scaffolding =
 
                     binding, ComponentDefinition.packageFor version definition, version)))
 
-    [<Literal>]
-    let private Folio030Release =
-        "https://github.com/kemiller2002/folio/releases/download/v0.3.0/echelon-foundry-print-components-0.3.0.tgz"
+    /// Where the scaffold's npm dependency pins come from (CON-367).
+    type NpmDistributions =
+        /// No Registry authority: each embedded descriptor's declared
+        /// distribution (its `releaseArtifacts`, otherwise the npm registry).
+        | EmbeddedCatalog
+        /// The declared Registry authority's `web-package` selections, by
+        /// component id, each with its release or why it cannot be pinned.
+        | RegistryDistributions of Map<string, Result<WebPackageRelease, string list>>
 
-    let private dependencySpecifier package version =
-        if package = "@echelon-foundry/print-components" && version = "0.3.0" then
-            Folio030Release
-        else
-            version
+    /// The package.json specifier that pins `version` of an npm-bound
+    /// component through its declared distribution: an npm registry release
+    /// by exact version, a release asset by its exact tarball URL. Under a
+    /// Registry authority the authority's declaration is the only source, and
+    /// anything Conditor cannot pin exactly is refused rather than guessed.
+    let private npmSpecifier (distributions: NpmDistributions) (definition: ComponentDefinition) (package: string) (version: string) =
+        match distributions with
+        | EmbeddedCatalog -> Ok(definition.ReleaseArtifacts |> Map.tryFind version |> Option.defaultValue version)
+        | RegistryDistributions selections ->
+            match selections |> Map.tryFind definition.Id with
+            | None ->
+                Error
+                    [ $"Scaffold dependency '{definition.Id}'@{version} has no {WebPackageRelease.DistributionClass} distribution in the declared Registry authority; Conditor will not guess how to pin it." ]
+            | Some(Error errors) -> Error errors
+            | Some(Ok release) when release.Version <> version ->
+                Error
+                    [ $"Registry selection '{definition.Id}' is {release.Version}, but the scaffold binds {version}; Conditor will not pin a release the authority did not select." ]
+            | Some(Ok release) when release.Package <> package ->
+                Error
+                    [ $"Registry selection '{definition.Id}'@{version} distributes package '{release.Package}', but Conditor binds '{definition.Id}' {version} as '{package}'; Conditor will not guess which package identity to pin." ]
+            | Some(Ok release) -> Ok release.Specifier
 
     let private renderDependencies dependencies =
         match dependencies with
         | [] -> "  }"
         | values ->
             values
-            |> List.mapi (fun index (package, version) ->
+            |> List.mapi (fun index (package, specifier) ->
                 let comma = if index = values.Length - 1 then String.Empty else ","
                 let encodedPackage = jsonString package
-                let encodedVersion = dependencySpecifier package version |> jsonString
-                $"    {encodedPackage}: {encodedVersion}{comma}")
+                let encodedSpecifier = jsonString specifier
+                $"    {encodedPackage}: {encodedSpecifier}{comma}")
             |> fun lines -> String.concat "\n" lines + "\n  }"
+
+    let private collectResults (results: Result<'T, string list> list) : Result<'T list, string list> =
+        match results |> List.collect (function Error errors -> errors | Ok _ -> []) with
+        | [] -> Ok(results |> List.choose (function Ok value -> Some value | Error _ -> None))
+        | errors -> Error errors
 
     /// The Playwright release the browser suite pins exactly (the version
     /// Signal pins). The pin fixes the Chromium build CI caches.
     [<Literal>]
     let PlaywrightVersion = "1.63.0"
 
-    let private packageJson projectName manifest =
-        let dependencies =
-            resolvedBindings manifest
-            |> List.choose (fun (binding, package, version) ->
-                match binding with
-                | NpmDependency -> Some(package, version)
-                | NugetReference -> None)
-            |> List.sortBy fst
-
-        let dependencyBody = renderDependencies dependencies
+    let private packageJson projectName (distributions: NpmDistributions) (manifest: ProjectManifest) =
         let encodedName = jsonString (packageSlug projectName)
 
-        $"{{\n  \"name\": {encodedName},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\",\n    \"test:browser\": \"playwright test\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"@playwright/test\": \"{PlaywrightVersion}\",\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n"
+        manifest.Components
+        |> List.choose (fun request ->
+            Registry.tryFind request.Id
+            |> Option.filter (fun definition -> definition.ApplicationBinding = Some NpmDependency)
+            |> Option.map (fun definition ->
+                let version = request.Version |> Option.defaultValue definition.DefaultVersion
+                let package = ComponentDefinition.packageFor version definition
+
+                npmSpecifier distributions definition package version
+                |> Result.map (fun specifier -> package, specifier)))
+        |> collectResults
+        |> Result.map (fun dependencies ->
+            let dependencyBody = dependencies |> List.sortBy fst |> renderDependencies
+
+            $"{{\n  \"name\": {encodedName},\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {{\n    \"check\": \"tsc --noEmit\",\n    \"test:browser\": \"playwright test\"\n  }},\n  \"dependencies\": {{\n{dependencyBody},\n  \"devDependencies\": {{\n    \"@playwright/test\": \"{PlaywrightVersion}\",\n    \"typescript\": \"5.9.3\"\n  }}\n}}\n")
 
     /// The Registry system whose NuGet release-asset feed carries the F# Limen
     /// packages, EchelonFoundry.Limen.Routing among them (Limen LCP-110).
@@ -629,9 +660,14 @@ pending (`ECHELON-FND-ROUTING-005`), which is not a failure.
         addCapability "aegis" (fun node -> node["boundaryManifest"] <- JsonValue.Create "aegis-boundaries.json")
         addCapability "forma" ignore
 
+        // The frozen Indy Init environment's foundations record Folio 0.3.0's
+        // release asset; later Praxis foundations schemas forbid the key.
         addCapability "folio" (fun node ->
             match resolvedVersion "folio" manifest with
-            | Some "0.3.0" -> node["releaseArtifact"] <- JsonValue.Create Folio030Release
+            | Some("0.3.0" as version) ->
+                Registry.tryFind "folio"
+                |> Option.bind (fun definition -> definition.ReleaseArtifacts |> Map.tryFind version)
+                |> Option.iter (fun url -> node["releaseArtifact"] <- JsonValue.Create url)
             | _ -> ())
 
         addCapability "limen" ignore
@@ -1680,7 +1716,7 @@ same change.
     let private webIgnores =
         "# Build, test, package and browser outputs (Conditor fsharp-limen-web scaffold)\nbin/\nobj/\ndist/\nTestResults/\nnode_modules/\ntest-results/\nplaywright-report/\n"
 
-    let private webFiles (projectName: string) (manifest: ProjectManifest) (limen: string) =
+    let private webFiles (projectName: string) (manifest: ProjectManifest) (limen: string) (packageManifest: string) =
         let ns = identifier projectName
 
         let render =
@@ -1712,7 +1748,7 @@ same change.
           "aegis-boundaries.json", aegisBoundaryManifest projectName
           RouteInventoryPath, routeInventory
           "requirements/URL-ADDRESSABLE-STATE.md", webUrlRequirements
-          "package.json", packageJson projectName manifest
+          "package.json", packageManifest
           "tsconfig.json", webTsconfig
           "limen.config.json", webLimenConfig
           "src/kernel/bootstrap.ts", kernelBootstrap limen
@@ -1729,7 +1765,7 @@ same change.
           ".gitignore", webIgnores ]
         @ ordoBaselineFiles webBaselineLocations manifest
 
-    let private desiredFiles (manifest: ProjectManifest) (scaffold: ScaffoldRequest) =
+    let private desiredFiles (distributions: NpmDistributions) (manifest: ProjectManifest) (scaffold: ScaffoldRequest) =
         let projectName =
             scaffold.Name
             |> Option.filter (String.IsNullOrWhiteSpace >> not)
@@ -1739,11 +1775,13 @@ same change.
         | "fsharp-limen-web", None ->
             Error [ "Scaffold 'fsharp-limen-web' requires an embedded Limen descriptor to name the kernel's protocol package." ]
         | "fsharp-limen-web", Some limen ->
-            let files = webFiles projectName manifest limen
+            packageJson projectName distributions manifest
+            |> Result.map (fun packageManifest ->
+                let files = webFiles projectName manifest limen packageManifest
 
-            match agentEntryFile manifest with
-            | Some agentFile -> Ok(agentFile :: files)
-            | None -> Ok files
+                match agentEntryFile manifest with
+                | Some agentFile -> agentFile :: files
+                | None -> files)
         | "fsharp-nuget-library", _ ->
             libraryFiles projectName manifest
             |> Result.map (fun files ->
@@ -1804,11 +1842,15 @@ same change.
     /// recreates nor compares them, and keeps ensuring only its bounded
     /// managed regions. Before that, an existing file with other content is
     /// refused rather than overwritten.
-    let plan target (manifest: ProjectManifest) =
+    ///
+    /// `distributions` is where npm dependency pins come from: the declared
+    /// Registry authority's distributions when there is one, otherwise the
+    /// embedded descriptors' (CON-367).
+    let plan target (distributions: NpmDistributions) (manifest: ProjectManifest) =
         match manifest.Scaffold with
         | None -> Ok []
         | Some scaffold ->
-            match desiredFiles manifest scaffold with
+            match desiredFiles distributions manifest scaffold with
             | Error errors -> Error errors
             | Ok desired ->
                 let errors = ResizeArray<string>()

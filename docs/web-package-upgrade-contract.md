@@ -27,6 +27,25 @@ same package name the Registry names (historical renames such as
 `@echelon-foundry/typescript-wasm-kernel` → `@echelon-foundry/limen` are
 resolved through the descriptor's `historicalPackages`).
 
+### The scaffold seeds the same pin (CON-367)
+
+A scaffold (`fsharp-limen-web`) writes the first pin with the same rule, read
+by the same code (`src/Conditor.Core/WebPackageRelease.fs`): under a declared
+`registryAuthority`, each npm-bound component's `package.json` specifier is
+the one its digest-verified resolved-set entry declares in the table above
+(echelon-current 1.25.0: Limen 0.9.0 `0.9.0`; Forma 0.9.0 and Folio 0.4.0
+their GitHub release assets). A selection Conditor cannot pin that way (no
+web-package entry, an unsupported mechanism, npm without an npmjs.org
+tarball, a version or package identity that disagrees with the binding) is
+refused before mutation. Without an authority, the embedded descriptor's
+`releaseArtifacts` name the release-asset versions (Folio 0.3.0 and 0.4.0);
+every other version is its exact npm registry version.
+
+The Registry declares a `github-release` distribution by its release tag
+page (`distribution.url`), not by an asset URL. The asset URL is derived from
+the entry's `repository`, `tag` and its one `package` artifact `name`, as the
+upgrade contract, the NuGet feed and the offline bundle already derive it.
+
 The **source** is the version `conditor.json` declares, which the Conditor lock
 already proves. When the repository records Registry authority, that authority
 file must still match its recorded digest and must select the same source

@@ -44,6 +44,19 @@
         }
       }
     },
+    "releaseArtifacts": {
+      "type": "array",
+      "description": "npm application bindings only (CON-367): qualified versions distributed as a release asset tarball rather than through the npm registry. Without a Registry authority the scaffold pins exactly this URL; every other version is pinned by its exact npm registry version. A declared Registry authority's distribution supersedes these.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["version", "url"],
+        "properties": {
+          "version": { "$ref": "#/$defs/nonBlankString" },
+          "url": { "type": "string", "pattern": "^https://\\S+\\.tgz$" }
+        }
+      }
+    },
     "defaultVersion": { "$ref": "#/$defs/nonBlankString" },
     "qualifiedVersions": {
       "type": "array",

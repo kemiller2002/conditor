@@ -53,11 +53,31 @@ let private release rid (id: string, version: string, role: FixtureRole) : JsonO
         artifact["name"] <- node $"{id}-{rid}.tar.gz"
         artifact["purpose"] <- node "executable"
         artifact["platform"] <- node rid
-    | WebBinding
+    | WebBinding ->
+        // A pinnable npm release, as the live Registry declares one: the
+        // package identity of this version, its npmjs.org tarball and the
+        // release manifest digest (CON-367).
+        let package =
+            Registry.tryFind id
+            |> Option.map (ComponentDefinition.packageFor version)
+            |> Option.defaultValue id
+
+        let stem = package.Split('/') |> Array.last
+        item["role"] <- node "project-binding"
+        item["distributionClass"] <- node "web-package"
+        distribution["mechanism"] <- node "npm"
+        distribution["package"] <- node package
+        distribution["url"] <- node $"https://registry.npmjs.org/{package}/-/{stem}-{version}.tgz"
+        let manifest = JsonObject()
+        manifest["schema"] <- node "echelon.release/v2"
+        manifest["sha256"] <- node (String.replicate 64 "b")
+        item["releaseManifest"] <- manifest
+        artifact["name"] <- node $"{id}-{version}.tgz"
+        artifact["purpose"] <- node "package"
     | NugetBinding ->
         item["role"] <- node "project-binding"
-        item["distributionClass"] <- node (if role = WebBinding then "web-package" else "nuget-library")
-        distribution["mechanism"] <- node (if role = WebBinding then "npm" else "nuget")
+        item["distributionClass"] <- node "nuget-library"
+        distribution["mechanism"] <- node "nuget"
         distribution["package"] <- node id
         artifact["name"] <- node $"{id}-{version}.pkg"
         artifact["purpose"] <- node "package"

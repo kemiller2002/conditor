@@ -91,7 +91,7 @@ module Upgrade =
         match manifest.Scaffold with
         | None -> Ok()
         | Some _ ->
-            match Scaffolding.plan target manifest with
+            match Planner.scaffoldPlan target manifest with
             | Error errors -> Error errors
             | Ok changes ->
                 let materialChanges =

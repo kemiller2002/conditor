@@ -352,7 +352,7 @@ let runLimenRouting (check: string -> bool -> unit) =
                      && Scaffolding.limenRoutingVersion (withFeed "latest") = None
                      && Scaffolding.limenRoutingVersion manifest = None)
 
-                match Scaffolding.plan target (withFeed "0.9.0") with
+                match Scaffolding.plan target Scaffolding.EmbeddedCatalog (withFeed "0.9.0") with
                 | Error errors -> check $"limen-routing scaffold plans: {joined errors}" false
                 | Ok planned ->
                     let files = Map.ofList planned
@@ -562,7 +562,17 @@ let runRegistryDistribution (check: string -> bool -> unit) =
             | Ok _ -> check "a scaffold binding with an unsupported Registry distribution must be refused" false
             | Error errors ->
                 check "a scaffold binding with an unsupported Registry distribution is refused before mutation, naming it"
-                    (errors |> List.exists (fun error -> error.Contains("folio", StringComparison.Ordinal) && error.Contains("'container'", StringComparison.Ordinal))))
+                    (errors |> List.exists (fun error -> error.Contains("'folio'", StringComparison.Ordinal))))
+
+        withTarget (fun target ->
+            let unlocated =
+                set |> redistribute "folio" """{"mechanism":"npm","package":"@echelon-foundry/print-components","url":null}"""
+
+            match planUnderAuthority target unlocated rehearsalComponents with
+            | Ok _ -> check "an npm distribution with no npmjs.org tarball must be refused" false
+            | Error errors ->
+                check "an npm distribution with no npmjs.org tarball is refused, not pinned by a guessed version"
+                    (errors |> List.exists (fun error -> error.Contains("'folio'@0.4.0", StringComparison.Ordinal) && error.Contains("npmjs.org", StringComparison.Ordinal))))
 
         withTarget (fun target ->
             let renamed =
