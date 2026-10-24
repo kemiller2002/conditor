@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-20T07:59:55.000Z",
+  "updatedAt": "2026-10-24T12:27:24.375Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2220,6 +2220,48 @@
       },
       "completedAt": "2026-10-20T07:59:55.000Z",
       "conclusion": "Praxis 3.16.0 and Ordo 1.17.0 qualified for upgrade --current on echelon-current 1.25.0; Conditor 0.10.8 requested."
+    },
+    {
+      "id": "WI-0049",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/praxis.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-24T12:27:24.375Z",
+      "telemetryExecutionIds": [
+        "EXE-20261024T122650210Z-c63fb81a"
+      ],
+      "latestCheckpoint": {
+        "id": "704503fae8b0f947837d8333",
+        "recordedAt": "2026-10-24T12:27:12.279Z",
+        "executionId": "EXE-20261024T122650210Z-c63fb81a",
+        "repository": "conditor",
+        "branch": "claude/echelon-constraint-driven-program-mq2d6o",
+        "commit": "65fc48ed581fe161284c67ef9af981b1d18ca611",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/echelon-constraint-driven-program-mq2d6o",
+        "remoteCommit": "65fc48ed581fe161284c67ef9af981b1d18ca611",
+        "summary": "Praxis 3.20.0 qualified; 0.10.9 requested; pushed f4d17cf",
+        "nextAction": "Merge the PR so the orchestrator releases 0.10.9, then merge the Registry 1.26.0 move",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-24T12:27:24.375Z",
+      "conclusion": "Praxis 3.20.0 qualified for upgrade --current on echelon-current 1.26.0; Conditor 0.10.9 requested; all Conditor tests pass locally"
     }
   ]
 }

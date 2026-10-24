@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 48,
+  "nextSeq": 50,
   "items": [
     {
       "id": "WI-0001",
@@ -1138,6 +1138,27 @@
       },
       "source": "Echelon release qualification",
       "sourceReference": "echelon-registry echelon-current 1.25.0 (Praxis 3.16.0, Dokimos 0.6.0, Ordo 1.17.0)"
+    },
+    {
+      "id": "WI-0049",
+      "title": "Qualify Praxis 3.20.0 for upgrade --current on echelon-current 1.26.0 and request Conditor 0.10.9",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-24T12:26:35.189Z",
+      "updatedAt": "2026-10-24T12:27:24.375Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }
