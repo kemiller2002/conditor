@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 53,
+  "nextSeq": 54,
   "items": [
     {
       "id": "WI-0001",
@@ -1228,6 +1228,27 @@
         "provider": "anthropic",
         "model": "unknown",
         "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0053",
+      "title": "Verify Conditor SD-1 with two clean Causa bootstraps using the latest stable compatible release",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-25T12:52:01.859Z",
+      "updatedAt": "2026-10-25T12:52:12.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "openai/codex",
+        "provider": "openai",
+        "model": "unknown",
+        "runtime": "codex"
       },
       "source": "manual",
       "sourceReference": null
