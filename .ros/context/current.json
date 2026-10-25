@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-24T12:54:29.212Z",
+  "updatedAt": "2026-10-25T04:38:57.182Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2312,6 +2312,93 @@
       },
       "completedAt": "2026-10-24T12:54:29.212Z",
       "conclusion": "Scaffold npm dependencies are rendered from declared distributions (CON-367); Folio 0.4.0 pins its Registry release asset."
+    },
+    {
+      "id": "WI-0051",
+      "type": "default",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "implementation",
+          "path": "research/decisions/DF-CON-2026-A007--percepta-semantic-cli-pinned-by-registry-authority.md"
+        }
+      ],
+      "updatedAt": "2026-10-25T04:33:36.681Z",
+      "telemetryExecutionIds": [
+        "EXE-20261025T013547873Z-404de468"
+      ],
+      "latestCheckpoint": {
+        "id": "a357db713670d924c4c029bf",
+        "recordedAt": "2026-10-25T04:33:35.079Z",
+        "executionId": "EXE-20261025T013547873Z-404de468",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.27.0",
+        "commit": "0c824e20dde1a71096af65efb423b4d25777761b",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.27.0",
+        "remoteCommit": "0c824e20dde1a71096af65efb423b4d25777761b",
+        "summary": "echelon-current 1.27.0 qualification tests, CI jobs, DF-CON-2026-A007 and 0.10.11 request pushed",
+        "nextAction": "PR CI green, merge, confirm 0.10.11 published",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-25T04:33:36.681Z",
+      "conclusion": "1.27.0 qualified by tests and CI; no code change needed"
+    },
+    {
+      "id": "WI-0052",
+      "type": "default",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-25T04:38:57.182Z",
+      "telemetryExecutionIds": [
+        "EXE-20261025T043841240Z-5819dcea"
+      ],
+      "latestCheckpoint": {
+        "id": "1fc58aaef0ec915a1f5344e5",
+        "recordedAt": "2026-10-25T04:38:55.867Z",
+        "executionId": "EXE-20261025T043841240Z-5819dcea",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.27.0",
+        "commit": "29c548c957f6be825ad2fa74abeb515290e9e4be",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.27.0",
+        "remoteCommit": "29c548c957f6be825ad2fa74abeb515290e9e4be",
+        "summary": "test string fixed; CI annotations added",
+        "nextAction": "CI green, merge PR #109",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-25T04:38:57.182Z"
     }
   ]
 }

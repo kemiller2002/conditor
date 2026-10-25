@@ -4,7 +4,8 @@ module EchelonCurrent
 /// The linux-x64 selection of echelon-current 1.17.0 (echelon-registry main
 /// 50c6c96, channels/echelon-current/linux-x64.json, sha256 94b37048...),
 /// with Praxis moved to the 3.20.0 that echelon-current 1.26.0 selects
-/// (linux-x64 set sha256 b0bc2e78...), for
+/// (linux-x64 set sha256 b0bc2e78...; 1.27.0, sha256 7cfb3e2b..., moves only
+/// the undeclared Dokimos 0.6.0 -> 0.7.0, so this list is unchanged), for
 /// every system that Conditor carries a component descriptor for. Dokimos,
 /// Strata, Arca, Fides, Summa Contracts and Limen F# are selected too but have
 /// no Conditor descriptor. When the channel moves, update this list in the

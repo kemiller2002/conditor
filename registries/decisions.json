@@ -269,5 +269,51 @@
     "title": "Workstation registration defaults to the ledger-owned, verified ~/.local/bin/praxis; explicit configuration wins; backfill is planned and authorized",
     "updated": "2026-10-13",
     "version": "1.0.0"
+  },
+  {
+    "confidence": "high",
+    "created": "2026-10-25",
+    "decision_type": "architecture",
+    "id": "DF-CON-2026-A007",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A007--percepta-semantic-cli-pinned-by-registry-authority.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261025T013547873Z-404de468": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "unknown",
+            "model": "claude-opus-5-5",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-10-25T04:33:03.000Z",
+          "operations": [
+            "created"
+          ],
+          "reason": "Decide how the kickoff set pins the Percepta semantic CLI under Conditor's component model (Indy-init OD-INDY-2, OD-INDY-8)"
+        }
+      }
+    },
+    "related_documents": [
+      "research/decisions/DF-CON-2026-A005--workstation-host-tools-from-the-registry.md",
+      "docs/decisions/0001-registry-version-authority.md",
+      "docs/indy-day-of.md"
+    ],
+    "research_area": "workstation-bootstrap",
+    "status": "accepted",
+    "tags": [
+      "decision",
+      "workstation",
+      "registry",
+      "percepta",
+      "dokimos",
+      "indy-init"
+    ],
+    "title": "The Percepta semantic CLI is pinned by the Registry authority and installed by the workstation, not declared as a conditor.json component",
+    "updated": "2026-10-25",
+    "version": "1.0.0"
   }
 ]

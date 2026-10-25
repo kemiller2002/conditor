@@ -1214,6 +1214,7 @@ LibraryScaffoldTests.run check
 WebScaffoldTests.run check
 WebScaffoldTests.runLimenRouting check
 WebScaffoldTests.runRegistryDistribution check
+WebScaffoldTests.runKickoffSet127 check
 BranchProtectionTests.run check
 RepositoryCreationTests.run check
 SupervisorTests.run check
