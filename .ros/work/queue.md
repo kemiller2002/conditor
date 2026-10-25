@@ -58,3 +58,4 @@
 | WI-0050 | SD-1: scaffold npm dependencies rendered from each component's declared Registry distribution (Folio 0.4.0 release tarball, not an npm ref) | complete | scaffold, registry, defect | high |
 | WI-0051 | Qualify echelon-current 1.27.0 (Dokimos 0.7.0, Percepta semantic CLI 0.1.0): workstation installs both from the set; the semantic CLI is pinned by the Registry authority, not as a conditor.json component; request Conditor 0.10.11 | complete | compatibility, release | high |
 | WI-0052 | WI-0051 follow-up: fix the Dokimos-declared kickoff manifest string in runKickoffSet127; raise failing Conditor checks as CI error annotations | complete | compatibility | high |
+| WI-0053 | Verify Conditor SD-1 with two clean Causa bootstraps using the latest stable compatible release | complete |  | medium |

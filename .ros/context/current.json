@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-25T04:38:57.182Z",
+  "updatedAt": "2026-10-25T13:04:32.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2399,6 +2399,51 @@
         }
       },
       "completedAt": "2026-10-25T04:38:57.182Z"
+    },
+    {
+      "id": "WI-0053",
+      "type": "maintenance",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "docs/evidence/2026-10-25-conditor-sd1-clean-bootstrap-verification.md"
+        },
+        {
+          "type": "tests",
+          "path": "docs/evidence/2026-10-25-conditor-sd1-clean-bootstrap-verification.md"
+        },
+        {
+          "type": "documentation",
+          "path": "docs/evidence/2026-10-25-conditor-sd1-clean-bootstrap-verification.md"
+        }
+      ],
+      "updatedAt": "2026-10-25T13:04:32.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261025T125213224Z-983b6348"
+      ],
+      "latestCheckpoint": {
+        "id": "effc4c4129c154d95c913838",
+        "recordedAt": "2026-10-25T13:04:05.000Z",
+        "executionId": "EXE-20261025T125213224Z-983b6348",
+        "repository": "conditor",
+        "branch": "codex/sd1-clean-bootstrap-verification",
+        "commit": "2eb970fbb51aee32b57e778e5720a0868e59d826",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "codex/sd1-clean-bootstrap-verification",
+        "remoteCommit": "2eb970fbb51aee32b57e778e5720a0868e59d826",
+        "summary": "Conditor 0.10.11 passed two clean Causa bootstraps; reproducibility was established; evidence and checkpoint state were committed and pushed",
+        "nextAction": "Complete WI-0053, rebuild registries, validate, and push the final Praxis state",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-25T13:04:32.000Z"
     }
   ]
 }
