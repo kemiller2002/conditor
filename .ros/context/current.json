@@ -2368,7 +2368,27 @@
       "updatedAt": "2026-10-25T04:38:40.844Z",
       "telemetryExecutionIds": [
         "EXE-20261025T043841240Z-5819dcea"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "8b3e6a6737033a4a085fbafe",
+        "recordedAt": "2026-10-25T04:38:43.881Z",
+        "executionId": "EXE-20261025T043841240Z-5819dcea",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.27.0",
+        "commit": "e4eeba5f145a3491a95a154fe896cc5b53e37d95",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.27.0",
+        "remoteCommit": "e4eeba5f145a3491a95a154fe896cc5b53e37d95",
+        "summary": "test string fixed; CI annotations added",
+        "nextAction": "CI green, merge PR #109",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
