@@ -1194,10 +1194,10 @@
         "release"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-25T01:35:42.856Z",
-      "updatedAt": "2026-10-25T01:35:47.203Z",
+      "updatedAt": "2026-10-25T04:33:36.681Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
