@@ -2409,7 +2409,27 @@
       "updatedAt": "2026-10-25T12:52:13.000Z",
       "telemetryExecutionIds": [
         "EXE-20261025T125213224Z-983b6348"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "5b0b88dea1ab3e7e029d5e2e",
+        "recordedAt": "2026-10-25T13:03:36.000Z",
+        "executionId": "EXE-20261025T125213224Z-983b6348",
+        "repository": "conditor",
+        "branch": "codex/sd1-clean-bootstrap-verification",
+        "commit": "5c91dc11b1b001a70971077be4deec0df6962c2a",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "codex/sd1-clean-bootstrap-verification",
+        "remoteCommit": "5c91dc11b1b001a70971077be4deec0df6962c2a",
+        "summary": "Conditor 0.10.11 passed two clean Causa bootstraps; reproducibility was established; evidence was committed and pushed at 5c91dc1",
+        "nextAction": "Complete WI-0053, rebuild registries, validate, and push the final Praxis state",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
