@@ -607,6 +607,12 @@ jobs:
           # 3.16.0 -> 3.20.0, vendored for the same REG-RU-007 reason.
           SET_126_PATH: tests/fixtures/registry/echelon-current-1.26.0-linux-x64.json
           SET_126_SHA256: b0bc2e78de72382b3ccef216cc89ab886586dd5619391a5ee9939c8cbb601c90
+          # 1.27.0 is the Registry's prepared cut (echelon-registry WI-0062):
+          # only Dokimos 0.6.0 -> 0.7.0, plus the capabilities record of the
+          # verified-completion-attested pairing. This repository does not
+          # declare Dokimos, so no declared component moves.
+          SET_127_PATH: tests/fixtures/registry/echelon-current-1.27.0-linux-x64.json
+          SET_127_SHA256: 7cfb3e2beab0777e849e090bc85c0755f2b841e3430b9c125addfe332d091734
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -669,6 +675,55 @@ jobs:
           # 1.17.0.
           "$home/.local/bin/praxis" --root "$repo" verify --strict
           ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
+          # 1.26.0 -> 1.27.0: Conditor reads the set (capabilities included)
+          # and plans no transition for the declared components.
+          echo "$SET_127_SHA256  $SET_127_PATH" | sha256sum -c -
+          conditor upgrade --current --check --home "$home" --target "$repo" --resolved-set "$SET_127_PATH" --resolved-set-sha256 "$SET_127_SHA256" | tee "$RUNNER_TEMP/sweep-1.27.0.txt"
+          grep -F "Current upgrade plan: echelon-current@1.27.0" "$RUNNER_TEMP/sweep-1.27.0.txt"
+          grep -F "version transitions: none" "$RUNNER_TEMP/sweep-1.27.0.txt"
+          if grep -E "REFUSED" "$RUNNER_TEMP/sweep-1.27.0.txt"; then exit 1; fi
+
+  # Indy-init OD-INDY-8: the kickoff set is approved in the Registry only after
+  # Conditor qualifies it (DF-CON-2026-A007). The workstation installs every
+  # native host tool of the prepared echelon-current 1.27.0 set from the real
+  # published release bytes and verifies each receipt; Dokimos 0.7.0 must
+  # report its release identity, which attested completion with Praxis 3.20.0
+  # needs (REG-PAIR-001 verified-completion-attested).
+  echelon-current-1-27-0-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_127_PATH: tests/fixtures/registry/echelon-current-1.27.0-linux-x64.json
+      SET_127_SHA256: 7cfb3e2beab0777e849e090bc85c0755f2b841e3430b9c125addfe332d091734
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.27.0 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_127_SHA256  $SET_127_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_127_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_127_PATH" --resolved-set-sha256 "$SET_127_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.20.0"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.17.0"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_127_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.7.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
 
   host-tool-upgrade-boundary:
     needs: build-test

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 51,
+  "nextSeq": 52,
   "items": [
     {
       "id": "WI-0001",
@@ -1174,6 +1174,30 @@
       "attachments": [],
       "createdAt": "2026-10-24T12:51:36.181Z",
       "updatedAt": "2026-10-24T12:54:29.212Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0051",
+      "title": "Qualify echelon-current 1.27.0 (Dokimos 0.7.0, Percepta semantic CLI 0.1.0): workstation installs both from the set; the semantic CLI is pinned by the Registry authority, not as a conditor.json component; request Conditor 0.10.11",
+      "description": null,
+      "tags": [
+        "compatibility",
+        "release"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-25T01:35:42.856Z",
+      "updatedAt": "2026-10-25T01:35:47.203Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
