@@ -24,7 +24,23 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore Conditor.slnx
       - run: dotnet build Conditor.slnx --configuration Release --no-restore
-      - run: dotnet run --project tests/Conditor.Tests --configuration Release --no-build
+      - name: Conditor tests
+        shell: bash
+        run: |
+          # Each failing check is also raised as an error annotation, so it is
+          # readable from the checks API without downloading the job log.
+          errors="$RUNNER_TEMP/conditor-test-errors.txt"
+          if dotnet run --project tests/Conditor.Tests --configuration Release --no-build 2> "$errors"; then
+            cat "$errors" >&2
+          else
+            cat "$errors" >&2
+            if grep -q '^FAIL ' "$errors"; then
+              grep '^FAIL ' "$errors" | head -50 | sed 's/^FAIL /::error title=Conditor test failed::/'
+            else
+              tail -20 "$errors" | sed 's/^/::error title=Conditor tests crashed::/'
+            fi
+            exit 1
+          fi
       - name: CLI plan smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/conditor-plan"
