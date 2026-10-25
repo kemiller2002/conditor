@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 52,
+  "nextSeq": 53,
   "items": [
     {
       "id": "WI-0001",
@@ -1198,6 +1198,29 @@
       "attachments": [],
       "createdAt": "2026-10-25T01:35:42.856Z",
       "updatedAt": "2026-10-25T04:33:36.681Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0052",
+      "title": "WI-0051 follow-up: fix the Dokimos-declared kickoff manifest string in runKickoffSet127; raise failing Conditor checks as CI error annotations",
+      "description": null,
+      "tags": [
+        "compatibility"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-25T04:38:40.364Z",
+      "updatedAt": "2026-10-25T04:38:40.570Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

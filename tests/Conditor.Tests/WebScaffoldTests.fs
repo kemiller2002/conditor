@@ -570,7 +570,7 @@ let runKickoffSet127 (check: string -> bool -> unit) =
             // A repository that wants attested verified completion declares
             // Dokimos; Conditor takes it on Registry authority through the
             // generic repository-lifecycle contract, with no descriptor.
-            match planUnderAuthority target set (kickoffComponents + ""","{"id":"dokimos","version":"0.7.0"}""") with
+            match planUnderAuthority target set (kickoffComponents + """,{"id":"dokimos","version":"0.7.0"}""") with
             | Error errors -> check $"a kickoff manifest that declares Dokimos 0.7.0 plans under 1.27.0: {joined errors}" false
             | Ok plan ->
                 let dokimos =
