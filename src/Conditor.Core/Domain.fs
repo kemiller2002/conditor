@@ -120,6 +120,11 @@ type ComponentDefinition =
       /// Earlier package identities, each owning an explicit set of qualified
       /// versions. Versions not listed here use `Package`.
       HistoricalPackages: HistoricalPackage list
+      /// Qualified versions of an npm binding distributed as a release asset
+      /// tarball rather than through the npm registry, by version, as the
+      /// descriptor declares them (CON-367). A declared Registry authority's
+      /// distribution supersedes these.
+      ReleaseArtifacts: Map<string, string>
       LifecycleSource: LifecycleSource option
       ApplicationBinding: ApplicationBinding option
       Command: string option

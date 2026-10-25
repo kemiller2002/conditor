@@ -1213,6 +1213,7 @@ NugetFeedTests.run check
 LibraryScaffoldTests.run check
 WebScaffoldTests.run check
 WebScaffoldTests.runLimenRouting check
+WebScaffoldTests.runRegistryDistribution check
 BranchProtectionTests.run check
 RepositoryCreationTests.run check
 SupervisorTests.run check

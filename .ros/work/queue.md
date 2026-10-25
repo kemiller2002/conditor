@@ -55,3 +55,4 @@
 | WI-0047 | Qualify Praxis 3.14.0 for upgrade --current on echelon-current 1.25.0 | complete |  | medium |
 | WI-0048 | Qualify Praxis 3.16.0 and Ordo 1.17.0 for upgrade --current on echelon-current 1.25.0 and request Conditor 0.10.8 | complete | compatibility, release | high |
 | WI-0049 | Qualify Praxis 3.20.0 for upgrade --current on echelon-current 1.26.0 and request Conditor 0.10.9 | complete |  | medium |
+| WI-0050 | SD-1: scaffold npm dependencies rendered from each component's declared Registry distribution (Folio 0.4.0 release tarball, not an npm ref) | complete | scaffold, registry, defect | high |

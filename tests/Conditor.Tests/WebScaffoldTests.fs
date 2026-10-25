@@ -352,7 +352,7 @@ let runLimenRouting (check: string -> bool -> unit) =
                      && Scaffolding.limenRoutingVersion (withFeed "latest") = None
                      && Scaffolding.limenRoutingVersion manifest = None)
 
-                match Scaffolding.plan target (withFeed "0.9.0") with
+                match Scaffolding.plan target Scaffolding.EmbeddedCatalog (withFeed "0.9.0") with
                 | Error errors -> check $"limen-routing scaffold plans: {joined errors}" false
                 | Ok planned ->
                     let files = Map.ofList planned
@@ -397,3 +397,209 @@ let runLimenRouting (check: string -> bool -> unit) =
                         (files |> Map.forall (fun _ text -> not (text.Contains("@@", StringComparison.Ordinal))))
         finally
             if File.Exists path then File.Delete path)
+
+// SD-1: the scaffold pins each npm-bound component through the distribution
+// its authority declares: an npm registry release by exact version, a GitHub
+// release asset by its exact tarball URL. Conditor 0.10.8 rendered Folio
+// 0.4.0 as the npm reference "0.4.0", which npm cannot install: Folio is
+// distributed only as a release asset (Registry echelon-current 1.25.0).
+
+let private repositoryRoot =
+    let rec up (directory: DirectoryInfo option) =
+        match directory with
+        | Some d when File.Exists(Path.Combine(d.FullName, "Conditor.slnx")) -> d.FullName
+        | Some d -> up (d.Parent |> Option.ofObj)
+        | None -> invalidOp "Conditor repository root (Conditor.slnx) was not found."
+
+    up (Some(DirectoryInfo AppContext.BaseDirectory))
+
+/// echelon-current 1.25.0 linux-x64, byte-identical to the authority Indy
+/// init rehearsals 2 and 3 bootstrapped from (sha256 06026da5...).
+let private echelonCurrent125 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.25.0-linux-x64.json")
+
+let private rehearsalComponents =
+    """{"id":"praxis","version":"3.16.0"},{"id":"ordo","version":"1.17.0"},{"id":"percepta","version":"0.1.0"},{"id":"aegis","version":"1.0.0"},{"id":"limen","version":"0.9.0"},{"id":"forma","version":"0.9.0"},{"id":"folio","version":"0.4.0"},{"id":"limen-fsharp","version":"0.9.0"}"""
+
+let private sha256Hex (bytes: byte array) =
+    Convert.ToHexString(Security.Cryptography.SHA256.HashData bytes).ToLowerInvariant()
+
+/// Plans the web scaffold in `target` under the resolved release set `set`.
+let private planUnderAuthority target (set: byte array) (components: string) =
+    let authority = Path.Combine(target, ".conditor", "authority", "resolved-release-set.json")
+    Directory.CreateDirectory(Path.GetDirectoryName authority |> Option.ofObj |> Option.defaultValue target) |> ignore
+    File.WriteAllBytes(authority, set)
+
+    let authorityJson =
+        $"\"registryAuthority\":{{\"kind\":\"resolved-release-set\",\"path\":\".conditor/authority/resolved-release-set.json\",\"sha256\":\"{sha256Hex set}\"}}"
+
+    planFor
+        target
+        ("""{"schemaVersion":1,"name":"Indy Web","components":["""
+         + components
+         + """],"requirements":[],"execution":{"enabled":false},"scaffold":{"kind":"fsharp-limen-web","name":"Indy Web"},"""
+         + authorityJson
+         + "}")
+
+let private dependenciesOf (plan: InstallationPlan) =
+    scaffoldFiles plan
+    |> Map.tryFind "package.json"
+    |> Option.map (fun text ->
+        use document = JsonDocument.Parse text
+
+        document.RootElement.GetProperty("dependencies").EnumerateObject()
+        |> Seq.map (fun property -> property.Name, property.Value.GetString() |> Option.ofObj |> Option.defaultValue "")
+        |> Map.ofSeq)
+    |> Option.defaultValue Map.empty
+
+/// The specifier a set's declared distribution calls for, computed here from
+/// the set itself rather than from Conditor: npm -> the exact version;
+/// github-release -> the release asset of the one package artifact.
+let private declaredSpecifiers (set: byte array) =
+    use document = JsonDocument.Parse set
+
+    document.RootElement.GetProperty("components").EnumerateArray()
+    |> Seq.filter (fun entry -> entry.GetProperty("distributionClass").GetString() = "web-package")
+    |> Seq.map (fun entry ->
+        let text (name: string) (element: JsonElement) = element.GetProperty(name).GetString() |> Option.ofObj |> Option.defaultValue ""
+        let distribution = entry.GetProperty "distribution"
+
+        let artifact =
+            entry.GetProperty("artifacts").EnumerateArray()
+            |> Seq.find (fun item -> text "purpose" item = "package")
+            |> text "name"
+
+        let specifier =
+            match text "mechanism" distribution with
+            | "npm" -> text "version" entry
+            | "github-release" -> $"""https://github.com/{text "repository" entry}/releases/download/{text "tag" entry}/{artifact}"""
+            | other -> $"<unexpected mechanism {other}>"
+
+        text "package" distribution, specifier)
+    |> Map.ofSeq
+
+/// The set with one component's `distribution` replaced.
+let private redistribute (systemId: string) (distribution: string) (set: byte array) =
+    match Nodes.JsonNode.Parse(set) with
+    | :? Nodes.JsonObject as root ->
+        match root["components"] with
+        | :? Nodes.JsonArray as components ->
+            components
+            |> Seq.iter (function
+                | :? Nodes.JsonObject as entry when (entry["systemId"] |> Option.ofObj |> Option.map _.GetValue<string>()) = Some systemId ->
+                    entry["distribution"] <- Nodes.JsonNode.Parse distribution
+                | _ -> ())
+        | _ -> ()
+
+        Text.Encoding.UTF8.GetBytes(root.ToJsonString())
+    | _ -> invalidOp "the resolved release set is not a JSON object"
+
+[<Literal>]
+let private FolioAsset040 =
+    "https://github.com/kemiller2002/folio/releases/download/v0.4.0/echelon-foundry-print-components-0.4.0.tgz"
+
+[<Literal>]
+let private FormaAsset090 =
+    "https://github.com/kemiller2002/forma/releases/download/v0.9.0/echelon-foundry-design-system-0.9.0.tgz"
+
+[<Literal>]
+let private LimenAsset090 =
+    "https://github.com/kemiller2002/limen/releases/download/v0.9.0/echelon-foundry-limen-0.9.0.tgz"
+
+let runRegistryDistribution (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent125
+
+        check "the vendored echelon-current 1.25.0 set is the rehearsal authority"
+            (sha256Hex set = "06026da529d5408a7363793790a0eed32b3f5414246fe4509a216adb27d403e3")
+
+        withTarget (fun target ->
+            match planUnderAuthority target set rehearsalComponents with
+            | Error errors -> check $"the rehearsal manifest plans under echelon-current 1.25.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: Folio 0.4.0 is pinned to its Registry release asset, not the npm reference \"0.4.0\""
+                    (dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset040)
+
+                check "Limen 0.9.0, which the Registry distributes through npm, keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.0")
+
+                check "Forma 0.9.0, which the Registry distributes as a GitHub release asset, is pinned to that asset"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset090)
+
+                check "every scaffold dependency is exactly the specifier its Registry distribution declares"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
+        withTarget (fun target ->
+            // The same releases with their distributions exchanged: the pin
+            // follows the declaration, not the component's identity.
+            let exchanged =
+                set
+                |> redistribute "folio" """{"mechanism":"npm","package":"@echelon-foundry/print-components","url":"https://registry.npmjs.org/@echelon-foundry/print-components/-/print-components-0.4.0.tgz"}"""
+                |> redistribute "limen" """{"mechanism":"github-release","package":"@echelon-foundry/limen","url":"https://github.com/kemiller2002/limen/releases/tag/v0.9.0"}"""
+
+            match planUnderAuthority target exchanged rehearsalComponents with
+            | Error errors -> check $"a set with exchanged distributions plans: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "a component the Registry declares as npm-distributed is pinned by exact version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some "0.4.0")
+
+                check "a component the Registry declares as a GitHub release asset is pinned to that asset"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some LimenAsset090))
+
+        withTarget (fun target ->
+            let unsupported =
+                set |> redistribute "folio" """{"mechanism":"container","package":"@echelon-foundry/print-components","url":null}"""
+
+            match planUnderAuthority target unsupported rehearsalComponents with
+            | Ok _ -> check "a scaffold binding with an unsupported Registry distribution must be refused" false
+            | Error errors ->
+                check "a scaffold binding with an unsupported Registry distribution is refused before mutation, naming it"
+                    (errors |> List.exists (fun error -> error.Contains("'folio'", StringComparison.Ordinal))))
+
+        withTarget (fun target ->
+            let unlocated =
+                set |> redistribute "folio" """{"mechanism":"npm","package":"@echelon-foundry/print-components","url":null}"""
+
+            match planUnderAuthority target unlocated rehearsalComponents with
+            | Ok _ -> check "an npm distribution with no npmjs.org tarball must be refused" false
+            | Error errors ->
+                check "an npm distribution with no npmjs.org tarball is refused, not pinned by a guessed version"
+                    (errors |> List.exists (fun error -> error.Contains("'folio'@0.4.0", StringComparison.Ordinal) && error.Contains("npmjs.org", StringComparison.Ordinal))))
+
+        withTarget (fun target ->
+            let renamed =
+                set |> redistribute "folio" """{"mechanism":"github-release","package":"@echelon-foundry/print","url":null}"""
+
+            match planUnderAuthority target renamed rehearsalComponents with
+            | Ok _ -> check "a Registry package identity that disagrees with Conditor's must be refused" false
+            | Error errors ->
+                check "a Registry package identity that disagrees with Conditor's is refused, not guessed"
+                    (errors |> List.exists (fun error -> error.Contains("@echelon-foundry/print", StringComparison.Ordinal) && error.Contains("folio", StringComparison.Ordinal))))
+
+    // Without a Registry authority the embedded descriptors' declarations
+    // govern: a release-asset version by its declared asset, every other
+    // version by its exact npm version.
+    withTarget (fun target ->
+        let json =
+            webManifest
+                .Replace("{\"id\":\"folio\",\"version\":\"0.3.0\"}", "{\"id\":\"folio\",\"version\":\"0.4.0\"}")
+
+        match planFor target json with
+        | Error errors -> check $"an embedded-catalog web scaffold with Folio 0.4.0 plans: {joined errors}" false
+        | Ok plan ->
+            let dependencies = dependenciesOf plan
+
+            check "without an authority, Folio 0.4.0 is pinned to the release asset its descriptor declares"
+                (dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset040)
+
+            check "without an authority, npm-distributed Limen and Forma keep their exact npm versions"
+                (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.7.1"
+                 && dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some "0.5.0"))

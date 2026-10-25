@@ -114,6 +114,9 @@ module Planner =
           /// Selected `nuget-library` releases distributed as GitHub release
           /// assets, installed through the local NuGet feed.
           NugetFeeds: Map<string, NugetFeedRelease>
+          /// Selected `web-package` releases, whose declared distributions
+          /// pin the scaffold's npm dependencies (CON-367).
+          WebPackages: Map<string, Result<WebPackageRelease, string list>>
           /// The authority bytes, digest-verified, for attestation checks.
           Bytes: byte array }
 
@@ -141,7 +144,20 @@ module Planner =
                                 { Profile = profile
                                   Selections = selections
                                   NugetFeeds = feeds
+                                  WebPackages = WebPackageRelease.selectionsIn bytes
                                   Bytes = bytes })))
+
+    let private npmDistributions (authority: LoadedAuthority option) =
+        authority
+        |> Option.map (fun loaded -> Scaffolding.RegistryDistributions loaded.WebPackages)
+        |> Option.defaultValue Scaffolding.EmbeddedCatalog
+
+    /// The scaffold files `manifest` calls for in `target`, with npm pins
+    /// from its declared Registry authority when it has one (CON-367).
+    let scaffoldPlan target (manifest: ProjectManifest) =
+        loadRegistryAuthority target manifest
+        |> Result.mapError (fun error -> [ $"Registry authority: {error}" ])
+        |> Result.bind (fun authority -> Scaffolding.plan target (npmDistributions authority) manifest)
 
     let private registryLifecycleComponents (profile: WorkstationProfile option) =
         profile
@@ -484,7 +500,7 @@ module Planner =
                             $"Component '{request.Id}' is an application dependency. A scaffold or an existing package.json binding is required so Conditor knows exactly where to bind it."
 
         if errors.Count = 0 && operation = Init then
-            match Scaffolding.plan target manifest with
+            match Scaffolding.plan target (npmDistributions loadedAuthority) manifest with
             | Error scaffoldErrors ->
                 scaffoldErrors |> List.iter errors.Add
             | Ok scaffoldFiles ->
