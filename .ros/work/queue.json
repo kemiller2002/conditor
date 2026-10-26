@@ -1231,6 +1231,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0053",
+      "title": "Qualify echelon-current 1.28.0: Praxis 3.21.0, Folio 0.4.1, percepta-semantic 0.2.1 (echelon-registry WI-0064, #98); request 0.10.12",
+      "description": null,
+      "tags": [
+        "release",
+        "qualification"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-26T20:39:13.000Z",
+      "updatedAt": "2026-10-26T20:39:13.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }

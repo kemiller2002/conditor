@@ -7,7 +7,8 @@
   "defaultVersion": "0.3.0",
   "qualifiedVersions": [
     "0.3.0",
-    "0.4.0"
+    "0.4.0",
+    "0.4.1"
   ],
   "qualifiedRange": ">=0.3.0 <1.0.0",
   "releaseArtifacts": [
@@ -18,6 +19,10 @@
     {
       "version": "0.4.0",
       "url": "https://github.com/kemiller2002/folio/releases/download/v0.4.0/echelon-foundry-print-components-0.4.0.tgz"
+    },
+    {
+      "version": "0.4.1",
+      "url": "https://github.com/kemiller2002/folio/releases/download/v0.4.1/echelon-foundry-print-components-0.4.1.tgz"
     }
   ],
   "applicationBinding": "npm",

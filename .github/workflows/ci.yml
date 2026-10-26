@@ -65,7 +65,7 @@ jobs:
           assert forma["qualifiedVersions"] == ["0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0"], forma
           folio = inventory["folio"]
           assert folio["package"] == "@echelon-foundry/print-components", folio
-          assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0"], folio
+          assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0", "0.4.1"], folio
           ordo = inventory["ordo"]
           assert ordo["qualifiedVersions"] == ["1.17.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2"], ordo
           PY
@@ -359,6 +359,46 @@ jobs:
           conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
           "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.20.0"
           ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
+      - name: Chrona 1.26.0 -> 1.28.0 moves only Praxis 3.20.0 -> 3.21.0 through its own lifecycle with the real release
+        shell: bash
+        env:
+          # The Registry's prepared 1.28.0 cut (echelon-registry WI-0064, #98),
+          # vendored byte-for-byte as the Registry tools generate it; the
+          # sha256 is its channel identity. Against 1.26.0 it moves Dokimos
+          # (1.27.0), Folio and percepta-semantic, none of which Chrona
+          # declares, and Praxis 3.20.0 -> 3.21.0.
+          SET_128_PATH: tests/fixtures/registry/echelon-current-1.28.0-linux-x64.json
+          SET_128_SHA256: 5aee6c3c355dbb1b556d7a1dba9db80ece9c88862f31239c3558c441bb7abc67
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          git -C "$repo" add -A
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current 1.26.0"
+          echo "$SET_128_SHA256  $SET_128_PATH" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$SET_128_PATH" --resolved-set-sha256 "$SET_128_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-128.txt"
+          actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-128.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
+          test "$actual" = "praxis: 3.20.0 -> 3.21.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          grep -F "praxis: 3.20.0 -> 3.21.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/chrona-plan-128.txt"
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/chrona-plan-128.txt" | cut -d' ' -f2)
+          conditor upgrade --current "${args[@]}" --authorize "$authorization"
+          python3 - "$repo" <<'PY'
+          import json, sys, pathlib
+          repo = pathlib.Path(sys.argv[1])
+          foundations = (repo / ".echelon/foundations.json").read_text()
+          capabilities = json.loads(foundations)["capabilities"]
+          assert capabilities["praxis"] == {"required": True, "version": "3.21.0"}, capabilities["praxis"]
+          assert capabilities["ordo"]["version"] == "1.17.0" and capabilities["forma"]["version"] == "0.9.0", capabilities
+          versions = {c["id"]: c["version"] for c in json.loads((repo / "conditor.json").read_text())["components"]}
+          assert versions["praxis"] == "3.21.0" and versions["ordo"] == "1.17.0" and versions["forma"] == "0.9.0", versions
+          toolchain = json.loads((repo / ".echelon/toolchain.json").read_text())
+          assert toolchain["praxis"] == "3.21.0" and toolchain["ordo"] == "1.17.0", toolchain
+          PY
+          conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.21.0"
+          ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
 
   echelon-current-sweep-qualification:
     needs: build-test
@@ -629,6 +669,12 @@ jobs:
           # declare Dokimos, so no declared component moves.
           SET_127_PATH: tests/fixtures/registry/echelon-current-1.27.0-linux-x64.json
           SET_127_SHA256: 7cfb3e2beab0777e849e090bc85c0755f2b841e3430b9c125addfe332d091734
+          # 1.28.0 is the Registry's prepared cut (echelon-registry WI-0064,
+          # #98): Praxis 3.20.0 -> 3.21.0, Folio 0.4.0 -> 0.4.1 and the new
+          # host tool percepta-semantic 0.2.1. This repository declares only
+          # Praxis of those, so only Praxis moves.
+          SET_128_PATH: tests/fixtures/registry/echelon-current-1.28.0-linux-x64.json
+          SET_128_SHA256: 5aee6c3c355dbb1b556d7a1dba9db80ece9c88862f31239c3558c441bb7abc67
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -698,6 +744,11 @@ jobs:
           grep -F "Current upgrade plan: echelon-current@1.27.0" "$RUNNER_TEMP/sweep-1.27.0.txt"
           grep -F "version transitions: none" "$RUNNER_TEMP/sweep-1.27.0.txt"
           if grep -E "REFUSED" "$RUNNER_TEMP/sweep-1.27.0.txt"; then exit 1; fi
+          step 1.28.0 "$SET_128_PATH" "$SET_128_SHA256" "praxis: 3.20.0 -> 3.21.0" 1.17.0 3.21.0
+          # The installed Praxis 3.21.0 verifies the swept repository on Ordo
+          # 1.17.0.
+          "$home/.local/bin/praxis" --root "$repo" verify --strict
+          ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
 
   # Indy-init OD-INDY-8: the kickoff set is approved in the Registry only after
   # Conditor qualifies it (DF-CON-2026-A007). The workstation installs every
@@ -738,6 +789,55 @@ jobs:
           "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
           "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
           jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_127_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.7.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
+
+  # Indy-init OD-INDY-8: echelon-current 1.28.0 is the Rehearsal 4 kickoff set
+  # (echelon-registry WI-0064, #98), approved only after this qualification.
+  # The workstation installs every native host tool of the prepared set from
+  # the real published release bytes and verifies each receipt: Praxis 3.21.0
+  # (the requirements-preservation gate), the Percepta semantic CLI 0.2.1
+  # (executable percepta; no repository lifecycle, DF-CON-2026-A007) and
+  # Dokimos 0.7.0 under its release identity.
+  echelon-current-1-28-0-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_128_PATH: tests/fixtures/registry/echelon-current-1.28.0-linux-x64.json
+      SET_128_SHA256: 5aee6c3c355dbb1b556d7a1dba9db80ece9c88862f31239c3558c441bb7abc67
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.28.0 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_128_SHA256  $SET_128_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_128_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_128_PATH" --resolved-set-sha256 "$SET_128_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.21.0"
+          # The installed Praxis carries the requirements-preservation gate:
+          # without inputs it refuses with exit 2 (unusable input), naming them.
+          rc=0; gate=$("$home/.local/bin/praxis" requirements preservation verify 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements preservation verify requires --baseline FILE" <<< "$gate"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.17.0"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          "$home/.local/bin/percepta" --version | tee "$RUNNER_TEMP/percepta-version.txt"
+          grep -E "^percepta 0\.2\.1([+ ]|$)" "$RUNNER_TEMP/percepta-version.txt"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_128_PATH")" '
             (with_entries(.key |= ascii_downcase)) as $v
             | $v.releaseversion == "0.7.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
 

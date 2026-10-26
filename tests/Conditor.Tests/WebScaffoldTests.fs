@@ -584,6 +584,85 @@ let runKickoffSet127 (check: string -> bool -> unit) =
                 check "Dokimos 0.7.0 is initialized and verified through its repository lifecycle"
                     (dokimos = [ "0.7.0", "dokimos", Some "init"; "0.7.0", "dokimos", Some "verify" ]))
 
+[<Literal>]
+let private FolioAsset041 =
+    "https://github.com/kemiller2002/folio/releases/download/v0.4.1/echelon-foundry-print-components-0.4.1.tgz"
+
+/// echelon-current 1.28.0 linux-x64, byte-identical to the Registry's
+/// prepared cut (echelon-registry WI-0064, #98, sha256 5aee6c3c...): 1.27.0
+/// with Praxis 3.20.0 -> 3.21.0 (the requirements-preservation gate), Folio
+/// 0.4.0 -> 0.4.1 and the Percepta semantic CLI percepta-semantic 0.2.1 that
+/// Indy-init OD-INDY-2 requires the kickoff set to pin. OD-INDY-8 approves it
+/// only after this Conditor qualification (DF-CON-2026-A007).
+let private echelonCurrent128 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.28.0-linux-x64.json")
+
+/// The Rehearsal 3 bootstrap manifest moved to the 1.28.0 selections.
+let private kickoffComponents128 =
+    rehearsalComponents
+        .Replace("""{"id":"praxis","version":"3.16.0"}""", """{"id":"praxis","version":"3.21.0"}""")
+        .Replace("""{"id":"folio","version":"0.4.0"}""", """{"id":"folio","version":"0.4.1"}""")
+
+let runKickoffSet128 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.28.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent128
+
+        check "the vendored echelon-current 1.28.0 set is the Registry's prepared cut"
+            (sha256Hex set = "5aee6c3c355dbb1b556d7a1dba9db80ece9c88862f31239c3558c441bb7abc67")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let selected systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+            |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections = [ "praxis"; "folio"; "percepta-semantic"; "dokimos" ] |> List.map selected
+
+        check "1.28.0 selects Praxis 3.21.0, Folio 0.4.1, percepta-semantic 0.2.1 and Dokimos 0.7.0"
+            (selections = [ Some "3.21.0"; Some "0.4.1"; Some "0.2.1"; Some "0.7.0" ])
+
+        check "1.28.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        // The workstation installs the semantic CLI as a plain host tool: it
+        // has no repository lifecycle, so it is no conditor.json component
+        // (DF-CON-2026-A007).
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent128 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.28.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation installs percepta-semantic 0.2.1 as the host tool percepta, with no repository lifecycle"
+                (installed "percepta-semantic"
+                 |> Option.exists (fun c ->
+                     c.Version = "0.2.1"
+                     && c.Executable = "percepta"
+                     && c.Tag = "percepta-semantic-v0.2.1"
+                     && c.Lifecycle.IsNone
+                     && not c.Assets.IsEmpty))
+
+            check "the workstation installs Praxis 3.21.0 from 1.28.0"
+                (installed "praxis" |> Option.exists (fun c -> c.Version = "3.21.0" && c.Tag = "v3.21.0"))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents128 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.28.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: under 1.28.0, Folio 0.4.1 is pinned to its Registry release asset"
+                    (dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.28.0 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true
