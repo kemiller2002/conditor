@@ -2409,7 +2409,27 @@
       "updatedAt": "2026-10-26T20:39:13.000Z",
       "telemetryExecutionIds": [
         "EXE-20261026T203914238Z-8b1135d2"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "72eb8fcef86b9de34ee110f0",
+        "recordedAt": "2026-10-26T20:46:57.000Z",
+        "executionId": "EXE-20261026T203914238Z-8b1135d2",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.28.0",
+        "commit": "b9347b0151866eba9487aee928bfcdfa009b9d5a",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.28.0",
+        "remoteCommit": "b9347b0151866eba9487aee928bfcdfa009b9d5a",
+        "summary": "Qualified Praxis 3.21.0, Folio 0.4.1 and the echelon-current 1.28.0 set; requested 0.10.12; 1143 tests and the kickoff job pass locally; REG-RU-007 passes against this build",
+        "nextAction": "CI green on the draft PR; the owner merges it, which releases Conditor 0.10.12; then rerun Registry REG-RU-007 on #98",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
