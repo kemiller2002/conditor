@@ -359,14 +359,15 @@ jobs:
           conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
           "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.20.0"
           ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
-      - name: Chrona 1.26.0 -> 1.28.0 moves only Praxis 3.20.0 -> 3.21.0 through its own lifecycle with the real release
+      - name: Chrona 1.26.0 -> 1.28.0 moves Praxis 3.20.0 -> 3.21.0 through its own lifecycle and Folio 0.4.0 -> 0.4.1 through npm with the real releases
         shell: bash
         env:
           # The Registry's prepared 1.28.0 cut (echelon-registry WI-0064, #98),
           # vendored byte-for-byte as the Registry tools generate it; the
           # sha256 is its channel identity. Against 1.26.0 it moves Dokimos
-          # (1.27.0), Folio and percepta-semantic, none of which Chrona
-          # declares, and Praxis 3.20.0 -> 3.21.0.
+          # (1.27.0) and adds percepta-semantic, neither of which Chrona
+          # declares, and moves Praxis 3.20.0 -> 3.21.0 and Folio 0.4.0 ->
+          # 0.4.1, which Chrona declares.
           SET_128_PATH: tests/fixtures/registry/echelon-current-1.28.0-linux-x64.json
           SET_128_SHA256: 5aee6c3c355dbb1b556d7a1dba9db80ece9c88862f31239c3558c441bb7abc67
         run: |
@@ -380,8 +381,9 @@ jobs:
           args=(--home "$home" --target "$repo" --resolved-set "$SET_128_PATH" --resolved-set-sha256 "$SET_128_SHA256")
           conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-128.txt"
           actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-128.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
-          test "$actual" = "praxis: 3.20.0 -> 3.21.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          test "$actual" = "folio: 0.4.0 -> 0.4.1;praxis: 3.20.0 -> 3.21.0" || { echo "transitions: '$actual'" >&2; exit 1; }
           grep -F "praxis: 3.20.0 -> 3.21.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/chrona-plan-128.txt"
+          grep -F "folio: 0.4.0 -> 0.4.1 [web-package-binding]" "$RUNNER_TEMP/chrona-plan-128.txt"
           authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/chrona-plan-128.txt" | cut -d' ' -f2)
           conditor upgrade --current "${args[@]}" --authorize "$authorization"
           python3 - "$repo" <<'PY'
@@ -391,8 +393,13 @@ jobs:
           capabilities = json.loads(foundations)["capabilities"]
           assert capabilities["praxis"] == {"required": True, "version": "3.21.0"}, capabilities["praxis"]
           assert capabilities["ordo"]["version"] == "1.17.0" and capabilities["forma"]["version"] == "0.9.0", capabilities
+          assert capabilities["folio"]["version"] == "0.4.1", capabilities["folio"]
           versions = {c["id"]: c["version"] for c in json.loads((repo / "conditor.json").read_text())["components"]}
           assert versions["praxis"] == "3.21.0" and versions["ordo"] == "1.17.0" and versions["forma"] == "0.9.0", versions
+          assert versions["folio"] == "0.4.1", versions
+          asset = "https://github.com/kemiller2002/folio/releases/download/v0.4.1/echelon-foundry-print-components-0.4.1.tgz"
+          dependencies = json.loads((repo / "package.json").read_text())["dependencies"]
+          assert dependencies["@echelon-foundry/print-components"] == asset, dependencies
           toolchain = json.loads((repo / ".echelon/toolchain.json").read_text())
           assert toolchain["praxis"] == "3.21.0" and toolchain["ordo"] == "1.17.0", toolchain
           PY
