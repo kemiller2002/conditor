@@ -8,7 +8,7 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
 
 - Install the Conditor release that contains `conditor requirements import`
   and `conditor supervise` (0.6.0 or later).
-- Install Praxis 3.20.0, Ordo 1.5.0 and percepta-repo 0.1.0 on the day-of
+- Install Praxis 3.21.0, Ordo 1.5.0 and percepta-repo 0.1.0 on the day-of
   host. These are the versions the preset pins.
 - Install the kickoff release set's native host tools from the Registry set
   (Indy-init OD-INDY-8, `DF-CON-2026-A007`). Use the approved kickoff version
@@ -17,11 +17,12 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  This installs Dokimos 0.7.0, which attested verified completion with Praxis
-  3.20.0 needs (from 1.27.0). Once the Registry selects `percepta-semantic`,
-  it also installs the Percepta semantic CLI (`percepta`), which produces the
-  UI completion evidence. 1.27.0 does not select it yet, because its release
-  is unpublished. Then run `percepta install-browser`.
+  The kickoff set is echelon-current 1.28.0, once the Registry approves it.
+  It installs Praxis 3.21.0, which carries the requirements-preservation gate,
+  and Dokimos 0.7.0, which attested verified completion with Praxis 3.17.0 and
+  later needs. It also installs the Percepta semantic CLI 0.2.1 (`percepta`),
+  which produces the UI completion evidence. Then run
+  `percepta install-browser`.
   The semantic CLI is not a `conditor.json` component: the Registry set pins
   it.
 - Authenticate `gh` with the rights to create repositories, and Claude Code

@@ -520,8 +520,8 @@ let private FolioPackage = "@echelon-foundry/print-components"
 let private FormaStem = "echelon-foundry-design-system"
 let private FolioStem = "echelon-foundry-print-components"
 
-let private registeredStepRepository check (formaTarget: string) (folioTarget: string) =
-    let label = $"forma-{formaTarget}-folio-{folioTarget}"
+let private registeredStepRepository check (formaSource: string, folioSource: string) (formaTarget: string) (folioTarget: string) =
+    let label = $"forma-{formaSource}-{formaTarget}-folio-{folioSource}-{folioTarget}"
     let target = temp $"{label}-target"
     let home = temp $"{label}-home"
     let mirror = temp $"{label}-mirror"
@@ -544,12 +544,12 @@ let private registeredStepRepository check (formaTarget: string) (folioTarget: s
 
     File.WriteAllText(
         manifestPath,
-        """{
+        $$"""{
   "schemaVersion": 1,
   "name": "chrona-shaped",
   "components": [
-    { "id": "forma", "version": "0.4.1", "required": false },
-    { "id": "folio", "version": "0.3.0", "required": false }
+    { "id": "forma", "version": "{{formaSource}}", "required": false },
+    { "id": "folio", "version": "{{folioSource}}", "required": false }
   ],
   "requirements": [],
   "execution": { "enabled": false }
@@ -564,15 +564,15 @@ let private registeredStepRepository check (formaTarget: string) (folioTarget: s
           Operation = Init
           Components =
             [ { Id = "forma"
-                Version = "0.4.1"
+                Version = formaSource
                 Distribution = NpmPackage
                 Package = FormaPackage
-                SourceReference = Some $"npm:{FormaPackage}@0.4.1" }
+                SourceReference = Some $"npm:{FormaPackage}@{formaSource}" }
               { Id = "folio"
-                Version = "0.3.0"
+                Version = folioSource
                 Distribution = NpmPackage
                 Package = FolioPackage
-                SourceReference = Some $"npm:{FolioPackage}@0.3.0" } ]
+                SourceReference = Some $"npm:{FolioPackage}@{folioSource}" } ]
           Actions = [] }
     |> ignore
 
@@ -600,8 +600,8 @@ let private registeredStepRepository check (formaTarget: string) (folioTarget: s
 }
 """
 
-    File.WriteAllText(Path.Combine(target, "package.json"), packageJson "0.4.1" "0.3.0")
-    File.WriteAllText(Path.Combine(target, "package-lock.json"), lockJson "0.4.1" "0.3.0" "" "")
+    File.WriteAllText(Path.Combine(target, "package.json"), packageJson formaSource folioSource)
+    File.WriteAllText(Path.Combine(target, "package-lock.json"), lockJson formaSource folioSource "" "")
     File.WriteAllText(Path.Combine(afterInstall, "package.json"), packageJson formaTarget folioTarget)
 
     File.WriteAllText(
@@ -626,7 +626,7 @@ let private registeredStepRepository check (formaTarget: string) (folioTarget: s
       AfterInstall = afterInstall }
 
 let private echelonCurrent120 check =
-    let f = registeredStepRepository check "0.6.1" "0.4.0"
+    let f = registeredStepRepository check ("0.4.1", "0.3.0") "0.6.1" "0.4.0"
 
     withPath f.Bin (fun () ->
         match preview f with
@@ -672,7 +672,7 @@ let private echelonCurrent120 check =
 
     // Qualification is still exact: a release Conditor has not qualified is
     // refused before anything changes.
-    let unqualified = registeredStepRepository check "0.7.0" "0.4.0"
+    let unqualified = registeredStepRepository check ("0.4.1", "0.3.0") "0.7.0" "0.4.0"
 
     withPath unqualified.Bin (fun () ->
         let refusals = refusalsOf unqualified
@@ -683,12 +683,44 @@ let private echelonCurrent120 check =
 
         check "a refused Forma release runs no package manager" (not (File.Exists unqualified.Log)))
 
+// ---- echelon-current 1.28.0: Folio 0.4.1 ------------------------------------
+// echelon-current 1.28.0 (echelon-registry WI-0064, #98) moves Folio
+// 0.4.0 -> 0.4.1 and keeps Forma 0.9.0. An application on the 1.27.0
+// selections moves only Folio, by its exact GitHub release-asset pin.
+let private echelonCurrent128 check =
+    let f = registeredStepRepository check ("0.9.0", "0.4.0") "0.9.0" "0.4.1"
+
+    withPath f.Bin (fun () ->
+        match preview f with
+        | Error errors -> check $"echelon-current 1.28.0 web plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                "current upgrade moves only Folio 0.4.0 -> 0.4.1, as a package-manager binding transition"
+                (plan.Refusals.IsEmpty
+                 && plan.Transitions
+                    |> List.map (fun transition -> transition.Id, transition.FromVersion, transition.ToVersion, transition.Mode) = [ "folio", "0.4.0", "0.4.1", "web-package-binding" ])
+
+            match apply f plan.Digest with
+            | Error errors -> check $"authorized Folio 0.4.1 upgrade succeeds: {joined errors}" false
+            | Ok result ->
+                check
+                    "Folio 0.4.1 is installed as the exact GitHub release-asset pin, and Forma is not reinstalled"
+                    (File.ReadAllLines f.Log
+                     |> Array.toList = [ let asset = releaseAsset "folio" FolioStem "0.4.1"
+                                         $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {FolioPackage}@{asset}" ])
+
+                check "Folio 0.4.1 upgrade leaves no version drift" result.NoRemainingVersionChanges
+
+                check
+                    "Folio 0.4.1 upgrade records the Registry versions"
+                    (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "0.9.0"; "folio", Some "0.4.1" ]))
+
 let run (check: string -> bool -> unit) =
     check
         "Conditor qualifies released Forma web-package upgrade boundaries"
         (Registry.qualifiedVersions "forma"
          |> Option.exists (fun versions -> Set.contains "0.6.1" versions && Set.contains "0.9.0" versions)
-         && Registry.qualifiedVersions "folio" |> Option.exists (Set.contains "0.4.0"))
+         && Registry.qualifiedVersions "folio" |> Option.exists (fun versions -> Set.contains "0.4.0" versions && Set.contains "0.4.1" versions))
 
     if OperatingSystem.IsWindows() then
         check "web-package current upgrade fixture is skipped on Windows" true
@@ -698,6 +730,7 @@ let run (check: string -> bool -> unit) =
         integrityMismatchRollsBack check
         refusals check
         echelonCurrent120 check
+        echelonCurrent128 check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"

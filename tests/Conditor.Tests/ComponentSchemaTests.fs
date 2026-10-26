@@ -275,9 +275,14 @@ let run (check: string -> bool -> unit) =
 
     let folioAsset = "https://github.com/kemiller2002/folio/releases/download/v0.4.0/echelon-foundry-print-components-0.4.0.tgz"
 
+    let folioAsset041 = "https://github.com/kemiller2002/folio/releases/download/v0.4.1/echelon-foundry-print-components-0.4.1.tgz"
+
     check "the built-in Folio descriptor declares its release-asset distributions"
         (Registry.tryFind "folio"
-         |> Option.exists (fun folio -> folio.ReleaseArtifacts |> Map.tryFind "0.4.0" = Some folioAsset && folio.ReleaseArtifacts.Count = 2))
+         |> Option.exists (fun folio ->
+             folio.ReleaseArtifacts |> Map.tryFind "0.4.0" = Some folioAsset
+             && folio.ReleaseArtifacts |> Map.tryFind "0.4.1" = Some folioAsset041
+             && folio.ReleaseArtifacts.Count = 3))
 
     check "npm-registry-distributed Limen and Forma declare no release-asset distribution"
         ([ "limen"; "forma" ] |> List.forall (fun id -> Registry.tryFind id |> Option.exists _.ReleaseArtifacts.IsEmpty))

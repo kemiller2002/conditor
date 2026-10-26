@@ -3,16 +3,16 @@ module EchelonCurrent
 
 /// The linux-x64 selection of echelon-current 1.17.0 (echelon-registry main
 /// 50c6c96, channels/echelon-current/linux-x64.json, sha256 94b37048...),
-/// with Praxis moved to the 3.20.0 that echelon-current 1.26.0 selects
-/// (linux-x64 set sha256 b0bc2e78...; 1.27.0, sha256 7cfb3e2b..., moves only
-/// the undeclared Dokimos 0.6.0 -> 0.7.0, so this list is unchanged), for
+/// with Praxis moved to the 3.21.0 that echelon-current 1.28.0 selects
+/// (linux-x64 set sha256 5aee6c3c...; 1.26.0 selected 3.20.0, b0bc2e78...;
+/// 1.27.0, 7cfb3e2b..., moved only the undeclared Dokimos 0.6.0 -> 0.7.0), for
 /// every system that Conditor carries a component descriptor for. Dokimos,
 /// Strata, Arca, Fides, Summa Contracts and Limen F# are selected too but have
 /// no Conditor descriptor. When the channel moves, update this list in the
 /// same change that qualifies the new versions and moves the presets that
 /// follow the channel.
 let selections =
-    [ "praxis", "3.20.0"
+    [ "praxis", "3.21.0"
       "ordo", "1.5.0"
       "percepta", "0.1.0"
       "visual-engineering", "1.0.1"
