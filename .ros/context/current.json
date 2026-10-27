@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-26T21:03:53.000Z",
+  "updatedAt": "2026-10-27T05:55:54Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2453,6 +2453,52 @@
       },
       "completedAt": "2026-10-26T21:03:53.000Z",
       "conclusion": "Conditor qualifies echelon-current 1.28.0 (Praxis 3.21.0, Folio 0.4.1, percepta-semantic 0.2.1); 0.10.12 requested"
+    },
+    {
+      "id": "WI-0054",
+      "type": "engineering",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "examples/indy-init.conditor.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+        },
+        {
+          "type": "document",
+          "path": "docs/evidence/2026-10-27-indy-preset-kickoff-set.md"
+        }
+      ],
+      "updatedAt": "2026-10-27T05:55:54Z",
+      "telemetryExecutionIds": [
+        "EXE-20261027T055036205Z-14f3eef3"
+      ],
+      "latestCheckpoint": {
+        "id": "1237be7afcceaf2c8b5fad38",
+        "recordedAt": "2026-10-27T05:51:53Z",
+        "executionId": "EXE-20261027T055036205Z-14f3eef3",
+        "repository": "conditor",
+        "branch": "claude/wi-0054-indy-preset-kickoff-set",
+        "commit": "dba48c4f4dd9d8133d9b3faa277547876aba2c4d",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/wi-0054-indy-preset-kickoff-set",
+        "remoteCommit": "dba48c4f4dd9d8133d9b3faa277547876aba2c4d",
+        "summary": "Preset and fixture moved to echelon-current 1.28.0; verified with released 0.10.12 init+verify",
+        "nextAction": "CI on the PR, owner merge, release Conditor 0.10.13",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-27T05:55:54Z",
+      "conclusion": "Indy preset and echelon-current fixture on 1.28.0; released 0.10.12 init+verify pass with the changed preset; PR #112 CI green (ci run 40457761922)"
     }
   ]
 }
