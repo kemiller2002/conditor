@@ -1307,10 +1307,10 @@
         "qualification"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-27T18:53:46.035Z",
-      "updatedAt": "2026-10-27T18:53:49.000Z",
+      "updatedAt": "2026-10-27T18:59:09.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
