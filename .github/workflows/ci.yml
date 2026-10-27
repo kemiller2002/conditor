@@ -62,7 +62,7 @@ jobs:
           forma = inventory["forma"]
           assert forma["package"] == "@echelon-foundry/design-system", forma
           assert forma["defaultVersion"] == "0.5.0", forma
-          assert forma["qualifiedVersions"] == ["0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0"], forma
+          assert forma["qualifiedVersions"] == ["0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0", "0.10.0"], forma
           folio = inventory["folio"]
           assert folio["package"] == "@echelon-foundry/print-components", folio
           assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0", "0.4.1"], folio
@@ -452,6 +452,49 @@ jobs:
           "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.22.0"
           "$home/.local/bin/ordo" --version | grep -Fx "1.18.0"
           ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
+      - name: Chrona 1.29.0 -> 1.30.0 moves only Forma 0.9.0 -> 0.10.0 through npm with the real release
+        shell: bash
+        env:
+          # The Registry's proposed 1.30.0 cut (echelon-registry WI-0067, #101),
+          # vendored byte-for-byte as the Registry tools generate it; the
+          # sha256 is its channel identity. Against 1.29.0 it moves only Forma
+          # 0.9.0 -> 0.10.0 (LCE-001 layout constraint enforcement), which
+          # Chrona declares.
+          SET_130_PATH: tests/fixtures/registry/echelon-current-1.30.0-linux-x64.json
+          SET_130_SHA256: 491041e924617c61b90ef7db60683fa391516c78956c421bc0e761c36b07ba82
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          git -C "$repo" add -A
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current 1.29.0"
+          echo "$SET_130_SHA256  $SET_130_PATH" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$SET_130_PATH" --resolved-set-sha256 "$SET_130_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-130.txt"
+          actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-130.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
+          test "$actual" = "forma: 0.9.0 -> 0.10.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          grep -F "forma: 0.9.0 -> 0.10.0 [web-package-binding]" "$RUNNER_TEMP/chrona-plan-130.txt"
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/chrona-plan-130.txt" | cut -d' ' -f2)
+          conditor upgrade --current "${args[@]}" --authorize "$authorization"
+          python3 - "$repo" <<'PY'
+          import json, sys, pathlib
+          repo = pathlib.Path(sys.argv[1])
+          capabilities = json.loads((repo / ".echelon/foundations.json").read_text())["capabilities"]
+          assert capabilities["forma"]["version"] == "0.10.0", capabilities["forma"]
+          assert capabilities["praxis"] == {"required": True, "version": "3.22.0"} and capabilities["ordo"]["version"] == "1.18.0", capabilities
+          assert capabilities["folio"]["version"] == "0.4.1", capabilities["folio"]
+          versions = {c["id"]: c["version"] for c in json.loads((repo / "conditor.json").read_text())["components"]}
+          assert versions["forma"] == "0.10.0" and versions["praxis"] == "3.22.0" and versions["ordo"] == "1.18.0", versions
+          assert versions["folio"] == "0.4.1", versions
+          asset = "https://github.com/kemiller2002/forma/releases/download/v0.10.0/echelon-foundry-design-system-0.10.0.tgz"
+          dependencies = json.loads((repo / "package.json").read_text())["dependencies"]
+          assert dependencies["@echelon-foundry/design-system"] == asset, dependencies
+          installed = json.loads((repo / "node_modules/@echelon-foundry/design-system/package.json").read_text())
+          assert installed["version"] == "0.10.0", installed["version"]
+          PY
+          conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+          ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
 
   echelon-current-sweep-qualification:
     needs: build-test
@@ -734,6 +777,11 @@ jobs:
           # declares Praxis and Ordo of those, so only they move.
           SET_129_PATH: tests/fixtures/registry/echelon-current-1.29.0-linux-x64.json
           SET_129_SHA256: d3774e7a24c0df9728ec2fcec197aa2582cfc612c642342c800d64aa4583a290
+          # 1.30.0 is the Registry's proposed cut (echelon-registry WI-0067,
+          # #101): only Forma 0.9.0 -> 0.10.0. This repository does not
+          # declare Forma, so no declared component moves.
+          SET_130_PATH: tests/fixtures/registry/echelon-current-1.30.0-linux-x64.json
+          SET_130_SHA256: 491041e924617c61b90ef7db60683fa391516c78956c421bc0e761c36b07ba82
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -814,6 +862,13 @@ jobs:
           "$home/.local/bin/ordo" --version | grep -Fx "1.18.0"
           "$home/.local/bin/praxis" --root "$repo" verify --strict
           ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
+          # 1.29.0 -> 1.30.0: Conditor reads the set and plans no transition
+          # for the declared components.
+          echo "$SET_130_SHA256  $SET_130_PATH" | sha256sum -c -
+          conditor upgrade --current --check --home "$home" --target "$repo" --resolved-set "$SET_130_PATH" --resolved-set-sha256 "$SET_130_SHA256" | tee "$RUNNER_TEMP/sweep-1.30.0.txt"
+          grep -F "Current upgrade plan: echelon-current@1.30.0" "$RUNNER_TEMP/sweep-1.30.0.txt"
+          grep -F "version transitions: none" "$RUNNER_TEMP/sweep-1.30.0.txt"
+          if grep -E "REFUSED" "$RUNNER_TEMP/sweep-1.30.0.txt"; then exit 1; fi
 
   # Indy-init OD-INDY-8: the kickoff set is approved in the Registry only after
   # Conditor qualifies it (DF-CON-2026-A007). The workstation installs every

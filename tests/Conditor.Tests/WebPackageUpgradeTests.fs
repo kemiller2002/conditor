@@ -715,11 +715,44 @@ let private echelonCurrent128 check =
                     "Folio 0.4.1 upgrade records the Registry versions"
                     (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "0.9.0"; "folio", Some "0.4.1" ]))
 
+// ---- echelon-current 1.30.0: Forma 0.10.0 -----------------------------------
+// echelon-current 1.30.0 (echelon-registry WI-0067, #101) moves Forma
+// 0.9.0 -> 0.10.0 (LCE-001 layout constraint enforcement) and keeps Folio
+// 0.4.1. An application on the 1.29.0 selections moves only Forma, by its
+// exact GitHub release-asset pin.
+let private echelonCurrent130 check =
+    let f = registeredStepRepository check ("0.9.0", "0.4.1") "0.10.0" "0.4.1"
+
+    withPath f.Bin (fun () ->
+        match preview f with
+        | Error errors -> check $"echelon-current 1.30.0 web plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                "current upgrade moves only Forma 0.9.0 -> 0.10.0, as a package-manager binding transition"
+                (plan.Refusals.IsEmpty
+                 && plan.Transitions
+                    |> List.map (fun transition -> transition.Id, transition.FromVersion, transition.ToVersion, transition.Mode) = [ "forma", "0.9.0", "0.10.0", "web-package-binding" ])
+
+            match apply f plan.Digest with
+            | Error errors -> check $"authorized Forma 0.10.0 upgrade succeeds: {joined errors}" false
+            | Ok result ->
+                check
+                    "Forma 0.10.0 is installed as the exact GitHub release-asset pin, and Folio is not reinstalled"
+                    (File.ReadAllLines f.Log
+                     |> Array.toList = [ let asset = releaseAsset "forma" FormaStem "0.10.0"
+                                         $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {FormaPackage}@{asset}" ])
+
+                check "Forma 0.10.0 upgrade leaves no version drift" result.NoRemainingVersionChanges
+
+                check
+                    "Forma 0.10.0 upgrade records the Registry versions"
+                    (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "0.10.0"; "folio", Some "0.4.1" ]))
+
 let run (check: string -> bool -> unit) =
     check
         "Conditor qualifies released Forma web-package upgrade boundaries"
         (Registry.qualifiedVersions "forma"
-         |> Option.exists (fun versions -> Set.contains "0.6.1" versions && Set.contains "0.9.0" versions)
+         |> Option.exists (fun versions -> [ "0.6.1"; "0.9.0"; "0.10.0" ] |> List.forall (fun version -> Set.contains version versions))
          && Registry.qualifiedVersions "folio" |> Option.exists (fun versions -> Set.contains "0.4.0" versions && Set.contains "0.4.1" versions))
 
     if OperatingSystem.IsWindows() then
@@ -731,6 +764,7 @@ let run (check: string -> bool -> unit) =
         refusals check
         echelonCurrent120 check
         echelonCurrent128 check
+        echelonCurrent130 check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"
