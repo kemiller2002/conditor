@@ -235,6 +235,33 @@ module Engine =
 
         compare (parts actual |> Array.toList) (parts minimum |> Array.toList) >= 0
 
+    /// A tool that reports its version on stdout (optionally prefixed with "v", as node does); Conditor does not
+    /// install it, so a missing or too old tool is external-only with the host-side remedy.
+    let private versionedTool (probe: string -> string list -> ProcessResult) (p: Prerequisite) (exe: string) (args: string list) (remedy: string) =
+        let r = probe exe args
+        let version = parseVersion (r.StandardOutput.Replace(" v", " ").TrimStart('v'))
+
+        match r.ExitCode, version with
+        | 0, Some v when p.MinimumVersion |> Option.forall (fun m -> versionAtLeast m v) -> PrerequisiteState.Satisfied v
+        | 0, Some v -> PrerequisiteState.ExternalOnly $"{exe} {v} is older than {p.MinimumVersion |> Option.defaultValue String.Empty}; {remedy}"
+        | 0, None -> PrerequisiteState.Unknown $"{exe} reported no version"
+        | _ -> PrerequisiteState.ExternalOnly $"{exe} is not installed; {remedy}"
+
+    /// A .NET SDK workload (e.g. "dotnet-workload:wasm-tools", which the .NET WebAssembly build needs for native
+    /// relinking): satisfied when `dotnet workload list` names it; its manifest version is reported.
+    let private dotnetWorkload (probe: string -> string list -> ProcessResult) (workload: string) =
+        let r = probe "dotnet" [ "workload"; "list" ]
+
+        let row =
+            r.StandardOutput.Split('\n')
+            |> Array.map (fun line -> line.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries))
+            |> Array.tryFind (fun cells -> cells.Length >= 2 && cells[0] = workload)
+
+        match r.ExitCode, row with
+        | 0, Some cells -> PrerequisiteState.Satisfied cells[1]
+        | 0, None -> PrerequisiteState.ExternalOnly $"the .NET workload {workload} is not installed (run: dotnet workload install {workload})"
+        | _ -> PrerequisiteState.ExternalOnly $"the .NET SDK is not installed, so the workload {workload} cannot be checked"
+
     /// Classify each prerequisite without mutating the host (CON-170..175).
     /// `probe` runs a command and returns its result; injected for tests.
     let discover (probe: string -> string list -> ProcessResult) (prerequisites: Prerequisite list) =
@@ -262,6 +289,10 @@ module Engine =
 
                         if auth.ExitCode = 0 then PrerequisiteState.Satisfied version
                         else PrerequisiteState.ExternalOnly $"GitHub CLI {version} is installed but not authenticated (run gh auth login)"
+                | "dotnet" -> versionedTool probe p "dotnet" [ "--version" ] "install the .NET SDK (https://dot.net) or put it on PATH"
+                | "node" -> versionedTool probe p "node" [ "--version" ] "install Node.js or put it on PATH"
+                | workload when workload.StartsWith("dotnet-workload:", StringComparison.Ordinal) ->
+                    dotnetWorkload probe (workload.Substring "dotnet-workload:".Length)
                 | other -> PrerequisiteState.Unknown $"no discovery rule for '{other}'"
 
             p, state)

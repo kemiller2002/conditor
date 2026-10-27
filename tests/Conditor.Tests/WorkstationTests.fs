@@ -167,6 +167,49 @@ let run (check: string -> bool -> unit) =
 
     check "minimal profile installs nothing" (Profiles.resolve "minimal" |> Result.map (fun p -> p.Components.IsEmpty) = Ok true)
 
+    // F# + .NET WebAssembly toolchain discovery (R5 bootstrap): .NET SDK, Node.js and SDK workloads are classified,
+    // never installed, by a fake host.
+    let toolchain (sdk: string option) (node: string option) (workloads: string) exe (args: string list) : ProcessResult =
+        let ok out = { ExitCode = 0; StandardOutput = out; StandardError = "" }
+        let missing = { ExitCode = 127; StandardOutput = ""; StandardError = "not found" }
+
+        match exe, args, sdk, node with
+        | "dotnet", [ "--version" ], Some v, _ -> ok (v + "\n")
+        | "dotnet", [ "workload"; "list" ], Some _, _ -> ok workloads
+        | "node", [ "--version" ], _, Some v -> ok ("v" + v + "\n")
+        | _ -> missing
+
+    let toolchainPrerequisites =
+        [ { Id = "dotnet"; MinimumVersion = Some "10.0.100"; Required = true }
+          { Id = "dotnet-workload:wasm-tools"; MinimumVersion = None; Required = true }
+          { Id = "node"; MinimumVersion = Some "22.0.0"; Required = true } ]
+
+    let workloadTable = "\nInstalled Workload Id      Manifest Version      Installation Source\n--------------------------------------------------------------------\nwasm-tools                 10.0.114/10.0.100     SDK 10.0.400\n"
+    let states sdk node workloads = Engine.discover (toolchain sdk node workloads) toolchainPrerequisites |> List.map snd
+
+    check
+        "a ready F#/WASM host: .NET SDK, wasm-tools workload and Node.js are satisfied with their versions"
+        (states (Some "10.0.402") (Some "22.22.0") workloadTable = [ PrerequisiteState.Satisfied "10.0.402"; PrerequisiteState.Satisfied "10.0.114/10.0.100"; PrerequisiteState.Satisfied "22.22.0" ])
+
+    match states (Some "8.0.100") None "" with
+    | [ PrerequisiteState.ExternalOnly sdk; PrerequisiteState.ExternalOnly workload; PrerequisiteState.ExternalOnly node ] ->
+        check "an old .NET SDK is external-only with its minimum" (sdk.Contains "older than 10.0.100")
+        check "a missing workload names the install command" (workload.Contains "dotnet workload install wasm-tools")
+        check "a missing Node.js is external-only" (node.Contains "node is not installed")
+    | other -> check $"toolchain gaps are external-only, never installed: {other}" false
+
+    match Profiles.resolve "fsharp-limen-wasm" with
+    | Ok p ->
+        check
+            "the embedded fsharp-limen-wasm profile requires git, the .NET SDK, the wasm-tools workload and Node.js and installs nothing"
+            ((p.Prerequisites |> List.filter _.Required |> List.map _.Id |> set) = set [ "git"; "dotnet"; "dotnet-workload:wasm-tools"; "node" ] && p.Components.IsEmpty)
+    | Error e -> check $"the embedded fsharp-limen-wasm profile resolves: {e}" false
+
+    match states None (Some "22.22.0") "" with
+    | [ PrerequisiteState.ExternalOnly _; PrerequisiteState.ExternalOnly workload; PrerequisiteState.Satisfied _ ] ->
+        check "without the .NET SDK the workload cannot be checked" (workload.Contains "cannot be checked")
+    | other -> check $"a host without the .NET SDK: {other}" false
+
     // Registry resolved release sets ----------------------------------------
     let registryHome = temp "registry-home"
     let registryMirror = temp "registry-mirror"

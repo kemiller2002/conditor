@@ -123,7 +123,7 @@ type PrerequisiteState =
 module Profiles =
     let private assembly = typeof<Prerequisite>.Assembly
 
-    let embeddedNames = [ "minimal"; "echelon-engineering" ]
+    let embeddedNames = [ "minimal"; "echelon-engineering"; "fsharp-limen-wasm" ]
 
     let private tryProperty (name: string) (element: JsonElement) =
         let mutable value = Unchecked.defaultof<JsonElement>

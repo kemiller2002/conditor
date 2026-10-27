@@ -5,7 +5,7 @@ uninstalls; Praxis stays the runtime authority for work after handoff, and
 Project Administration records what is installed where.
 
 ```
-conditor workstation plan      [--profile echelon-engineering|minimal|FILE] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--with OPTIONAL]* [--home DIR] [--json]
+conditor workstation plan      [--profile echelon-engineering|minimal|fsharp-limen-wasm|FILE] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--with OPTIONAL]* [--home DIR] [--json]
 conditor workstation apply     --authorize PLAN-DIGEST [--profile ...] --resolved-set SET --resolved-set-sha256 SHA [--allow-downgrade] [--praxis PATH] [--target-id ID] [--no-rollback]
 conditor workstation register  [--authorize DIGEST] [--profile ...] --resolved-set SET --resolved-set-sha256 SHA [--praxis PATH] [--target-id ID] [--home DIR]
 conditor workstation status    [--home DIR]
@@ -63,6 +63,15 @@ Versioned, declarative, composable JSON (`profiles/*.profile.json`, schema
   Tutela). They are installed only when selected with `--with`, and this
   profile version refuses them explicitly rather than half-installing them.
   Agent providers are selectable, and Conditor never installs them.
+- **`fsharp-limen-wasm`**: extends `minimal`. Host readiness for an F#/Limen
+  .NET WebAssembly application (the `fsharp-limen-web` scaffold): .NET SDK ≥
+  10.0.100, the `wasm-tools` SDK workload (native relinking of the browser
+  runtime) and Node.js ≥ 22 are required. Installs nothing: each is discovered
+  (`dotnet --version`, `dotnet workload list`, `node --version`) and a
+  missing or older one is reported external-only with the host-side remedy, so
+  the local WebAssembly build is proven possible before any work starts.
+  Prerequisite ids `dotnet`, `node` and `dotnet-workload:<id>` are
+  available to any profile.
 - **Project composition**: any file with `"extends": "echelon-engineering"`
   that adds or overrides prerequisites and components by id.
 

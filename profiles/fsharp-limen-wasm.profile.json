@@ -1,0 +1,25 @@
+{
+  "schema": "conditor.workstation-profile/v1",
+  "id": "fsharp-limen-wasm",
+  "version": 1,
+  "extends": "minimal",
+  "description": "Host readiness for an F#/Limen .NET WebAssembly application: .NET SDK 10, the wasm-tools workload, Node.js 22.",
+  "prerequisites": [
+    {
+      "id": "dotnet",
+      "minimumVersion": "10.0.100",
+      "required": true
+    },
+    {
+      "id": "dotnet-workload:wasm-tools",
+      "required": true
+    },
+    {
+      "id": "node",
+      "minimumVersion": "22.0.0",
+      "required": true
+    }
+  ],
+  "components": [],
+  "optional": []
+}
