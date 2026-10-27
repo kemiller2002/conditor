@@ -62,4 +62,4 @@
 | WI-0054 | Indy Init preset pins Ordo 1.5.0, Forma 0.5.0 and Folio 0.3.0, off the approved echelon-current 1.28.0 selection (Ordo 1.17.0, Forma 0.9.0, Folio 0.4.1); a fresh bootstrap is therefore not on the kickoff set (Indy-init Rehearsal 4 T10 / PRE-TOOL-03) | complete |  | medium |
 | WI-0055 | conditor upgrade --current refuses Folio 0.3.0 -> 0.4.1 for an existing repository: the foundations capability declares a releaseArtifact Conditor cannot prove for 0.4.1, so the whole echelon-current 1.28.0 plan (including Ordo and Forma) is refused (seen on an Indy preset bootstrap, WI-0054) | captured |  | medium |
 | WI-0056 | Qualify echelon-current 1.29.0: Praxis 3.22.0, Ordo 1.18.0, Dokimos 0.8.0, percepta-semantic 0.3.0 (echelon-registry WI-0066, proposed cut); move the Indy preset; request 0.10.14 | complete | release, qualification | high |
-| WI-0057 | Qualify Forma 0.10.0 for echelon-current 1.30.0 (echelon-registry WI-0067, proposed cut, #101) | ready | release, qualification | high |
+| WI-0057 | Qualify Forma 0.10.0 for echelon-current 1.30.0 (echelon-registry WI-0067, proposed cut, #101) | complete | release, qualification | high |
