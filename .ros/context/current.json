@@ -2563,7 +2563,27 @@
       "updatedAt": "2026-10-27T19:44:17Z",
       "telemetryExecutionIds": [
         "EXE-20261027T194418935Z-e767a61f"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "3631670aa6640ea3ce62fb25",
+        "recordedAt": "2026-10-27T19:46:52Z",
+        "executionId": "EXE-20261027T194418935Z-e767a61f",
+        "repository": "conditor",
+        "branch": "claude/qualify-forma-0.10.0",
+        "commit": "674b11656c80c2159fd12bc18026bfd1bbcc2f14",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-forma-0.10.0",
+        "remoteCommit": "674b11656c80c2159fd12bc18026bfd1bbcc2f14",
+        "summary": "Forma 0.10.0 qualified (component, unit test, vendored 1.30.0 set, Chrona and sweep CI); all 1164 tests pass; REG-RU-007 passes on 1.30.0 against this build.",
+        "nextAction": "Owner decides: merge and release Conditor 0.10.15 (bump release/requested-version.txt), and whether the Indy preset follows 1.30.0.",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
