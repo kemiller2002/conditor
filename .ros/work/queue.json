@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 59,
+  "nextSeq": 60,
   "items": [
     {
       "id": "WI-0001",
@@ -1369,6 +1369,30 @@
       },
       "source": "inbox",
       "sourceReference": ".praxis/inbox/documents/2026-10-28-EII-E-test-environment-contract.md"
+    },
+    {
+      "id": "WI-0059",
+      "title": "ESO-P6: test-env resolve emitter (single source for consumer configs) and incorrect-endpoint preflight scenarios",
+      "description": "Process .praxis/inbox/documents/2026-10-28-ESO-P6-test-environment-single-source.md (Echelon development speed optimization, Priority Six): test-env resolve emitter, incorrect-endpoint preflight scenarios, docs.",
+      "tags": [
+        "eso",
+        "test-environment"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-28T06:31:56.560Z",
+      "updatedAt": "2026-10-28T06:35:33.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }
