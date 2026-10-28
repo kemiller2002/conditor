@@ -62,7 +62,7 @@ jobs:
           forma = inventory["forma"]
           assert forma["package"] == "@echelon-foundry/design-system", forma
           assert forma["defaultVersion"] == "0.5.0", forma
-          assert forma["qualifiedVersions"] == ["0.10.0", "0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0"], forma
+          assert forma["qualifiedVersions"] == ["0.10.0", "0.11.0", "0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0"], forma
           folio = inventory["folio"]
           assert folio["package"] == "@echelon-foundry/print-components", folio
           assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0", "0.4.1"], folio
@@ -542,6 +542,42 @@ jobs:
           "$home/.local/bin/ordo" --version | grep -Fx "1.19.0"
           ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
 
+      - name: Chrona 1.31.0 -> 1.32.0 plans Forma 0.10.0 -> 0.11.0 and Arca 0.5.0 -> 0.6.0, and stays on 1.31.0
+        shell: bash
+        env:
+          # The proposed 1.32.0 cut, vendored byte-for-byte as the Registry
+          # tools resolve it; the sha256 is its channel identity. Against
+          # 1.31.0 it moves Forma 0.10.0 -> 0.11.0 (typography roles) and
+          # Arca 0.5.0 -> 0.6.0, both of which Chrona declares. Arca 0.6.0
+          # makes EntryState, QueueEntry, OfflineQueue and CommitReceipt opaque
+          # (DF-ARCA-2026-0014), and Chrona's store code matches on them, so
+          # Chrona does not compile against it. The owner decided on 2026-10-28
+          # that 1.32.0 ships Arca 0.6.0 and Chrona stays on 1.31.0 until it
+          # migrates: this step proves the plan names both transitions with the
+          # real release digests, and does not apply it. Forma 0.10.0 -> 0.11.0
+          # is applied by WebPackageUpgradeTests.echelonCurrent132.
+          SET_132_PATH: tests/fixtures/registry/echelon-current-1.32.0-linux-x64.json
+          SET_132_SHA256: bf52d105279f5239697239cd7d57485f632f022f7bb89e2ca89cc852314527d1
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          git -C "$repo" add -A
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current 1.31.0"
+          echo "$SET_132_SHA256  $SET_132_PATH" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$SET_132_PATH" --resolved-set-sha256 "$SET_132_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-132.txt"
+          actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-132.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
+          test "$actual" = "arca: 0.5.0 -> 0.6.0;forma: 0.10.0 -> 0.11.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          grep -F "forma: 0.10.0 -> 0.11.0 [web-package-binding]" "$RUNNER_TEMP/chrona-plan-132.txt"
+          grep -F "arca: 0.5.0 -> 0.6.0 from kemiller2002/arca@v0.6.0" "$RUNNER_TEMP/chrona-plan-132.txt"
+          grep -F "EchelonFoundry.Arca.Core 0.6.0 (sha256:e93c434553819704f57bfc6c9e70ed0333ca2dad37247ce9d4068a7abffc9646)" "$RUNNER_TEMP/chrona-plan-132.txt"
+          grep -F "EchelonFoundry.Arca.GitHub 0.6.0 (sha256:34f160c4825952f0b2f8c48cb06943bdb2f6c25ed357ced31e9a8d2240c57fe9)" "$RUNNER_TEMP/chrona-plan-132.txt"
+          grep -F "EchelonFoundry.Arca.Limen 0.6.0 (sha256:c4ef571f1fd1171cbe1a441ad5cd6d574c5faea148a45effd0b94f4131535a11)" "$RUNNER_TEMP/chrona-plan-132.txt"
+          if grep -F "REFUSED" "$RUNNER_TEMP/chrona-plan-132.txt"; then exit 1; fi
+          # Not applied: Chrona stays on 1.31.0 until it migrates to Arca 0.6.0.
+          ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
   echelon-current-sweep-qualification:
     needs: build-test
     runs-on: ubuntu-latest
@@ -833,6 +869,11 @@ jobs:
           # repository declares Praxis and Ordo of those, so only they move.
           SET_131_PATH: tests/fixtures/registry/echelon-current-1.31.0-linux-x64.json
           SET_131_SHA256: 4d30d15f3b268a0b2673d511d092d592c086eadc985283606b536e6c027287d8
+          # 1.32.0 is the proposed cut: Forma 0.10.0 -> 0.11.0 and the optional
+          # Arca 0.5.0 -> 0.6.0. This repository declares neither, so no
+          # declared component moves and Arca is not added.
+          SET_132_PATH: tests/fixtures/registry/echelon-current-1.32.0-linux-x64.json
+          SET_132_SHA256: bf52d105279f5239697239cd7d57485f632f022f7bb89e2ca89cc852314527d1
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -926,6 +967,13 @@ jobs:
           "$home/.local/bin/ordo" --version | grep -Fx "1.19.0"
           "$home/.local/bin/praxis" --root "$repo" verify --strict
           ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
+          # 1.31.0 -> 1.32.0: Conditor reads the set and plans no transition
+          # for the declared components, and does not add Arca.
+          echo "$SET_132_SHA256  $SET_132_PATH" | sha256sum -c -
+          conditor upgrade --current --check --home "$home" --target "$repo" --resolved-set "$SET_132_PATH" --resolved-set-sha256 "$SET_132_SHA256" | tee "$RUNNER_TEMP/sweep-1.32.0.txt"
+          grep -F "Current upgrade plan: echelon-current@1.32.0" "$RUNNER_TEMP/sweep-1.32.0.txt"
+          grep -F "version transitions: none" "$RUNNER_TEMP/sweep-1.32.0.txt"
+          if grep -E "REFUSED|arca" "$RUNNER_TEMP/sweep-1.32.0.txt"; then exit 1; fi
 
   # Indy-init OD-INDY-8: the kickoff set is approved in the Registry only after
   # Conditor qualifies it (DF-CON-2026-A007). The workstation installs every

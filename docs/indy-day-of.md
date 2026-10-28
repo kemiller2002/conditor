@@ -17,8 +17,12 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.31.0, once the Registry approves it
-  (1.30.0 is the approved set until then). It installs Praxis 3.23.0, which
+  The kickoff set is echelon-current 1.32.0, once the Registry approves it
+  (1.31.0 is the approved set until then). 1.32.0 installs the same native
+  host tools as 1.31.0; it moves only the application bindings Forma 0.10.0
+  -> 0.11.0 (typography roles, `data-ef-type`) and the optional Arca 0.5.0 ->
+  0.6.0 (only a provider can confirm a write; a breaking API change, see
+  Arca's CHANGELOG). It installs Praxis 3.23.0, which
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`) and records process evidence in the work
   event log (`praxis work evidence`); Ordo 1.19.0, which orders the admitted
