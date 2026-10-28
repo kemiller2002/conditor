@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 60,
+  "nextSeq": 61,
   "items": [
     {
       "id": "WI-0001",
@@ -1383,6 +1383,30 @@
       "attachments": [],
       "createdAt": "2026-10-28T06:31:56.560Z",
       "updatedAt": "2026-10-28T06:35:33.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0060",
+      "title": "Qualify echelon-current 1.31.0: Praxis 3.23.0, Ordo 1.19.0, Dokimos 0.9.0, Limen 0.9.1 (generated from the registry tools, proposed cut); move the Indy preset; request 0.10.16",
+      "description": null,
+      "tags": [
+        "release",
+        "qualification"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-28T12:56:06.315Z",
+      "updatedAt": "2026-10-28T12:56:13Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

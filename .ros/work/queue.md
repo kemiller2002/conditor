@@ -65,3 +65,4 @@
 | WI-0057 | Qualify Forma 0.10.0 for echelon-current 1.30.0 (echelon-registry WI-0067, proposed cut, #101) | complete | release, qualification | high |
 | WI-0058 | EII-E: standard test-environment contract and conditor test-env preflight (reproducible browser environments) | complete | eii, test-environment | high |
 | WI-0059 | ESO-P6: test-env resolve emitter (single source for consumer configs) and incorrect-endpoint preflight scenarios | complete | eso, test-environment | high |
+| WI-0060 | Qualify echelon-current 1.31.0: Praxis 3.23.0, Ordo 1.19.0, Dokimos 0.9.0, Limen 0.9.1 (generated from the registry tools, proposed cut); move the Indy preset; request 0.10.16 | ready | release, qualification | high |
