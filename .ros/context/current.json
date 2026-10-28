@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-28T17:29:25Z",
+  "updatedAt": "2026-10-28T22:57:30.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2832,6 +2832,48 @@
         }
       },
       "completedAt": "2026-10-28T17:29:25Z"
+    },
+    {
+      "id": "WI-0062",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "docs/unattended-readiness.md"
+        },
+        {
+          "type": "tests",
+          "path": "docs/unattended-readiness.md"
+        }
+      ],
+      "updatedAt": "2026-10-28T22:57:30.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261028T221924628Z-0a9c29fe"
+      ],
+      "latestCheckpoint": {
+        "id": "67aa3bfaebce554c30f33e25",
+        "recordedAt": "2026-10-28T22:57:29.000Z",
+        "executionId": "EXE-20261028T221924628Z-0a9c29fe",
+        "repository": "conditor",
+        "branch": "claude/echelon-autonomous-execution-ic4yhx",
+        "commit": "90feb506a7ed940604259a866bf3b00669ebead1",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/echelon-autonomous-execution-ic4yhx",
+        "remoteCommit": "90feb506a7ed940604259a866bf3b00669ebead1",
+        "summary": "Implemented and verified (see praxis docs/autonomous-execution)",
+        "nextAction": "Owner review and merge",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-28T22:57:30.000Z",
+      "conclusion": "Implemented and verified; part of praxis WI-0104"
     }
   ]
 }
