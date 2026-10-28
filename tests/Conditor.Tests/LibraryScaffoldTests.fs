@@ -270,7 +270,7 @@ let run (check: string -> bool -> unit) =
         match planInit () |> Result.bind (fun plan -> Installer.execute target manifestPath plan) with
         | Error errors -> check $"library scaffold is established by init: {joined errors}" false
         | Ok _ ->
-            check "init records the scaffold in the lock" (Scaffolding.establishedScaffold target = Some { Kind = "fsharp-nuget-library"; Name = Some "Arca" })
+            check "init records the scaffold in the lock" (Scaffolding.establishedScaffold target = Some { Kind = "fsharp-nuget-library"; Name = Some "Arca"; TestEnvironment = false })
 
             // The project grows: the test project changes, the library is renamed.
             File.AppendAllText(Path.Combine(target, "tests", "Arca.Tests", "Arca.Tests.fsproj"), "<!-- grown -->\n")

@@ -1,6 +1,7 @@
 namespace Conditor.Core
 
 open System
+open System.IO
 
 module Doctor =
     type FindingSeverity =
@@ -104,6 +105,39 @@ module Doctor =
                       Remediation =
                         Some $"Run the {action.ComponentId} lifecycle remediation named above, then run 'conditor repair' and 'conditor status'." })
 
+    /// The test-environment preflight, only when the repository opted in with
+    /// a `conditor.test-environment.json` contract (CON-374). Doctor stays
+    /// read-only: no diagnostics files are written. A repository without a
+    /// contract gets no finding at all.
+    let testEnvironmentFindings (target: string) (environment: string -> string option) =
+        let path = Path.Combine(target, TestEnvironment.DefaultContractPath)
+
+        if not (File.Exists path) then
+            []
+        else
+            match TestEnvironment.preflight path environment false with
+            | Result.Error errors ->
+                errors
+                |> List.map (fun error ->
+                    { Code = "COND-DOC-TENV-CONTRACT"
+                      Severity = Error
+                      Area = "test-environment"
+                      Detail = error
+                      Remediation =
+                        Some "Make the contract conform to schemas/conditor-test-environment.schema.json, then run 'conditor test-env preflight'." })
+            | Ok report ->
+                report.Findings
+                |> List.map (fun finding ->
+                    { Code = "COND-DOC-" + finding.Code.Substring("COND-".Length)
+                      Severity =
+                        match finding.Severity with
+                        | TestEnvironment.Info -> Info
+                        | TestEnvironment.Warning -> Warning
+                        | TestEnvironment.Error -> Error
+                      Area = "test-environment"
+                      Detail = $"{finding.What} ({finding.Where})"
+                      Remediation = finding.Fix })
+
     let inspect target manifestPath manifest =
         let findings = ResizeArray<Finding>()
 
@@ -113,6 +147,9 @@ module Doctor =
         addStatusFindings findings status
 
         lifecycleDoctorFindings target manifest
+        |> List.iter findings.Add
+
+        testEnvironmentFindings target TestEnvironment.processEnvironment
         |> List.iter findings.Add
 
         let result = List.ofSeq findings

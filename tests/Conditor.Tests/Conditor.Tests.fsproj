@@ -24,6 +24,7 @@
     <Compile Include="VerificationGateTests.fs" />
     <Compile Include="LibraryScaffoldTests.fs" />
     <Compile Include="WebScaffoldTests.fs" />
+    <Compile Include="TestEnvironmentTests.fs" />
     <Compile Include="BranchProtectionTests.fs" />
     <Compile Include="RepositoryCreationTests.fs" />
     <Compile Include="SupervisorTests.fs" />

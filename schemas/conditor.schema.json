@@ -91,6 +91,10 @@
         "name": {
           "type": "string",
           "minLength": 1
+        },
+        "testEnvironment": {
+          "description": "fsharp-limen-web only: also emit conditor.test-environment.json and a playwright.config.js that reads its ports from it (CON-375). Default false.",
+          "type": "boolean"
         }
       }
     },

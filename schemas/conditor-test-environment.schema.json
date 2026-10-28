@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor/test-environment/v1",
+  "title": "Conditor test-environment contract (conditor.test-environment.json)",
+  "description": "The one authoritative declaration of a repository's browser test environment: endpoints, the test port and its override, fixtures and their digests, build and runtime configuration, the identity of the artifact under test, the browsers the suite launches, and where diagnostics go. Every config, spec and script reads its values from this file; 'conditor test-env preflight' proves the machine matches it before any browser starts (CON-368..375). Relative paths resolve against the directory holding this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "application", "test", "build", "runtime", "artifact", "fixtures", "browsers", "diagnostics"],
+  "properties": {
+    "schema": { "const": "conditor.test-environment/v1" },
+    "application": {
+      "description": "The application (production-configuration) endpoint, distinct from the test site.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint"],
+      "properties": {
+        "endpoint": {
+          "description": "Absolute http(s) URL, or null when the repository serves no separate application endpoint. A local endpoint must not share the test port.",
+          "type": ["string", "null"],
+          "pattern": "^https?://"
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrl", "port"],
+      "properties": {
+        "baseUrl": {
+          "description": "The browser base URL of the test site. When local, its port must equal 'port'.",
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "baseUrlVariable": {
+          "description": "Environment variable that replaces baseUrl entirely (for example, to test a deployed site).",
+          "$ref": "#/$defs/variableOrNull"
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "portVariable": {
+          "description": "Environment variable that overrides 'port' (for parallel worktrees). Every runner must read this same variable.",
+          "$ref": "#/$defs/variableOrNull"
+        },
+        "readinessPath": {
+          "description": "Path, relative to baseUrl, that answers once the server is ready.",
+          "type": "string"
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuration"],
+      "properties": {
+        "configuration": { "description": "The build configuration the artifact under test must have (for example 'test').", "type": "string", "minLength": 1 },
+        "command": { "description": "The command that builds the artifact in that configuration.", "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuration"],
+      "properties": {
+        "configuration": { "description": "Name of the runtime configuration the suite runs under (for example 'fixture').", "type": "string", "minLength": 1 },
+        "environment": {
+          "description": "Environment variables that configuration requires, with their values. A variable set to another value is a conflict.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "artifact": {
+      "description": "Identity of the artifact under test.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "description": "Directory (or single file) holding the built artifact.", "type": "string", "minLength": 1 },
+        "servedAt": { "description": "URL path, relative to baseUrl, at which the artifact root is served. Default: the base URL itself.", "type": "string" },
+        "identityPath": {
+          "description": "Artifact-relative file whose served bytes prove which artifact a running server serves. Default: the build-info file when it lies inside the artifact, else index.html.",
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "buildInfo": {
+          "description": "The JSON file the build writes, recording its configuration and content digest.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path"],
+              "properties": {
+                "path": { "type": "string", "minLength": 1 },
+                "configurationField": { "type": "string", "minLength": 1, "default": "configuration" },
+                "digestField": { "type": "string", "minLength": 1, "default": "contentSha256" }
+              }
+            }
+          ]
+        },
+        "sha256": { "description": "Pinned expected content digest of the artifact.", "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+        "sha256Variable": {
+          "description": "Environment variable carrying the exact candidate artifact's content digest (for example, from the CI build job).",
+          "$ref": "#/$defs/variableOrNull"
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "browsers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "anyOf": [{ "required": ["executable"] }, { "required": ["executableVariable"] }],
+        "properties": {
+          "name": { "description": "Playwright browser name (chromium, firefox, webkit).", "type": "string", "minLength": 1 },
+          "executable": { "type": ["string", "null"], "minLength": 1 },
+          "executableVariable": { "$ref": "#/$defs/variableOrNull" },
+          "revision": {
+            "description": "Expected Playwright browser revision, read from the install directory name (<name>-<revision>). Null leaves the revision unchecked.",
+            "type": ["string", "null"],
+            "pattern": "^[0-9]+$"
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "description": "Directory receiving preflight.json and preflight.txt.", "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "variableOrNull": { "type": ["string", "null"], "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+  }
+}

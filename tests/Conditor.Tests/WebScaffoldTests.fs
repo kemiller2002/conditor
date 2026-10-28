@@ -858,3 +858,54 @@ let runRegistryDistribution (check: string -> bool -> unit) =
             check "without an authority, npm-distributed Limen and Forma keep their exact npm versions"
                 (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.7.1"
                  && dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some "0.5.0"))
+
+/// CON-375: the opt-in test-environment contract. Only a scaffold that sets
+/// `testEnvironment: true` gets the contract and the Playwright config that
+/// reads it; every other repository keeps the unchanged config.
+let runTestEnvironmentOptIn (check: string -> bool -> unit) (validateContract: string -> Result<unit, string list>) =
+    let optedIn =
+        webManifest.Replace(
+            "\"scaffold\":{\"kind\":\"fsharp-limen-web\",\"name\":\"Indy Web\"}",
+            "\"scaffold\":{\"kind\":\"fsharp-limen-web\",\"name\":\"Indy Web\",\"testEnvironment\":true}"
+        )
+
+    check "the opt-in manifest differs from the default one" (optedIn <> webManifest)
+
+    withTarget (fun target ->
+        match planFor target webManifest with
+        | Error errors -> check $"the default web scaffold plans: {joined errors}" false
+        | Ok plan ->
+            let files = scaffoldFiles plan
+            check "a scaffold that does not opt in emits no test-environment contract" (not (files.ContainsKey "conditor.test-environment.json"))
+
+            check
+                "a scaffold that does not opt in keeps the unchanged Playwright config"
+                (files.TryFind "playwright.config.js"
+                 |> Option.exists (fun text -> text.Contains "const port = 4321;" && not (text.Contains "conditor.test-environment.json"))))
+
+    withTarget (fun target ->
+        match planFor target optedIn with
+        | Error errors -> check $"the opted-in web scaffold plans: {joined errors}" false
+        | Ok plan ->
+            let files = scaffoldFiles plan
+
+            match files.TryFind "conditor.test-environment.json", files.TryFind "playwright.config.js" with
+            | Some contract, Some config ->
+                check
+                    "the emitted contract conforms to conditor-test-environment.schema.json"
+                    (validateContract contract = Ok())
+
+                check "the emitted contract parses as a test-environment contract" (TestEnvironment.parse contract |> Result.isOk)
+                check "the opted-in Playwright config reads the contract" (config.Contains "readFileSync(new URL(\"./conditor.test-environment.json\"")
+                check "the opted-in Playwright config writes no port literal" (not (config.Contains "4321"))
+                check "the contract is the one place the test port is written" (contract.Contains "\"port\": 4321")
+
+                let otherFiles =
+                    files
+                    |> Map.filter (fun path text -> path <> "conditor.test-environment.json" && text.Contains "4321")
+                    |> Map.keys
+                    |> List.ofSeq
+
+                let listed = String.concat ", " otherFiles
+                check $"no other scaffold file writes the test port ({listed})" otherFiles.IsEmpty
+            | _ -> check "the opted-in scaffold emits the contract and the Playwright config" false)

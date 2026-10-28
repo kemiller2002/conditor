@@ -67,7 +67,11 @@ module Manifest =
                 Ok(
                     Some
                         { Kind = kind.Trim().ToLowerInvariant()
-                          Name = optionalString "name" value }
+                          Name = optionalString "name" value
+                          TestEnvironment =
+                            match tryProperty "testEnvironment" value with
+                            | Some flag when flag.ValueKind = JsonValueKind.True -> true
+                            | _ -> false }
                 )
         | Some _ -> Error "'scaffold' must be an object."
 

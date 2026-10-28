@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor/test-environment-report/v1",
+  "title": "Conditor test-environment preflight report (conditor test-env preflight --json; <diagnostics>/preflight.json)",
+  "description": "What the preflight proved or refused, each finding saying what, where and how to fix it (CON-371).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "contract", "passed", "elapsedMilliseconds", "diagnostics", "findings"],
+  "properties": {
+    "schema": { "const": "conditor.test-environment-report/v1" },
+    "contract": { "type": "string", "minLength": 1 },
+    "passed": { "type": "boolean" },
+    "elapsedMilliseconds": { "type": "integer", "minimum": 0 },
+    "diagnostics": { "type": "string", "minLength": 1 },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "what", "where", "fix"],
+        "properties": {
+          "code": { "enum": ["COND-TENV-CONFIG", "COND-TENV-PORT", "COND-TENV-FIXTURE", "COND-TENV-BUILD", "COND-TENV-BROWSER", "COND-TENV-ARTIFACT", "COND-TENV-SERVER"] },
+          "severity": { "enum": ["info", "warning", "error"] },
+          "what": { "type": "string", "minLength": 1 },
+          "where": { "type": "string" },
+          "fix": { "type": ["string", "null"] }
+        },
+        "if": { "properties": { "severity": { "enum": ["warning", "error"] } } },
+        "then": { "properties": { "fix": { "type": "string", "minLength": 1 } } }
+      }
+    }
+  }
+}

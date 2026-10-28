@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 57,
+  "nextSeq": 59,
   "items": [
     {
       "id": "WI-0001",
@@ -1345,6 +1345,30 @@
       },
       "source": "manual",
       "sourceReference": null
+    },
+    {
+      "id": "WI-0058",
+      "title": "EII-E: standard test-environment contract and conditor test-env preflight (reproducible browser environments)",
+      "description": "Process .praxis/inbox/documents/2026-10-28-EII-E-test-environment-contract.md: contract schema, F# preflight, tests, doctor integration, opt-in scaffold, docs.",
+      "tags": [
+        "eii",
+        "test-environment"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-28T00:54:36.000Z",
+      "updatedAt": "2026-10-28T01:12:05.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "inbox",
+      "sourceReference": ".praxis/inbox/documents/2026-10-28-EII-E-test-environment-contract.md"
     }
   ]
 }
