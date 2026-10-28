@@ -95,6 +95,7 @@ checks that the recipe and the implementation agree.
 ```text
 conditor test-env preflight [--contract PATH] [--target PATH] [--json]
 conditor test-env digest    [--contract PATH] [--target PATH]
+conditor test-env resolve   [--contract PATH] [--target PATH] [--json | --shell]
 ```
 
 - `--contract` defaults to `<target>/conditor.test-environment.json`.
@@ -111,6 +112,43 @@ conditor test-env digest    [--contract PATH] [--target PATH]
 - `conditor doctor` includes the same findings as `COND-DOC-TENV-*`, but only
   when the repository has a contract. Doctor stays read-only and writes no
   diagnostics. A repository without a contract sees no change.
+
+### Reading the contract from configs and scripts: `test-env resolve`
+
+`resolve` is the single-source path for consumers that honour the override
+variables (WI-0059, Echelon development speed optimization, Priority Six). It
+prints the settings a run actually uses, computed by the same pure `effective`
+function the preflight checks, so no config or script re-implements the
+override rules or writes a port of its own:
+
+- `--json` (default): `{ "schema": "conditor.test-environment-resolved/v1",
+  "port", "baseUrl", "readinessUrl", "applicationEndpoint", "browsers":
+  [{ "name", "executable" }], "runtimeEnvironment", "environment", "diagnostics" }`.
+- `--shell`: single-quoted `export` lines for `eval`. It always exports
+  `CONDITOR_TEST_PORT`, `CONDITOR_TEST_BASE_URL`, `CONDITOR_TEST_READINESS_URL`,
+  `CONDITOR_APPLICATION_ENDPOINT` (when declared) and
+  `CONDITOR_BROWSER_<NAME>_EXECUTABLE`. It also exports the contract's own
+  `portVariable`, `baseUrlVariable`, browser `executableVariable`s and
+  `runtime.environment`, so an existing runner that reads them keeps working.
+- Exit codes: `0` resolved; `3` the configuration refuses a run (the same
+  `COND-TENV-CONFIG` errors the preflight reports, on stderr); `2` the contract
+  is missing or invalid.
+
+```bash
+# CI or fixture script (R5 tools/acceptance/ci/fixture-ui.sh wrote its own port)
+eval "$(conditor test-env resolve --shell)"
+python3 -m http.server "$CONDITOR_TEST_PORT" --bind 127.0.0.1 --directory obj/site-test &
+```
+
+```js
+// playwright.config.js in a repository that sets override variables
+import { execFileSync } from "node:child_process";
+const env = JSON.parse(execFileSync("conditor", ["test-env", "resolve", "--json"], { encoding: "utf8" }));
+// use: { baseURL: env.baseUrl }, webServer: { url: env.readinessUrl, ... }
+```
+
+A repository that never sets the override variables may keep reading
+`conditor.test-environment.json` directly, as the opt-in scaffold does.
 
 ## Failures it prevents
 
@@ -141,6 +179,7 @@ fixture repositories in the temp directory.
 | 1 port occupied by a foreign HTTP server | 173.4 ms |
 | 1b port held by a non-HTTP listener | 2011.8 ms (bounded by the 2 s HTTP timeout) |
 | 2 / 2b / 2c conflicting configuration | 14.6 / 10.9 / 15.3 ms |
+| 2d / 2e incorrect endpoint (base URL disagrees with `test.port` / malformed base URL override) | 11.6 / 16.3 ms (WI-0059 run) |
 | 3 / 3b missing fixture / digest mismatch | 9.5 / 7.4 ms |
 | 4 wrong build configuration | 10.3 ms |
 | 5 / 5b / 5c missing browser / missing libraries / wrong revision | 10.8 / 13.5 / 15.5 ms |
@@ -172,8 +211,8 @@ contract is a seed: Conditor writes it once and never upgrades it.
 1. Write `conditor.test-environment.json` with the values the repository uses
    today, and validate it against the schema.
 2. Delete every other definition of the port, base URL and browser path.
-   Configs, specs, CI scripts and fixture scripts read the contract, or the
-   contract's one override variable. A spec takes the origin from Playwright's
+   Configs, specs, CI scripts and fixture scripts read the contract, the
+   contract's one override variable, or `conditor test-env resolve`. A spec takes the origin from Playwright's
    `baseURL`, not from a literal.
 3. Make the build write `build-info.json` with `configuration` and
    `contentSha256`, using the digest recipe above.

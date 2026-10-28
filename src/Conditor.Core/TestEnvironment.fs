@@ -1108,3 +1108,157 @@ module TestEnvironment =
 
     let processEnvironment (name: string) =
         Environment.GetEnvironmentVariable name |> Option.ofObj
+
+    // ------------------------------------------------------------------
+    // Resolved settings: the single source for consumer configs
+    // ------------------------------------------------------------------
+
+    /// The settings a browser run actually uses, after the contract's override
+    /// variables are applied by `effective`, the same function the preflight
+    /// uses. Consumer configs and scripts read these instead of re-implementing
+    /// the override rules, so the port is never written twice
+    /// (Echelon development speed optimization, Priority Six; WI-0059).
+    type Resolved =
+        { ContractPath: string
+          TestPort: int
+          TestBaseUrl: string
+          ReadinessUrl: string
+          Application: string option
+          Browsers: (string * string option) list
+          Runtime: (string * string) list
+          Variables: (string * string) list
+          Diagnostics: string }
+
+    let ResolvedSchema = "conditor.test-environment-resolved/v1"
+
+    /// `CONDITOR_BROWSER_<NAME>_EXECUTABLE` for a browser name.
+    let browserVariable (name: string) =
+        let upper = name.ToUpperInvariant() |> String.map (fun c -> if Char.IsAsciiLetterOrDigit c then c else '_')
+        $"CONDITOR_BROWSER_{upper}_EXECUTABLE"
+
+    /// Pure: the resolved settings, or the configuration findings that refuse
+    /// them (exactly the errors the preflight would report as COND-TENV-CONFIG).
+    let resolve (root: string) (contractPath: string) (contract: Contract) (environment: Map<string, string>) : Result<Resolved, Finding list> =
+        let refusals =
+            configurationFindings contract (relativeTo root contractPath) environment
+            |> List.filter (fun finding -> finding.Severity = Error)
+
+        match refusals, (effective contract environment) with
+        | [], { Port = Ok port; BaseUrl = Ok endpoint } ->
+            let baseUrl = endpoint.Uri.AbsoluteUri
+            let readiness = Uri(endpoint.Uri, contract.ReadinessPath).AbsoluteUri
+
+            let browsers =
+                contract.Browsers
+                |> List.map (fun browser ->
+                    let fromVariable = browser.ExecutableVariable |> Option.bind environment.TryFind
+                    browser.Name, fromVariable |> Option.orElse (browser.Executable |> Option.map (resolvePath root)))
+
+            let variables =
+                [ yield "CONDITOR_TEST_PORT", string port
+                  yield "CONDITOR_TEST_BASE_URL", baseUrl
+                  yield "CONDITOR_TEST_READINESS_URL", readiness
+                  yield! contract.ApplicationEndpoint |> Option.map (fun app -> "CONDITOR_APPLICATION_ENDPOINT", app) |> Option.toList
+                  // The contract's own override variables, so a runner that
+                  // reads them sees the value the preflight checked.
+                  yield! contract.PortVariable |> Option.map (fun name -> name, string port) |> Option.toList
+                  yield! contract.BaseUrlVariable |> Option.map (fun name -> name, baseUrl) |> Option.toList
+                  for (name, executable), browser in List.zip browsers contract.Browsers do
+                      match executable with
+                      | Some path ->
+                          yield browserVariable name, path
+                          yield! browser.ExecutableVariable |> Option.map (fun variable -> variable, path) |> Option.toList
+                      | None -> ()
+                  yield! contract.RuntimeEnvironment ]
+                |> List.distinctBy fst
+
+            Ok
+                { ContractPath = contractPath
+                  TestPort = port
+                  TestBaseUrl = baseUrl
+                  ReadinessUrl = readiness
+                  Application = contract.ApplicationEndpoint
+                  Browsers = browsers
+                  Runtime = contract.RuntimeEnvironment
+                  Variables = variables
+                  Diagnostics = resolvePath root contract.DiagnosticsPath }
+        | [], _ -> Result.Error(configurationFindings contract (relativeTo root contractPath) environment)
+        | refusals, _ -> Result.Error refusals
+
+    /// POSIX single-quoting: safe to `eval`.
+    let shellQuote (value: string) = "'" + value.Replace("'", "'\\''") + "'"
+
+    /// `export NAME='value'` lines for `eval "$(conditor test-env resolve --shell)"`.
+    let resolvedToShell (resolved: Resolved) =
+        resolved.Variables
+        |> List.map (fun (name, value) -> $"export {name}={shellQuote value}\n")
+        |> String.concat ""
+
+    let resolvedToJson (resolved: Resolved) =
+        use stream = new MemoryStream()
+        let mutable options = JsonWriterOptions()
+        options.Indented <- true
+        options.Encoder <- System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+
+        (use writer = new Utf8JsonWriter(stream, options)
+         writer.WriteStartObject()
+         writer.WriteString("schema", ResolvedSchema)
+         writer.WriteString("contract", resolved.ContractPath)
+         writer.WriteNumber("port", resolved.TestPort)
+         writer.WriteString("baseUrl", resolved.TestBaseUrl)
+         writer.WriteString("readinessUrl", resolved.ReadinessUrl)
+
+         match resolved.Application with
+         | Some app -> writer.WriteString("applicationEndpoint", app)
+         | None -> writer.WriteNull "applicationEndpoint"
+
+         writer.WriteStartArray "browsers"
+
+         for name, executable in resolved.Browsers do
+             writer.WriteStartObject()
+             writer.WriteString("name", name)
+
+             match executable with
+             | Some path -> writer.WriteString("executable", path)
+             | None -> writer.WriteNull "executable"
+
+             writer.WriteEndObject()
+
+         writer.WriteEndArray()
+         writer.WriteStartObject "runtimeEnvironment"
+
+         for name, value in resolved.Runtime do
+             writer.WriteString(name, value)
+
+         writer.WriteEndObject()
+         writer.WriteStartObject "environment"
+
+         for name, value in resolved.Variables do
+             writer.WriteString(name, value)
+
+         writer.WriteEndObject()
+         writer.WriteString("diagnostics", resolved.Diagnostics)
+         writer.WriteEndObject())
+
+        Encoding.UTF8.GetString(stream.ToArray()) + "\n"
+
+    /// Shell: loads the contract and resolves it against the process (or an
+    /// injected) environment. Outer error: the contract cannot be read (exit 2);
+    /// inner error: its configuration refuses a run (exit 3).
+    let resolveContract (contractPath: string) (environment: string -> string option) =
+        let contractPath = Path.GetFullPath contractPath
+
+        if not (File.Exists contractPath) then
+            Result.Error [ $"No test-environment contract at {contractPath}. Create {DefaultContractPath} (schemas/conditor-test-environment.schema.json) or pass --contract PATH." ]
+        else
+            match parse (File.ReadAllText contractPath) with
+            | Result.Error errors -> Result.Error(errors |> List.map (sprintf "%s: %s" contractPath))
+            | Ok contract ->
+                let root = Path.GetDirectoryName contractPath |> nonNull
+
+                let observed =
+                    variables contract
+                    |> List.choose (fun name -> environment name |> Option.map (fun value -> name, value))
+                    |> Map.ofList
+
+                Ok(resolve root contractPath contract observed)

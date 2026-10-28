@@ -367,6 +367,23 @@ let private scenarios (check: string -> bool -> unit) (validateReport: string ->
             fixture
             (environmentOf [ "FIXTURE_MODE", "0" ]))
 
+    // 2d. Incorrect endpoint: the contract's own base URL points at another
+    // port than test.port (R5 a0e7d4a: the config moved, a URL did not).
+    withFixture (fun fixture ->
+        let path = Path.Combine(fixture.Root, TestEnvironment.DefaultContractPath)
+        let wrong = fixture.ApplicationPort
+        File.WriteAllText(path, File.ReadAllText(path).Replace($"\"baseUrl\": \"http://127.0.0.1:{fixture.TestPort}/\"", $"\"baseUrl\": \"http://127.0.0.1:{wrong}/\""))
+        expectFailure "2d incorrect endpoint (base URL disagrees with test.port)" "COND-TENV-CONFIG" "disagrees with itself" fixture noEnvironment)
+
+    // 2e. Incorrect endpoint: the base URL override is not a URL.
+    withFixture (fun fixture ->
+        expectFailure
+            "2e incorrect endpoint (malformed base URL override)"
+            "COND-TENV-CONFIG"
+            "is not an absolute http(s) URL"
+            fixture
+            (environmentOf [ "FIXTURE_BASE_URL", $"127.0.0.1:{fixture.TestPort}" ]))
+
     // 3. Missing fixture, and a fixture whose digest changed.
     withFixture (fun fixture ->
         File.Delete(Path.Combine(fixture.Root, "fixtures", "state.json"))
@@ -437,6 +454,81 @@ let private scenarios (check: string -> bool -> unit) (validateReport: string ->
     withFixture (fun fixture ->
         use _server = new TestServer(fixture.TestPort, Path.Combine(fixture.Root, "obj", "site-test"), Crashes)
         expectFailure "7b server crashes on an undecodable path" "COND-TENV-SERVER" "crashed or dropped the connection" fixture noEnvironment)
+
+/// `test-env resolve` (WI-0059, Echelon development speed optimization
+/// Priority Six): consumer configs read the effective settings from the
+/// contract through the preflight's own override rules, never a second copy.
+let private resolution (check: string -> bool -> unit) =
+    let resolveIn (fixture: Fixture) environment =
+        TestEnvironment.resolveContract (Path.Combine(fixture.Root, TestEnvironment.DefaultContractPath)) environment
+
+    withFixture (fun fixture ->
+        match resolveIn fixture noEnvironment with
+        | Ok(Ok resolved) ->
+            check "resolve: the port is the contract's test.port" (resolved.TestPort = fixture.TestPort)
+            check "resolve: the base URL is the contract's" (resolved.TestBaseUrl = $"http://127.0.0.1:{fixture.TestPort}/")
+            check "resolve: the readiness URL joins base URL and readinessPath" (resolved.ReadinessUrl = $"http://127.0.0.1:{fixture.TestPort}/index.html")
+            check "resolve: the browser executable is the contract's" (resolved.Browsers = [ "chromium", Some fixture.Browser ])
+            check "resolve: the application endpoint is carried" (resolved.Application = Some $"http://127.0.0.1:{fixture.ApplicationPort}/")
+            let variables = Map.ofList resolved.Variables
+            check "resolve: the contract's own port variable is exported" (variables.TryFind "FIXTURE_TEST_PORT" = Some(string fixture.TestPort))
+            check "resolve: the runtime configuration is exported" (variables.TryFind "FIXTURE_MODE" = Some "1")
+            check "resolve: the browser is exported under its standard name" (variables.TryFind "CONDITOR_BROWSER_CHROMIUM_EXECUTABLE" = Some fixture.Browser)
+
+            use json = System.Text.Json.JsonDocument.Parse(TestEnvironment.resolvedToJson resolved)
+            check "resolve --json: names its schema" (json.RootElement.GetProperty("schema").GetString() = TestEnvironment.ResolvedSchema)
+            check "resolve --json: carries the port" (json.RootElement.GetProperty("port").GetInt32() = fixture.TestPort)
+
+            let shell = TestEnvironment.resolvedToShell resolved
+            check "resolve --shell: one export line per variable" (shell.Split('\n', StringSplitOptions.RemoveEmptyEntries) |> Array.forall (fun line -> line.StartsWith "export "))
+
+            if OperatingSystem.IsLinux() && File.Exists "/bin/bash" then
+                let info = ProcessStartInfo("/bin/bash")
+                info.ArgumentList.Add "-c"
+                info.ArgumentList.Add "eval \"$1\"; printf '%s|%s' \"$CONDITOR_TEST_PORT\" \"$CONDITOR_TEST_BASE_URL\""
+                info.ArgumentList.Add "resolve"
+                info.ArgumentList.Add shell
+                info.RedirectStandardOutput <- true
+                use proc = Process.Start info |> nonNull
+                let output = proc.StandardOutput.ReadToEnd()
+                proc.WaitForExit()
+                check $"resolve --shell: bash eval reproduces the settings ({output})" (output = $"{fixture.TestPort}|http://127.0.0.1:{fixture.TestPort}/")
+        | other -> check $"resolve: a matching contract resolves ({other})" false)
+
+    withFixture (fun fixture ->
+        let other = Seq.initInfinite (fun _ -> freePort ()) |> Seq.find (fun port -> port <> fixture.TestPort && port <> fixture.ApplicationPort)
+        let environment = environmentOf [ "FIXTURE_TEST_PORT", string other ]
+
+        match resolveIn fixture environment with
+        | Ok(Ok resolved) ->
+            check "resolve: the port override is the resolved port" (resolved.TestPort = other)
+            check "resolve: the local base URL follows the port override, as in the preflight" (resolved.TestBaseUrl = $"http://127.0.0.1:{other}/")
+            check "resolve: the readiness URL follows too" (resolved.ReadinessUrl.StartsWith $"http://127.0.0.1:{other}/")
+        | result -> check $"resolve: a port override resolves ({result})" false)
+
+    withFixture (fun fixture ->
+        let browser = Path.Combine(fixture.Root, "elsewhere", "chrome")
+
+        match resolveIn fixture (environmentOf [ "FIXTURE_CHROMIUM_PATH", browser ]) with
+        | Ok(Ok resolved) -> check "resolve: the executable variable wins over the contract path" (resolved.Browsers = [ "chromium", Some browser ])
+        | result -> check $"resolve: a browser override resolves ({result})" false)
+
+    withFixture (fun fixture ->
+        let environment = environmentOf [ "FIXTURE_BASE_URL", $"http://127.0.0.1:{fixture.TestPort - 1}/"; "FIXTURE_TEST_PORT", string (fixture.TestPort + 1) ]
+
+        match resolveIn fixture environment with
+        | Ok(Error findings) ->
+            check "resolve: disagreeing overrides are refused with the preflight's finding" (findings |> List.exists (fun finding -> finding.Code = "COND-TENV-CONFIG" && finding.What.Contains "The overrides disagree"))
+        | result -> check $"resolve: disagreeing overrides are refused ({result})" false)
+
+    withFixture (fun fixture ->
+        match resolveIn fixture (environmentOf [ "FIXTURE_MODE", "0" ]) with
+        | Ok(Error findings) -> check "resolve: a conflicting runtime variable is refused" (findings |> List.exists (fun finding -> finding.What.Contains "FIXTURE_MODE='1'"))
+        | result -> check $"resolve: a conflicting runtime variable is refused ({result})" false)
+
+    check "resolve: a missing contract is an error, not an empty result" (TestEnvironment.resolveContract (Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}.json")) noEnvironment |> Result.isError)
+    check "resolve --shell: values are single-quoted for eval" (TestEnvironment.shellQuote "a'b $x" = "'a'\\''b $x'")
+    check "resolve: browser variable names are sanitized" (TestEnvironment.browserVariable "chromium-headless" = "CONDITOR_BROWSER_CHROMIUM_HEADLESS_EXECUTABLE")
 
 /// Pure-core rules: parsing, effective settings, ldd and revision parsing and
 /// the reproducible content digest.
@@ -564,5 +656,6 @@ let private realBrowser (check: string -> bool -> unit) =
 let run (check: string -> bool -> unit) (validateContract: string -> Result<unit, string list>) (validateReport: string -> Result<unit, string list>) =
     units check validateContract
     scenarios check validateReport
+    resolution check
     doctor check
     realBrowser check

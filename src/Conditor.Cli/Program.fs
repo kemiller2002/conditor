@@ -27,6 +27,7 @@ let private usage () =
     Console.WriteLine "  conditor drift --registry DIR [--channel NAME] [--platform RID] [--target PATH] [--json] [--fail-on never|warn|fail]"
     Console.WriteLine "  conditor test-env preflight [--contract PATH] [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env digest    [--contract PATH] [--target PATH]"
+    Console.WriteLine "  conditor test-env resolve   [--contract PATH] [--target PATH] [--json | --shell]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
@@ -1815,7 +1816,7 @@ let private runDrift (args: string array) =
 
             Drift.exitCodeFor failOn report.Level
 
-/// `conditor test-env preflight|digest` (CON-368..375): the test-environment
+/// `conditor test-env preflight|digest|resolve` (CON-368..375; resolve: WI-0059): the test-environment
 /// contract's preflight. Exit 0 when a browser run can be trusted, 3 when a
 /// finding refuses it, 2 when the contract cannot be read.
 let private runTestEnvironment (args: string array) =
@@ -1842,6 +1843,23 @@ let private runTestEnvironment (args: string array) =
                 Console.Write(TestEnvironment.toText report)
 
             if report.Passed then 0 else 3
+    | Some "resolve" ->
+        match TestEnvironment.resolveContract contractPath TestEnvironment.processEnvironment with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok(Error findings) ->
+            for finding in findings do
+                eprintfn "%s %s (where: %s)%s" finding.Code finding.What finding.Where (finding.Fix |> Option.map (sprintf " fix: %s") |> Option.defaultValue "")
+
+            3
+        | Ok(Ok resolved) ->
+            if hasFlag "--shell" args then
+                Console.Write(TestEnvironment.resolvedToShell resolved)
+            else
+                Console.Write(TestEnvironment.resolvedToJson resolved)
+
+            0
     | Some "digest" ->
         let contract =
             if File.Exists contractPath then

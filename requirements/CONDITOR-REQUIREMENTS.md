@@ -861,3 +861,12 @@ Source: `.praxis/inbox/documents/2026-10-28-EII-E-test-environment-contract.md`
   `playwright.config.js` that reads its ports and browser path from it only
   when the manifest sets `scaffold.testEnvironment: true`; every other
   scaffold output is unchanged.
+- **CON-376** `conditor test-env resolve [--contract PATH] [--target PATH]
+  [--json | --shell]` SHALL print the effective test port, base URL,
+  readiness URL, application endpoint, browser executables and runtime
+  environment, computed by the same override rules the preflight checks, so a
+  consumer config or script never writes a second copy of them. It SHALL exit
+  3 with the preflight's `COND-TENV-CONFIG` errors when the configuration
+  refuses a run and 2 when the contract cannot be read. Source:
+  `.praxis/inbox/documents/2026-10-28-ESO-P6-test-environment-single-source.md`
+  (WI-0059, Echelon development speed optimization, Priority Six).
