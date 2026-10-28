@@ -26,6 +26,7 @@ let private usage () =
     Console.WriteLine "  conditor upgrade --current --check --stepwise --registry DIR [--channel NAME] --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR]"
     Console.WriteLine "  conditor drift --registry DIR [--channel NAME] [--platform RID] [--target PATH] [--json] [--fail-on never|warn|fail]"
     Console.WriteLine "  conditor test-env preflight [--contract PATH] [--target PATH] [--json]"
+    Console.WriteLine "  conditor rehearsal init [--manifest PATH] [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env digest    [--contract PATH] [--target PATH]"
     Console.WriteLine "  conditor test-env resolve   [--contract PATH] [--target PATH] [--json | --shell]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
@@ -1878,6 +1879,46 @@ let private runTestEnvironment (args: string array) =
         usage ()
         2
 
+/// Initializes, publishes, re-reads and application-verifies the configured
+/// Causa workspace. Exit 0 is READY; every missing or failed evidence stage is
+/// a fail-closed exit 3 with a BLOCKED receipt.
+let private runRehearsal (args: string array) =
+    let target =
+        optionValue "--target" args
+        |> Option.defaultValue (Directory.GetCurrentDirectory())
+        |> Path.GetFullPath
+
+    let manifestPath =
+        optionValue "--manifest" args
+        |> Option.map Path.GetFullPath
+        |> Option.defaultValue (Path.Combine(target, "conditor.json"))
+
+    match args |> Array.tryItem 1 with
+    | Some "init" ->
+        match Manifest.load manifestPath with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok _ ->
+            match Rehearsal.load manifestPath target with
+            | Error errors ->
+                writeErrors errors
+                2
+            | Ok config ->
+                match Rehearsal.runWithProcess target config with
+                | Error error ->
+                    Console.Error.WriteLine error
+                    3
+                | Ok receipt ->
+                    if hasFlag "--json" args then Console.Write(Rehearsal.toJson receipt)
+                    else
+                        Console.WriteLine $"READY rehearsal={receipt.RehearsalId} workspace={receipt.WorkspaceId} commit={receipt.PublishedCommit.Value}"
+                        Console.WriteLine $"receipt={receipt.Path}"
+                    0
+    | _ ->
+        usage ()
+        2
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -1919,6 +1960,8 @@ let private execute (args: string array) =
             runDrift args
         elif command = "test-env" then
             runTestEnvironment args
+        elif command = "rehearsal" then
+            runRehearsal args
         else
             let target =
                 optionValue "--target" args

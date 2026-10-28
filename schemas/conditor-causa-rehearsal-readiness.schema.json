@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor-causa-rehearsal-readiness/v1",
+  "title": "Conditor Causa Rehearsal Readiness Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "rehearsalIdentifier",
+    "templateIdentifier",
+    "templateVersion",
+    "templateDigest",
+    "sourceRepository",
+    "sourceCommit",
+    "destinationRepository",
+    "destinationBranch",
+    "workspaceIdentifier",
+    "publishedCommit",
+    "investigationIdentifiers",
+    "investigationCount",
+    "workspaceValidationResult",
+    "remoteVerificationResult",
+    "applicationCompatibilityResult",
+    "initializationTimestamp",
+    "overallReadinessVerdict",
+    "failureStage",
+    "failure",
+    "permittedRecoveryAction",
+    "evidence",
+    "transitions"
+  ],
+  "properties": {
+    "schema": { "const": "conditor.causa-rehearsal-readiness/v1" },
+    "rehearsalIdentifier": { "type": "string", "pattern": "^[0-9]{1,6}$" },
+    "templateIdentifier": { "type": "string", "minLength": 1 },
+    "templateVersion": { "type": ["string", "null"] },
+    "templateDigest": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "sourceRepository": { "type": ["string", "null"] },
+    "sourceCommit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "destinationRepository": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+    "destinationBranch": { "type": "string", "minLength": 1 },
+    "workspaceIdentifier": { "type": "string", "pattern": "^rehearsal-[0-9]{3,6}$" },
+    "publishedCommit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "investigationIdentifiers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "format": "uuid" }
+    },
+    "investigationCount": { "type": "integer", "minimum": 0 },
+    "workspaceValidationResult": { "enum": ["NOT_RUN", "LOCAL_VERIFIED"] },
+    "remoteVerificationResult": { "enum": ["NOT_RUN", "REMOTE_VERIFIED"] },
+    "applicationCompatibilityResult": { "enum": ["NOT_RUN", "APPLICATION_VERIFIED"] },
+    "initializationTimestamp": { "type": "string", "format": "date-time" },
+    "overallReadinessVerdict": { "enum": ["READY", "BLOCKED"] },
+    "failureStage": { "type": ["string", "null"] },
+    "failure": { "type": ["string", "null"] },
+    "permittedRecoveryAction": { "type": ["string", "null"] },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "result", "at", "toolEvidence"],
+        "properties": {
+          "stage": { "type": "string" },
+          "result": { "enum": ["PASSED", "FAILED"] },
+          "at": { "type": "string", "format": "date-time" },
+          "toolEvidence": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "at", "evidenceStage"],
+        "properties": {
+          "state": {
+            "enum": [
+              "LOCAL_CREATED",
+              "LOCAL_VERIFIED",
+              "PUBLISHED",
+              "REMOTE_VERIFIED",
+              "APPLICATION_VERIFIED",
+              "READY",
+              "BLOCKED"
+            ]
+          },
+          "at": { "type": "string", "format": "date-time" },
+          "evidenceStage": { "type": "string" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "overallReadinessVerdict": { "const": "READY" } },
+        "required": ["overallReadinessVerdict"]
+      },
+      "then": {
+        "properties": {
+          "templateVersion": { "type": "string" },
+          "templateDigest": { "type": "string" },
+          "sourceRepository": { "type": "string" },
+          "sourceCommit": { "type": "string" },
+          "publishedCommit": { "type": "string" },
+          "investigationCount": { "const": 3 },
+          "workspaceValidationResult": { "const": "LOCAL_VERIFIED" },
+          "remoteVerificationResult": { "const": "REMOTE_VERIFIED" },
+          "applicationCompatibilityResult": { "const": "APPLICATION_VERIFIED" },
+          "failureStage": { "type": "null" },
+          "failure": { "type": "null" },
+          "permittedRecoveryAction": { "type": "null" }
+        }
+      }
+    }
+  ]
+}

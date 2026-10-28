@@ -355,3 +355,8 @@ let validateTestEnvironmentContract (text: string) = validate testEnvironmentSch
 let private testEnvironmentReportSchema = lazy (loadSchema "conditor-test-environment-report.schema.json")
 
 let validateTestEnvironmentReport (text: string) = validate testEnvironmentReportSchema.Value text
+
+/// Validates the evidence emitted by `conditor rehearsal init`.
+let private rehearsalReceiptSchema = lazy (loadSchema "conditor-causa-rehearsal-readiness.schema.json")
+
+let validateRehearsalReceipt (text: string) = validate rehearsalReceiptSchema.Value text

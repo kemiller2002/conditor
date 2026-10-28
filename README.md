@@ -128,6 +128,8 @@ Use `conditor start --check --preset indy-init` only after initialization when y
 
 The three-step competition sequence is `conditor init` plus `repo create --deploy github-pages`, then `requirements import` with the pinned plan digest, then `supervise` until the deadline. It is in [docs/indy-day-of.md](docs/indy-day-of.md), with the defaults it relies on (DF-CON-2026-A002).
 
+Before a Causa-based rehearsal is declared ready, `conditor rehearsal init` can now provision its unique historical workspace from the rehearsal section of the same `conditor.json`. Conditor invokes Causa Data's F# tool in a fixed fail-closed sequence: template verification, local and remote uniqueness, creation, local verification, non-forced Git publication, independent remote readback, and application-resolver verification. READY is impossible without evidence for every stage, and the command never selects a previous workspace. See [Causa rehearsal workspace initialization](docs/causa-rehearsal-initialization.md).
+
 ## Create the GitHub repository
 
 `conditor repo create` publishes a freshly initialized target as a new GitHub repository and prepares it for agent work:
@@ -183,6 +185,7 @@ conditor repair  --target . --manifest ./conditor.json
 conditor upgrade --target . --manifest ./conditor.json
 conditor start   --check --target . --manifest ./conditor.json
 conditor resume  --launcher claude --target . --manifest ./conditor.json
+conditor rehearsal init --target . --manifest ./conditor.json --json
 ```
 
 The committed source form of the Indy Init preset remains at `examples/indy-init.conditor.json`; release binaries embed that exact content.

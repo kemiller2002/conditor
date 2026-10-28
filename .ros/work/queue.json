@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 61,
+  "nextSeq": 62,
   "items": [
     {
       "id": "WI-0001",
@@ -1414,6 +1414,27 @@
         "provider": "anthropic",
         "model": "unknown",
         "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0061",
+      "title": "Implement immutable Causa historical templates and fail-closed rehearsal workspace initialization",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-28T16:59:31.810Z",
+      "updatedAt": "2026-10-28T16:59:46.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "openai/codex",
+        "provider": "openai",
+        "model": "unknown",
+        "runtime": "codex"
       },
       "source": "manual",
       "sourceReference": null
