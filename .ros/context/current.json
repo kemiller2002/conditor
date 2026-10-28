@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-28T16:14:23Z",
+  "updatedAt": "2026-10-28T17:29:25Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2767,13 +2767,71 @@
     {
       "id": "WI-0061",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-28T16:14:23Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/forma.component.json"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Compatibility.fs"
+        },
+        {
+          "type": "implementation",
+          "path": "examples/indy-init.conditor.json"
+        },
+        {
+          "type": "implementation",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "implementation",
+          "path": "tests/fixtures/registry/echelon-current-1.32.0-linux-x64.json"
+        },
+        {
+          "type": "implementation",
+          "path": "release/requested-version.txt"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebPackageUpgradeTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+        }
+      ],
+      "updatedAt": "2026-10-28T17:29:25Z",
       "telemetryExecutionIds": [
         "EXE-20261028T161424630Z-e8f2fda5"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "6929aff78f6c4f1de7e730fd",
+        "recordedAt": "2026-10-28T17:29:19Z",
+        "executionId": "EXE-20261028T161424630Z-e8f2fda5",
+        "repository": "conditor",
+        "branch": "claude/echelon-speed-optimization-vtqjg4",
+        "commit": "6cdfc44e4debbf8973894485775154b8ff486b1e",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/echelon-speed-optimization-vtqjg4",
+        "remoteCommit": "6cdfc44e4debbf8973894485775154b8ff486b1e",
+        "summary": "Qualification (Forma 0.11.0 exact release-asset pin; Arca 0.6.0 through the release-asset NuGet feed, no descriptor) and the 0.10.17 release trigger are pushed; all Conditor tests pass (1337 checks).",
+        "nextAction": "Owner merges the draft PR to release Conditor 0.10.17, then the Registry moves echelon-current to 1.32.0.",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-28T17:29:25Z"
     }
   ]
 }

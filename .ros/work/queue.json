@@ -1427,10 +1427,10 @@
         "qualification"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-28T16:14:06.750Z",
-      "updatedAt": "2026-10-28T16:14:20Z",
+      "updatedAt": "2026-10-28T17:29:25Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
