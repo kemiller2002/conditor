@@ -1222,6 +1222,7 @@ WebScaffoldTests.runKickoffSet132 check
 WebScaffoldTests.runTestEnvironmentOptIn check ComponentSchemaTests.validateTestEnvironmentContract
 TestEnvironmentTests.run check ComponentSchemaTests.validateTestEnvironmentContract ComponentSchemaTests.validateTestEnvironmentReport
 BranchProtectionTests.run check
+UnattendedReadinessTests.run check
 RepositoryCreationTests.run check
 SupervisorTests.run check
 RequirementsImportTests.run check
