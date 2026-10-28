@@ -57,7 +57,10 @@ type RegistryAuthority =
 
 type ScaffoldRequest =
     { Kind: string
-      Name: string option }
+      Name: string option
+      /// Opt-in (CON-375): the fsharp-limen-web scaffold also emits the
+      /// test-environment contract and a Playwright config that reads it.
+      TestEnvironment: bool }
 
 type RequirementSource =
     { Id: string

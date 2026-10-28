@@ -819,3 +819,45 @@ was reported the same way.
   - without an authority, the embedded descriptor's `releaseArtifacts` SHALL
     name the versions distributed as release-asset tarballs; every other
     version is pinned by its exact npm registry version.
+
+## Test-environment contract and preflight (EII-E)
+
+Source: `.praxis/inbox/documents/2026-10-28-EII-E-test-environment-contract.md`
+(WI-0058). Documentation: `docs/test-environment.md`.
+
+- **CON-368** A consuming repository SHALL declare its browser test
+  environment in one authoritative file, `conditor.test-environment.json`,
+  conforming to `schemas/conditor-test-environment.schema.json`: application
+  endpoint, browser base URL, test port and its override variable, fixtures
+  with expected sha256, build configuration, runtime configuration, artifact
+  identity, required browsers and the diagnostics location.
+- **CON-369** `conditor test-env preflight [--contract PATH] [--target PATH]
+  [--json]` SHALL refuse (exit 3) before any browser starts when the machine
+  does not match the contract: port unavailable or occupied by a server not
+  serving the expected artifact; conflicting configuration; missing fixture or
+  fixture digest mismatch; wrong build configuration; missing browser, missing
+  shared libraries or wrong revision; stale artifact; a running server that
+  answers 5xx or crashes on an undecodable URL path. It SHALL exit 0 otherwise
+  and 2 when the contract cannot be read.
+- **CON-370** The preflight's decision SHALL be a pure function of the
+  contract and observed facts; file, socket, HTTP and process access SHALL be
+  confined to the observation shell.
+- **CON-371** Every warning and error SHALL say what is wrong, where and how
+  to fix it, and the preflight SHALL write `preflight.json`
+  (`schemas/conditor-test-environment-report.schema.json`) and `preflight.txt`
+  to the contract's diagnostics location.
+- **CON-372** A stale artifact SHALL be refused: the artifact's content
+  digest (documented, reproducible with `sha256sum`) SHALL equal every
+  declared expectation (pinned, candidate variable, build-info). The remedy is
+  the exact candidate artifact or a rebuild, never a looser check.
+- **CON-373** The preflight SHALL probe a server only when one is running on
+  the test port, and SHALL NOT report a value it could not observe (an
+  undeterminable browser revision or an unavailable shared-library check is a
+  warning, never a pass or an invented value).
+- **CON-374** `conditor doctor` SHALL include the preflight's findings as
+  `COND-DOC-TENV-*` when, and only when, the repository has the contract, and
+  SHALL write no diagnostics files.
+- **CON-375** The `fsharp-limen-web` scaffold SHALL emit the contract and a
+  `playwright.config.js` that reads its ports and browser path from it only
+  when the manifest sets `scaffold.testEnvironment: true`; every other
+  scaffold output is unchanged.

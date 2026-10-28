@@ -25,6 +25,8 @@ let private usage () =
     Console.WriteLine "  conditor upgrade --current --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--check | --authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor upgrade --current --check --stepwise --registry DIR [--channel NAME] --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR]"
     Console.WriteLine "  conditor drift --registry DIR [--channel NAME] [--platform RID] [--target PATH] [--json] [--fail-on never|warn|fail]"
+    Console.WriteLine "  conditor test-env preflight [--contract PATH] [--target PATH] [--json]"
+    Console.WriteLine "  conditor test-env digest    [--contract PATH] [--target PATH]"
     Console.WriteLine "  conditor resume [--launcher codex|claude] [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor handoff [--resume] [--launcher codex|claude] --prompt-file ABSOLUTE_PATH [--manifest PATH] [--target PATH]"
     Console.WriteLine "  conditor start  [--preset NAME | --manifest PATH] [--check] [--launcher codex|claude] [--target PATH]"
@@ -1813,6 +1815,51 @@ let private runDrift (args: string array) =
 
             Drift.exitCodeFor failOn report.Level
 
+/// `conditor test-env preflight|digest` (CON-368..375): the test-environment
+/// contract's preflight. Exit 0 when a browser run can be trusted, 3 when a
+/// finding refuses it, 2 when the contract cannot be read.
+let private runTestEnvironment (args: string array) =
+    let target =
+        optionValue "--target" args
+        |> Option.defaultValue (Directory.GetCurrentDirectory())
+        |> Path.GetFullPath
+
+    let contractPath =
+        optionValue "--contract" args
+        |> Option.map Path.GetFullPath
+        |> Option.defaultValue (Path.Combine(target, TestEnvironment.DefaultContractPath))
+
+    match args |> Array.tryItem 1 with
+    | Some "preflight" ->
+        match TestEnvironment.preflight contractPath TestEnvironment.processEnvironment true with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok report ->
+            if hasFlag "--json" args then
+                Console.Write(TestEnvironment.toJson report)
+            else
+                Console.Write(TestEnvironment.toText report)
+
+            if report.Passed then 0 else 3
+    | Some "digest" ->
+        let contract =
+            if File.Exists contractPath then
+                TestEnvironment.parse (File.ReadAllText contractPath)
+            else
+                Error [ $"No test-environment contract at {contractPath}." ]
+
+        match contract |> Result.bind (fun contract -> TestEnvironment.computeArtifactDigest (Path.GetDirectoryName contractPath |> nonNull) contract |> Result.mapError List.singleton) with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok digest ->
+            Console.WriteLine digest
+            0
+    | _ ->
+        usage ()
+        2
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -1852,6 +1899,8 @@ let private execute (args: string array) =
             runRequirements args
         elif command = "drift" then
             runDrift args
+        elif command = "test-env" then
+            runTestEnvironment args
         else
             let target =
                 optionValue "--target" args

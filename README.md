@@ -294,6 +294,8 @@ That one plan adopts the binding and moves it to the set's selection. It moves `
 
 `conditor upgrade --current --check --stepwise --registry <checkout> ...` breaks a large move into Registry-produced steps (for example Forma 0.4.1 → 0.5.0 → 0.6.1). Step 1 is checked in full and can be authorized. See `docs/drift-advisory.md`.
 
+`conditor test-env preflight [--contract PATH] [--json]` proves, before any browser starts, that the machine matches the repository's one test-environment contract (`conditor.test-environment.json`): ports, overrides, fixtures, build configuration, the exact artifact under test, browsers and their shared libraries, and a running server's robustness. It writes actionable diagnostics and exits 3 on any refusal. See `docs/test-environment.md`.
+
 #### Opting in to an optional native tool
 
 A resolved set can select optional components, such as `strata` in echelon-current 1.2.0, that a project has not declared. To adopt one:

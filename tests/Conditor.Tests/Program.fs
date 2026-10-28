@@ -1217,6 +1217,8 @@ WebScaffoldTests.runRegistryDistribution check
 WebScaffoldTests.runKickoffSet127 check
 WebScaffoldTests.runKickoffSet128 check
 WebScaffoldTests.runKickoffSet129 check
+WebScaffoldTests.runTestEnvironmentOptIn check ComponentSchemaTests.validateTestEnvironmentContract
+TestEnvironmentTests.run check ComponentSchemaTests.validateTestEnvironmentContract ComponentSchemaTests.validateTestEnvironmentReport
 BranchProtectionTests.run check
 RepositoryCreationTests.run check
 SupervisorTests.run check

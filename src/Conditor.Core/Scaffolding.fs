@@ -1425,6 +1425,88 @@ export default defineConfig({
 });
 """
 
+    /// The opted-in (`scaffold.testEnvironment: true`) test-environment
+    /// contract: the one place the scaffold's test port, base URL and browser
+    /// path are written (CON-375). It is a seed like every scaffold file.
+    let private webTestEnvironmentContract =
+        """{
+  "schema": "conditor.test-environment/v1",
+  "application": { "endpoint": null },
+  "test": {
+    "baseUrl": "http://127.0.0.1:4321/",
+    "baseUrlVariable": null,
+    "port": 4321,
+    "portVariable": null,
+    "readinessPath": "src/kernel/index.html"
+  },
+  "build": { "configuration": "source", "command": null },
+  "runtime": { "configuration": "default", "environment": {} },
+  "artifact": {
+    "path": "src/kernel",
+    "servedAt": "src/kernel/",
+    "identityPath": "index.html",
+    "buildInfo": null,
+    "sha256": null,
+    "sha256Variable": null
+  },
+  "fixtures": [],
+  "browsers": [
+    {
+      "name": "chromium",
+      "executable": "/opt/pw-browsers/chromium",
+      "executableVariable": "CONDITOR_CHROMIUM_PATH",
+      "revision": null
+    }
+  ],
+  "diagnostics": { "path": "TestResults/test-environment" }
+}
+"""
+
+    /// The opted-in Playwright config: the same configuration as
+    /// `webPlaywrightConfig`, with every port, URL and browser path read from
+    /// the contract. Reading the JSON is the only JavaScript it adds.
+    let private webContractPlaywrightConfig =
+        """// Real-browser checks for the application pages.
+//
+// The .NET tests prove the engine decides correctly; they cannot prove a page
+// loads. These tests serve the repository root (the pages reach into
+// node_modules/ for Forma and Folio) and drive the pages in Chromium.
+//
+// Every port, URL and browser path comes from conditor.test-environment.json,
+// the repository's one test-environment contract. Change them there, never
+// here or in a spec, and run `conditor test-env preflight` before this suite.
+import { existsSync, readFileSync } from "node:fs";
+import { defineConfig, devices } from "@playwright/test";
+
+const environment = JSON.parse(readFileSync(new URL("./conditor.test-environment.json", import.meta.url), "utf8"));
+const port = environment.test.port;
+const origin = environment.test.baseUrl;
+
+// Some environments ship a Chromium that Playwright did not download itself.
+// Where that binary exists it is used as-is; everywhere else Playwright
+// resolves its own, so CI needs no special case.
+const preinstalledChromium = environment.browsers[0].executable;
+const launchOptions = existsSync(preinstalledChromium) ? { executablePath: preinstalledChromium } : {};
+
+export default defineConfig({
+  testDir: "./tests/browser",
+  fullyParallel: false,
+  workers: 1,
+  forbidOnly: !!process.env.CI,
+  retries: 0,
+  timeout: 60_000,
+  reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
+  use: { baseURL: origin, trace: "retain-on-failure" },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], launchOptions } }],
+  webServer: {
+    command: `python3 -m http.server ${port} --bind 127.0.0.1`,
+    url: `${origin}${environment.test.readinessPath}`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000
+  }
+});
+"""
+
     let private webSmokeSpec =
         """// Scaffold smoke suite: every page loads every resource it references and
 // raises no script error. Extend it with the application's real journeys.
@@ -1733,6 +1815,15 @@ same change.
             | Some _ -> webLimenRoutesSource, webLimenRouteTests, webLimenRouteInventory
             | None -> webRoutesSource, webRouteTests, webRouteInventory
 
+        // CON-375: only a scaffold that opts in gets the contract; every other
+        // repository keeps the unchanged Playwright config.
+        let playwrightFiles =
+            match manifest.Scaffold with
+            | Some scaffold when scaffold.TestEnvironment ->
+                [ "conditor.test-environment.json", webTestEnvironmentContract
+                  "playwright.config.js", webContractPlaywrightConfig ]
+            | _ -> [ "playwright.config.js", webPlaywrightConfig ]
+
         [ "Directory.Build.props",
           "<Project>\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <LangVersion>latest</LangVersion>\n    <Nullable>enable</Nullable>\n    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>\n    <Deterministic>true</Deterministic>\n  </PropertyGroup>\n</Project>\n"
           "App.slnx", webSolution
@@ -1754,7 +1845,7 @@ same change.
           "src/kernel/bootstrap.ts", kernelBootstrap limen
           "src/kernel/index.html", webIndexPage
           "src/kernel/print.html", webPrintPage
-          "playwright.config.js", webPlaywrightConfig
+          yield! playwrightFiles
           "tests/browser/smoke.spec.js", webSmokeSpec
           ".github/workflows/build-and-test.yml", render webBuildWorkflow
           ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
@@ -1831,7 +1922,16 @@ same change.
                                     | _ -> None
                                 | _ -> None
 
-                            text "kind" |> Option.map (fun kind -> { Kind = kind; Name = text "name" })
+                            let testEnvironment =
+                                match scaffold["testEnvironment"] with
+                                | :? JsonValue as value -> value.GetValueKind() = JsonValueKind.True
+                                | _ -> false
+
+                            text "kind"
+                            |> Option.map (fun kind ->
+                                { Kind = kind
+                                  Name = text "name"
+                                  TestEnvironment = testEnvironment })
                         | _ -> None
             with _ ->
                 None

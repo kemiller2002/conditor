@@ -343,3 +343,15 @@ let runStalenessPolicy (check: string -> bool -> unit) =
     check
         "a misspelt stalenessPolicy field is rejected by conditor.schema.json"
         (validate manifestSchema (manifest """{"warnAfterMinors":2}""") |> Result.isError)
+
+/// Validates a `conditor.test-environment.json` contract against
+/// `schemas/conditor-test-environment.schema.json` (CON-368).
+let private testEnvironmentSchema = lazy (loadSchema "conditor-test-environment.schema.json")
+
+let validateTestEnvironmentContract (text: string) = validate testEnvironmentSchema.Value text
+
+/// Validates a `conditor test-env preflight --json` report against
+/// `schemas/conditor-test-environment-report.schema.json` (CON-371).
+let private testEnvironmentReportSchema = lazy (loadSchema "conditor-test-environment-report.schema.json")
+
+let validateTestEnvironmentReport (text: string) = validate testEnvironmentReportSchema.Value text
