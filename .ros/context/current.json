@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-28T22:23:04.000Z",
+  "updatedAt": "2026-10-28T22:26:40.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2836,13 +2836,48 @@
     {
       "id": "WI-0062",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-10-28T22:23:04.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Rehearsal.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RehearsalTests.fs"
+        },
+        {
+          "type": "documentation",
+          "path": "docs/causa-rehearsal-initialization.md"
+        }
+      ],
+      "updatedAt": "2026-10-28T22:26:40.000Z",
       "telemetryExecutionIds": [
         "EXE-20261028T222306478Z-4eb6f64f"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "ad59c62c7a902c8092f82343",
+        "recordedAt": "2026-10-28T22:26:20.000Z",
+        "executionId": "EXE-20261028T222306478Z-4eb6f64f",
+        "repository": "conditor",
+        "branch": "codex/causa-rehearsal-preflight-v2",
+        "commit": "e77bfd16c33aa0747d454f7d2e8d55b65892f053",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "codex/causa-rehearsal-preflight-v2",
+        "remoteCommit": "e77bfd16c33aa0747d454f7d2e8d55b65892f053",
+        "summary": "Causa rehearsal preflight integrated on current main, builds cleanly, and selectable historical/demonstration template tests pass",
+        "nextAction": "Complete WI-0062, rebuild the registry, validate, and push the final Praxis state",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-28T22:26:40.000Z",
+      "conclusion": "Conditor now provisions, publishes, remotely verifies, and application-verifies the exact non-empty investigation set declared by the selected Causa template; every mandatory failure blocks readiness."
     }
   ]
 }
