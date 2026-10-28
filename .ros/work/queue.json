@@ -1355,10 +1355,10 @@
         "test-environment"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-28T00:54:36.000Z",
-      "updatedAt": "2026-10-28T00:54:42.000Z",
+      "updatedAt": "2026-10-28T01:12:05.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
