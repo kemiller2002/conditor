@@ -761,6 +761,113 @@ let runKickoffSet129 (check: string -> bool -> unit) =
                 check "Dokimos 0.8.0 is initialized and verified through its repository lifecycle"
                     (dokimos = [ "0.8.0", "dokimos", Some "init"; "0.8.0", "dokimos", Some "verify" ]))
 
+[<Literal>]
+let private FormaAsset0100 =
+    "https://github.com/kemiller2002/forma/releases/download/v0.10.0/echelon-foundry-design-system-0.10.0.tgz"
+
+/// echelon-current 1.31.0 linux-x64, byte-identical to the set the Registry's
+/// own tools resolve for the proposed cut (sha256 4d30d15f...): the approved
+/// 1.30.0 with Praxis 3.22.0 -> 3.23.0 (praxis work evidence, praxis streams
+/// check), Ordo 1.18.0 -> 1.19.0 (per-policy and per-obligation evidence
+/// freshness in sde verification schedule), Dokimos 0.8.0 -> 0.9.0 (the
+/// release checkpoint, mandatory final verification) and Limen 0.9.0 -> 0.9.1
+/// (limen wasm-check). OD-INDY-8 approves it only after this Conditor
+/// qualification (DF-CON-2026-A007).
+let private echelonCurrent131 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.31.0-linux-x64.json")
+
+/// The Rehearsal 3 bootstrap manifest moved to the 1.31.0 selections.
+let private kickoffComponents131 =
+    rehearsalComponents
+        .Replace("""{"id":"praxis","version":"3.16.0"}""", """{"id":"praxis","version":"3.23.0"}""")
+        .Replace("""{"id":"ordo","version":"1.17.0"}""", """{"id":"ordo","version":"1.19.0"}""")
+        .Replace("""{"id":"limen","version":"0.9.0"}""", """{"id":"limen","version":"0.9.1"}""")
+        .Replace("""{"id":"forma","version":"0.9.0"}""", """{"id":"forma","version":"0.10.0"}""")
+        .Replace("""{"id":"folio","version":"0.4.0"}""", """{"id":"folio","version":"0.4.1"}""")
+
+let runKickoffSet131 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.31.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent131
+
+        check "the vendored echelon-current 1.31.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "4d30d15f3b268a0b2673d511d092d592c086eadc985283606b536e6c027287d8")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let selected systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+            |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "praxis"; "ordo"; "dokimos"; "limen"; "percepta-semantic"; "forma"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.31.0 selects Praxis 3.23.0, Ordo 1.19.0, Dokimos 0.9.0 and Limen 0.9.1, and keeps percepta-semantic 0.3.0, Forma 0.10.0, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "3.23.0"; Some "1.19.0"; Some "0.9.0"; Some "0.9.1"; Some "0.3.0"; Some "0.10.0"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.31.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent131 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.31.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation installs Dokimos 0.9.0 from 1.31.0 with its release commit as identity"
+                (installed "dokimos"
+                 |> Option.exists (fun c ->
+                     c.Version = "0.9.0"
+                     && c.Tag = "dokimos-v0.9.0"
+                     && c.Lifecycle |> Option.exists (fun l -> l.SourceCommit = "2dab315ba10c8eef652562ffa4543eee10942a51")))
+
+            check "the workstation installs Praxis 3.23.0 and Ordo 1.19.0 from 1.31.0"
+                (installed "praxis" |> Option.exists (fun c -> c.Version = "3.23.0" && c.Tag = "v3.23.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.19.0" && c.Tag = "v1.19.0"))
+
+            check "the workstation keeps percepta-semantic 0.3.0 as the host tool percepta, with no repository lifecycle"
+                (installed "percepta-semantic"
+                 |> Option.exists (fun c -> c.Version = "0.3.0" && c.Executable = "percepta" && c.Lifecycle.IsNone))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents131 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.31.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "under 1.31.0, Limen 0.9.1, which the Registry distributes through npm, keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.1")
+
+                check "SD-1: under 1.31.0, Forma 0.10.0 and Folio 0.4.1 are pinned to their Registry release assets"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset0100
+                     && dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.31.0 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
+        withTarget (fun target ->
+            // A repository that declares Dokimos takes 0.9.0 on Registry
+            // authority through the generic repository-lifecycle contract.
+            match planUnderAuthority target set (kickoffComponents131 + """,{"id":"dokimos","version":"0.9.0"}""") with
+            | Error errors -> check $"a kickoff manifest that declares Dokimos 0.9.0 plans under 1.31.0: {joined errors}" false
+            | Ok plan ->
+                let dokimos =
+                    plan.Actions
+                    |> List.filter (fun action -> action.ComponentId = "dokimos")
+                    |> List.choose (fun action ->
+                        match action.Execution with
+                        | ExternalProcess(command, arguments) -> Some(action.ComponentVersion, command, List.tryHead arguments)
+                        | _ -> None)
+
+                check "Dokimos 0.9.0 is initialized and verified through its repository lifecycle"
+                    (dokimos = [ "0.9.0", "dokimos", Some "init"; "0.9.0", "dokimos", Some "verify" ]))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true

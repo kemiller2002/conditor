@@ -748,6 +748,142 @@ let private echelonCurrent130 check =
                     "Forma 0.10.0 upgrade records the Registry versions"
                     (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "0.10.0"; "folio", Some "0.4.1" ]))
 
+// ---- echelon-current 1.31.0: Limen 0.9.1 ------------------------------------
+// echelon-current 1.31.0 moves Limen 0.9.0 -> 0.9.1 (limen wasm-check; the
+// browser-kernel build carries its package version), which the Registry
+// distributes through npm. An application that declares Limen 0.9.0 moves it
+// as an exact npm production pin, and nothing else.
+let private LimenPackage = "@echelon-foundry/limen"
+
+let private npmLimen (version: string) (packageSha: string) =
+    $$"""
+    {
+      "systemId": "limen",
+      "role": "project-binding",
+      "required": true,
+      "version": "{{version}}",
+      "repository": "kemiller2002/limen",
+      "tag": "v{{version}}",
+      "commit": "{{String.replicate 40 "5"}}",
+      "releaseStage": "stable",
+      "lifecycleState": "active",
+      "distributionClass": "web-package",
+      "executable": null,
+      "releaseManifest": { "schema": "echelon.release/v2", "sha256": "{{String.replicate 64 "c"}}" },
+      "distribution": {
+        "mechanism": "npm",
+        "package": "{{LimenPackage}}",
+        "url": "https://registry.npmjs.org/@echelon-foundry/limen/-/limen-{{version}}.tgz"
+      },
+      "artifacts": [
+        { "name": "echelon-foundry-limen-{{version}}.tgz", "purpose": "package", "platform": null, "sha256": "{{packageSha}}" }
+      ]
+    }"""
+
+let private echelonCurrent131 check =
+    let source, targetVersion = "0.9.0", "0.9.1"
+    let target = temp "limen-0.9.1-target"
+    let home = temp "limen-0.9.1-home"
+    let mirror = temp "limen-0.9.1-mirror"
+    let bin = temp "limen-0.9.1-bin"
+    let afterInstall = temp "limen-0.9.1-after"
+    let targetBytes = Encoding.UTF8.GetBytes $"fixture limen {targetVersion} package tarball"
+    File.WriteAllBytes(Path.Combine(mirror, $"echelon-foundry-limen-{targetVersion}.tgz"), targetBytes)
+    let resolvedPath = Path.Combine(mirror, "current.resolved.json")
+    let resolvedSha = resolvedSet resolvedPath [ npmLimen targetVersion (sha256Bytes targetBytes) ]
+    let manifestPath = Path.Combine(target, "conditor.json")
+
+    File.WriteAllText(
+        manifestPath,
+        $$"""{
+  "schemaVersion": 1,
+  "name": "limen-app",
+  "components": [
+    { "id": "limen", "version": "{{source}}", "required": true }
+  ],
+  "requirements": [],
+  "execution": { "enabled": false }
+}
+"""
+    )
+
+    LockFile.write
+        target
+        manifestPath
+        { ProjectName = "limen-app"
+          Operation = Init
+          Components =
+            [ { Id = "limen"
+                Version = source
+                Distribution = NpmPackage
+                Package = LimenPackage
+                SourceReference = Some $"npm:{LimenPackage}@{source}" } ]
+          Actions = [] }
+    |> ignore
+
+    let packageJson (version: string) =
+        $$"""{
+  "name": "limen-app",
+  "private": true,
+  "dependencies": {
+    "{{LimenPackage}}": "{{version}}"
+  }
+}
+"""
+
+    let lockJson (version: string) (integrityField: string) =
+        $$"""{
+  "name": "limen-app",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": { "name": "limen-app" },
+    "node_modules/{{LimenPackage}}": { "version": "{{version}}", "resolved": "https://registry.npmjs.org/@echelon-foundry/limen/-/limen-{{version}}.tgz"{{integrityField}} }
+  }
+}
+"""
+
+    File.WriteAllText(Path.Combine(target, "package.json"), packageJson source)
+    File.WriteAllText(Path.Combine(target, "package-lock.json"), lockJson source "")
+    File.WriteAllText(Path.Combine(afterInstall, "package.json"), packageJson targetVersion)
+    File.WriteAllText(Path.Combine(afterInstall, "package-lock.json"), lockJson targetVersion $", \"integrity\": \"{integrity targetBytes}\"")
+    let log = Path.Combine(bin, "npm.log")
+    fakeNpm bin afterInstall log
+
+    let f =
+        { Target = target
+          ManifestPath = manifestPath
+          ResolvedPath = resolvedPath
+          ResolvedSha = resolvedSha
+          Context = context home mirror
+          Bin = bin
+          Log = log
+          AfterInstall = afterInstall }
+
+    withPath f.Bin (fun () ->
+        match preview f with
+        | Error errors -> check $"echelon-current 1.31.0 Limen plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                $"current upgrade moves only Limen 0.9.0 -> 0.9.1, as a package-manager binding transition: {joined plan.Refusals}"
+                (plan.Refusals.IsEmpty
+                 && plan.Transitions
+                    |> List.map (fun transition -> transition.Id, transition.FromVersion, transition.ToVersion, transition.Mode) = [ "limen", source, targetVersion, "web-package-binding" ])
+
+            match apply f plan.Digest with
+            | Error errors -> check $"authorized Limen 0.9.1 upgrade succeeds: {joined errors}" false
+            | Ok result ->
+                check
+                    "Limen 0.9.1 is installed through npm as an exact production pin, and nothing else runs"
+                    (File.ReadAllLines f.Log
+                     |> Array.toList = [ $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {LimenPackage}@{targetVersion}" ])
+
+                check "Limen 0.9.1 upgrade leaves no version drift" result.NoRemainingVersionChanges
+
+                check
+                    "Limen 0.9.1 upgrade records the Registry version"
+                    (declaredVersions f.ManifestPath = Map.ofList [ "limen", Some targetVersion ]))
+
 let run (check: string -> bool -> unit) =
     check
         "Conditor qualifies released Forma web-package upgrade boundaries"
@@ -765,6 +901,7 @@ let run (check: string -> bool -> unit) =
         echelonCurrent120 check
         echelonCurrent128 check
         echelonCurrent130 check
+        echelonCurrent131 check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"

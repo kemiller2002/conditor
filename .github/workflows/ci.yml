@@ -55,7 +55,7 @@ jobs:
           limen = inventory["limen"]
           assert limen["package"] == "@echelon-foundry/limen", limen
           assert limen["defaultVersion"] == "0.9.0", limen
-          assert limen["qualifiedVersions"] == ["0.6.1", "0.6.2", "0.7.0", "0.7.1", "0.9.0"], limen
+          assert limen["qualifiedVersions"] == ["0.6.1", "0.6.2", "0.7.0", "0.7.1", "0.9.0", "0.9.1"], limen
           assert limen["historicalPackages"] == [
               {"package": "@echelon-foundry/typescript-wasm-kernel", "versions": ["0.6.1", "0.6.2"]}
           ], limen
@@ -67,7 +67,7 @@ jobs:
           assert folio["package"] == "@echelon-foundry/print-components", folio
           assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0", "0.4.1"], folio
           ordo = inventory["ordo"]
-          assert ordo["qualifiedVersions"] == ["1.17.0", "1.18.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2"], ordo
+          assert ordo["qualifiedVersions"] == ["1.17.0", "1.18.0", "1.19.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2"], ordo
           PY
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility
           dotnet run --project src/Conditor.Cli --configuration Release --no-build -- compatibility --json > "$RUNNER_TEMP/conditor-compatibility.json"
@@ -126,8 +126,10 @@ jobs:
         # echelon-current 1.24.0 step (the Ordo Praxis 3.13.0 pins); 1.17.0
         # is the echelon-current 1.25.0 step (the contract admission and
         # readiness Praxis 3.16.0 mirrors); 1.18.0 is the echelon-current
-        # 1.29.0 step (sde verification schedule).
-        ordo: ["1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2", "1.17.0", "1.18.0"]
+        # 1.29.0 step (sde verification schedule); 1.19.0 is the
+        # echelon-current 1.31.0 step (per-policy and per-obligation evidence
+        # freshness).
+        ordo: ["1.4.2", "1.5.0", "1.6.0", "1.7.0", "1.8.2", "1.17.0", "1.18.0", "1.19.0"]
     env:
       ORDO_VERSION: ${{ matrix.ordo }}
     steps:
@@ -495,6 +497,50 @@ jobs:
           PY
           conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
           ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
+      - name: Chrona 1.30.0 -> 1.31.0 moves Praxis 3.22.0 -> 3.23.0 through its own lifecycle and Ordo 1.18.0 -> 1.19.0 with the real releases
+        shell: bash
+        env:
+          # The proposed 1.31.0 cut, vendored byte-for-byte as the Registry
+          # tools resolve it; the sha256 is its channel identity. Against
+          # 1.30.0 it moves Praxis 3.22.0 -> 3.23.0 and Ordo 1.18.0 -> 1.19.0,
+          # which Chrona declares, and Dokimos 0.8.0 -> 0.9.0 and Limen 0.9.0
+          # -> 0.9.1, which it does not (Chrona pins Limen in package.json but
+          # does not declare it to Conditor, so Limen stays where it is).
+          SET_131_PATH: tests/fixtures/registry/echelon-current-1.31.0-linux-x64.json
+          SET_131_SHA256: 4d30d15f3b268a0b2673d511d092d592c086eadc985283606b536e6c027287d8
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          git -C "$repo" add -A
+          git -C "$repo" -c user.name=conditor-ci -c user.email=ci@example.invalid commit -q -m "echelon-current 1.30.0"
+          echo "$SET_131_SHA256  $SET_131_PATH" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$SET_131_PATH" --resolved-set-sha256 "$SET_131_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-131.txt"
+          actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-131.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
+          test "$actual" = "ordo: 1.18.0 -> 1.19.0;praxis: 3.22.0 -> 3.23.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          grep -F "praxis: 3.22.0 -> 3.23.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/chrona-plan-131.txt"
+          authorization=$(grep -o 'authorize sha256:[0-9a-f]*' "$RUNNER_TEMP/chrona-plan-131.txt" | cut -d' ' -f2)
+          conditor upgrade --current "${args[@]}" --authorize "$authorization"
+          python3 - "$repo" <<'PY'
+          import json, sys, pathlib
+          repo = pathlib.Path(sys.argv[1])
+          capabilities = json.loads((repo / ".echelon/foundations.json").read_text())["capabilities"]
+          assert capabilities["praxis"] == {"required": True, "version": "3.23.0"}, capabilities["praxis"]
+          assert capabilities["ordo"]["version"] == "1.19.0" and capabilities["forma"]["version"] == "0.10.0", capabilities
+          assert capabilities["folio"]["version"] == "0.4.1", capabilities["folio"]
+          versions = {c["id"]: c["version"] for c in json.loads((repo / "conditor.json").read_text())["components"]}
+          assert versions["praxis"] == "3.23.0" and versions["ordo"] == "1.19.0" and versions["forma"] == "0.10.0", versions
+          assert versions["folio"] == "0.4.1" and "dokimos" not in versions and "limen" not in versions, versions
+          toolchain = json.loads((repo / ".echelon/toolchain.json").read_text())
+          assert toolchain["praxis"] == "3.23.0" and toolchain["ordo"] == "1.19.0", toolchain
+          assert (repo / ".sde/VERSION").read_text().strip() == "1.19.0"
+          PY
+          conditor upgrade --current --check "${args[@]}" | grep -F "version transitions: none"
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.23.0"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.19.0"
+          ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
 
   echelon-current-sweep-qualification:
     needs: build-test
@@ -782,6 +828,11 @@ jobs:
           # declare Forma, so no declared component moves.
           SET_130_PATH: tests/fixtures/registry/echelon-current-1.30.0-linux-x64.json
           SET_130_SHA256: 491041e924617c61b90ef7db60683fa391516c78956c421bc0e761c36b07ba82
+          # 1.31.0 is the proposed cut: Praxis 3.22.0 -> 3.23.0, Ordo 1.18.0 ->
+          # 1.19.0, Dokimos 0.8.0 -> 0.9.0 and Limen 0.9.0 -> 0.9.1. This
+          # repository declares Praxis and Ordo of those, so only they move.
+          SET_131_PATH: tests/fixtures/registry/echelon-current-1.31.0-linux-x64.json
+          SET_131_SHA256: 4d30d15f3b268a0b2673d511d092d592c086eadc985283606b536e6c027287d8
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -869,6 +920,12 @@ jobs:
           grep -F "Current upgrade plan: echelon-current@1.30.0" "$RUNNER_TEMP/sweep-1.30.0.txt"
           grep -F "version transitions: none" "$RUNNER_TEMP/sweep-1.30.0.txt"
           if grep -E "REFUSED" "$RUNNER_TEMP/sweep-1.30.0.txt"; then exit 1; fi
+          step 1.31.0 "$SET_131_PATH" "$SET_131_SHA256" "ordo: 1.18.0 -> 1.19.0;praxis: 3.22.0 -> 3.23.0" 1.19.0 3.23.0
+          # The installed Praxis 3.23.0 and Ordo 1.19.0 each verify the swept
+          # repository.
+          "$home/.local/bin/ordo" --version | grep -Fx "1.19.0"
+          "$home/.local/bin/praxis" --root "$repo" verify --strict
+          ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
 
   # Indy-init OD-INDY-8: the kickoff set is approved in the Registry only after
   # Conditor qualifies it (DF-CON-2026-A007). The workstation installs every
@@ -1017,6 +1074,67 @@ jobs:
             | $v.releaseversion == "0.8.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
           rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
           grep -F "evidence plan --request F" <<< "$dokimos_usage"
+
+  # Indy-init OD-INDY-8: echelon-current 1.31.0 is proposed as the next kickoff
+  # set, approved only after this qualification. The workstation installs
+  # every native host tool of the set from the real published release bytes
+  # and verifies each receipt: Praxis 3.23.0 (praxis work evidence, praxis
+  # streams check), Ordo 1.19.0 (sde verification schedule with a reuse
+  # context), the Percepta semantic CLI 0.3.0 (unchanged; no repository
+  # lifecycle, DF-CON-2026-A007) and Dokimos 0.9.0 (the release checkpoint of
+  # dokimos evidence plan) under its release identity.
+  echelon-current-1-31-0-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_131_PATH: tests/fixtures/registry/echelon-current-1.31.0-linux-x64.json
+      SET_131_SHA256: 4d30d15f3b268a0b2673d511d092d592c086eadc985283606b536e6c027287d8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.31.0 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_131_SHA256  $SET_131_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_131_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_131_PATH" --resolved-set-sha256 "$SET_131_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.23.0"
+          # The installed Praxis carries work evidence and streams check, and
+          # keeps inbox admit-plan and the requirements-preservation gate
+          # (exit 2 without inputs).
+          rc=0; usage=$("$home/.local/bin/praxis" inbox 2>&1) || rc=$?
+          grep -F "inbox admit-plan CLAIM-ID" <<< "$usage"
+          rc=0; gate=$("$home/.local/bin/praxis" requirements preservation verify 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements preservation verify requires --baseline FILE" <<< "$gate"
+          rc=0; evidence=$("$home/.local/bin/praxis" work evidence 2>&1) || rc=$?
+          grep -F "Usage: praxis work evidence --id ID --kind" <<< "$evidence"
+          rc=0; streams=$("$home/.local/bin/praxis" streams 2>&1) || rc=$?
+          grep -F "streams check [--stream ID]*" <<< "$streams"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.19.0"
+          "$home/.local/bin/ordo" verification --help | grep -F -- "--reuse-context FILE"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          "$home/.local/bin/percepta" --version | tee "$RUNNER_TEMP/percepta-version.txt"
+          grep -E "^percepta 0\.3\.0([+ ]|$)" "$RUNNER_TEMP/percepta-version.txt"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_131_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.9.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
+          rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
+          grep -F "evidence plan --request F" <<< "$dokimos_usage"
+          grep -F -- "--checkpoint incremental|release" <<< "$dokimos_usage"
 
   host-tool-upgrade-boundary:
     needs: build-test
