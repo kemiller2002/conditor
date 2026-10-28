@@ -8,6 +8,9 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="EchelonFoundry.Aegis.Core" Version="1.0.0" />
+    <!-- Aegis 1.0.0 requires this floor; pin it explicitly so SDK 10.0.100
+         does not select its older implicit FSharp.Core and fail NU1605. -->
+    <PackageReference Update="FSharp.Core" Version="10.1.400" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />

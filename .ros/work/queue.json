@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 62,
+  "nextSeq": 63,
   "items": [
     {
       "id": "WI-0001",
@@ -1438,6 +1438,27 @@
         "provider": "anthropic",
         "model": "unknown",
         "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0062",
+      "title": "Implement Causa rehearsal workspace initialization and selectable demonstration templates",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-28T22:23:00.118Z",
+      "updatedAt": "2026-10-28T22:23:03.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "openai/codex",
+        "provider": "openai",
+        "model": "unknown",
+        "runtime": "codex"
       },
       "source": "manual",
       "sourceReference": null

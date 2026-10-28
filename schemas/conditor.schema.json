@@ -44,6 +44,85 @@
         }
       }
     },
+    "rehearsal": {
+      "description": "Optional fail-closed rehearsal workspace preflight. Conditor orchestrates the component-owned Causa F# tool; it does not implement storage operations.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "application",
+        "workspace"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9]{1,6}$"
+        },
+        "application": {
+          "const": "causa"
+        },
+        "receipt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative readiness receipt path. Defaults to .conditor/evidence/rehearsal-<id>-readiness.json."
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "branch",
+            "template",
+            "name",
+            "checkout",
+            "create",
+            "publish",
+            "verify"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}$"
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "template": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^rehearsal-[0-9]{3,6}$"
+            },
+            "checkout": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Causa Data checkout, relative to the manifest or absolute."
+            },
+            "toolProject": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Causa F# tool project relative to checkout."
+            },
+            "dotnetExecutable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "create": {
+              "const": true
+            },
+            "publish": {
+              "const": true
+            },
+            "verify": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
     "execution": {
       "type": "object",
       "additionalProperties": false,
