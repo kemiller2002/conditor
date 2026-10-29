@@ -51,11 +51,12 @@ type CiPolicyReport =
 ///   workflow, at workflow or job level (superseded runs pile up);
 /// - CIP-002 a push or pull-request workflow with no workflow-level group;
 /// - CIP-003 a pull-request workflow that does not cancel superseded runs;
-/// - CIP-004 a job-level `always()` (it runs even when the run is cancelled;
-///   use `!cancelled()`);
+/// - CIP-004 a job-level `always()` or un-negated `cancelled()` (it runs
+///   even when the run is cancelled; use `!cancelled()`);
 /// - CIP-005 a job that runs steps with no `timeout-minutes`;
 /// - CIP-006 an unfiltered `push` together with `pull_request` (every
 ///   pull-request push runs twice);
+/// - CIP-008 a pull-request workflow whose group is shared by every ref;
 /// - CIP-007 a candidate workflow that development pushes, or another
 ///   candidate, can cancel: it must be dispatch-only, keyed on its candidate
 ///   input, and never cancel in progress.
@@ -172,6 +173,40 @@ module CiPolicy =
     let private value key entries =
         find key entries |> Option.bind (fun (value, _, _) -> value) |> Option.map unquote
 
+    let private isFlowMapping (text: string) = text.StartsWith "{" && text.EndsWith "}"
+
+    /// The top-level `key: value` pairs of a one-line flow mapping `{a: b, c: [x, y]}`,
+    /// split at commas outside brackets and quotes; None when it is not one.
+    let private flowMapping (text: string) =
+        if not (isFlowMapping text) then
+            None
+        else
+            let inner = text.Substring(1, text.Length - 2)
+
+            let rec split index depth quote start acc =
+                if index >= inner.Length then
+                    List.rev (inner.Substring start :: acc)
+                else
+                    match inner.[index], quote with
+                    | c, Some q when c = q -> split (index + 1) depth None start acc
+                    | _, Some _ -> split (index + 1) depth quote start acc
+                    | ('\'' | '"') as c, None -> split (index + 1) depth (Some c) start acc
+                    | ('[' | '{'), None -> split (index + 1) (depth + 1) None start acc
+                    | (']' | '}'), None -> split (index + 1) (depth - 1) None start acc
+                    | ',', None when depth = 0 -> split (index + 1) depth None (index + 1) (inner.Substring(start, index - start) :: acc)
+                    | _ -> split (index + 1) depth None start acc
+
+            let parts = split 0 0 None 0 [] |> List.map _.Trim() |> List.filter ((<>) "")
+
+            let pairs =
+                parts
+                |> List.map (fun part ->
+                    match keyValue part with
+                    | Some(key, value) -> Some(unquote key, value |> Option.defaultValue "")
+                    | None -> None)
+
+            if pairs |> List.forall Option.isSome then Some(pairs |> List.choose id) else None
+
     /// `[a, b]`, a single scalar, or a block of `- item` entries.
     let private sequence (value: string option) (children: Entry list) =
         match value with
@@ -188,6 +223,9 @@ module CiPolicy =
         entries
         |> List.choose (function
             | Unreadable(line, text) -> Some(line, text)
+            // A flow mapping the reader does not take apart (a job, or nested
+            // trigger settings) is not read as a scalar: it fails closed.
+            | Pair(key, Some value, line, _) when value.StartsWith "{" && flowMapping value |> Option.isNone -> Some(line, $"{key}: {value}")
             | Pair(key, value, line, _) when key.StartsWith "<<" || key.StartsWith "&" || key.StartsWith "*" -> Some(line, key)
             | Pair(key, Some value, line, _) when value.StartsWith "&" || value.StartsWith "*" -> Some(line, $"{key}: {value}")
             | _ -> None)
@@ -195,12 +233,18 @@ module CiPolicy =
     let private concurrency (entries: Entry list) =
         find "concurrency" entries
         |> Option.map (fun (scalar, line, children) ->
-            match scalar with
-            | Some group ->
+            match scalar |> Option.bind flowMapping, scalar with
+            | Some pairs, _ ->
+                let get key = pairs |> List.tryFind (fst >> (=) key) |> Option.map (snd >> unquote)
+
+                { Group = get "group" |> Option.defaultValue ""
+                  CancelInProgress = get "cancel-in-progress"
+                  Line = line }
+            | None, Some group ->
                 { Group = unquote group
                   CancelInProgress = None
                   Line = line }
-            | None ->
+            | None, None ->
                 { Group = value "group" children |> Option.defaultValue ""
                   CancelInProgress = value "cancel-in-progress" children
                   Line = find "group" children |> Option.map (fun (_, groupLine, _) -> groupLine) |> Option.defaultValue line })
@@ -219,8 +263,14 @@ module CiPolicy =
         let on = find "on" top |> Option.orElse (find "true" top)
         let jobs = find "jobs" top |> Option.map (fun (_, _, children) -> children) |> Option.defaultValue []
 
+        let onMapping = on |> Option.bind (fun (scalar, _, _) -> scalar) |> Option.bind flowMapping
+
         let triggers, onChildren =
             match on with
+            | Some(Some value, _, _) when isFlowMapping value ->
+                match onMapping with
+                | Some pairs -> pairs |> List.map fst, []
+                | None -> [], []
             | Some(Some value, _, _) -> sequence (Some value) [], []
             | Some(None, _, children) ->
                 children
@@ -231,12 +281,29 @@ module CiPolicy =
                 children
             | None -> [], []
 
+        // `branches` (without a catch-all pattern) or `tags` filter `push`;
+        // `branches-ignore` and `tags-ignore` still run on nearly every branch.
+        let pushFilter (settings: (string * string list) list) =
+            let patterns key = settings |> List.tryFind (fst >> (=) key) |> Option.map snd
+            let catchAll = List.exists (fun pattern -> pattern = "*" || pattern = "**")
+
+            match patterns "branches", patterns "tags" with
+            | Some branches, _ when not branches.IsEmpty && not (catchAll branches) -> true
+            | None, Some _ -> true
+            | _ -> false
+
         let pushFiltered =
-            match find "push" onChildren with
-            | Some(_, _, children) ->
-                [ "branches"; "branches-ignore"; "tags"; "tags-ignore" ]
-                |> List.exists (fun key -> (find key children).IsSome)
-            | None -> false
+            match find "push" onChildren, onMapping |> Option.bind (List.tryFind (fst >> (=) "push")) with
+            | Some(Some text, _, _), _
+            | None, Some(_, text) ->
+                flowMapping text
+                |> Option.map (List.map (fun (key, v) -> key, sequence (Some v) []) >> pushFilter)
+                |> Option.defaultValue false
+            | Some(None, _, children), _ ->
+                [ "branches"; "tags" ]
+                |> List.choose (fun key -> find key children |> Option.map (fun (v, _, c) -> key, sequence v c))
+                |> pushFilter
+            | None, None -> false
 
         let inputs =
             find "workflow_dispatch" onChildren
@@ -263,8 +330,22 @@ module CiPolicy =
               yield! unreadable concurrencyChildren
               yield! unreadable jobs
               yield! unreadable jobKeys
+              // A job written as a flow mapping hides its `if`, timeout and group.
+              for entry in jobs do
+                  match entry with
+                  | Pair(id, Some value, line, _) when isFlowMapping value -> yield line, $"{id}: {value}"
+                  | _ -> ()
               if on.IsNone then
                   yield 1, "no `on:` trigger section"
+              match on with
+              | Some(Some value, line, _) when isFlowMapping value && onMapping.IsNone -> yield line, $"on: {value}"
+              | _ -> ()
+              // Dispatch inputs written as a flow mapping cannot be read, so a
+              // candidate input could go unseen.
+              match find "workflow_dispatch" onChildren, onMapping |> Option.bind (List.tryFind (fst >> (=) "workflow_dispatch")) with
+              | Some(Some text, line, _), _ when text.Contains "inputs" -> yield line, $"workflow_dispatch: {text}"
+              | None, Some(_, text) when text.Contains "inputs" -> yield (on |> Option.map (fun (_, l, _) -> l) |> Option.defaultValue 1), $"workflow_dispatch: {text}"
+              | _ -> ()
               if triggers.IsEmpty then
                   yield (on |> Option.map (fun (_, line, _) -> line) |> Option.defaultValue 1), "no trigger could be read" ]
 
@@ -285,6 +366,10 @@ module CiPolicy =
 
     let private developmentTriggers = [ "push"; "pull_request"; "pull_request_target" ]
 
+    /// Triggers whose runs repeat per commit or per upstream run, so a
+    /// per-commit group piles them up too.
+    let private repeatingTriggers = developmentTriggers @ [ "workflow_run"; "workflow_call"; "merge_group" ]
+
     let private perCommitMarkers =
         [ "github.sha"
           "github.run_id"
@@ -292,7 +377,22 @@ module CiPolicy =
           "github.run_attempt"
           "github.event.after"
           "github.event.pull_request.head.sha"
-          "github.event.head_commit.id" ]
+          "github.event.head_commit.id"
+          "github['sha']"
+          "github[\"sha\"]"
+          "github['run_id']"
+          "github[\"run_id\"]" ]
+
+    /// What distinguishes one ref's runs from another's in a group.
+    let private refMarkers =
+        [ "github.ref"
+          "github.head_ref"
+          "github.ref_name"
+          "github.event.number"
+          "github.event.pull_request.number"
+          "github['ref']"
+          "github[\"ref\"]"
+          "github['head_ref']" ]
 
     let private normalized (text: string) =
         text.ToLowerInvariant().Replace(" ", "")
@@ -305,6 +405,18 @@ module CiPolicy =
 
     let private isExpression (text: string) = text.Contains "${{"
 
+    /// `true`, or an expression that is not the literal `${{ false }}`.
+    let private mayCancel (cancel: string) =
+        let n = normalized cancel
+        n = "true" || (isExpression cancel && n <> "${{false}}")
+
+    /// A job condition that runs in a cancelled run: `always()` (unless
+    /// `!cancelled()` also holds) or a `cancelled()` that is not negated.
+    let runsWhenCancelled (condition: string) =
+        let n = normalized condition
+        (n.Contains "always()" && not (n.Contains "!cancelled()"))
+        || Text.RegularExpressions.Regex.IsMatch(n, @"(?<!!)cancelled\(\)")
+
     let private finding (workflow: Workflow) rule line message =
         { Rule = rule
           Path = workflow.Path
@@ -312,22 +424,28 @@ module CiPolicy =
           Message = message }
 
     let private candidateInputs (workflow: Workflow) =
-        workflow.DispatchInputs |> List.filter (fun input -> input.ToLowerInvariant().Contains "candidate")
+        workflow.DispatchInputs
+        |> List.filter (fun input ->
+            let name = input.ToLowerInvariant()
+            name.Contains "candidate" || name.Contains "sha")
 
     /// Every finding for one workflow.
     let check (workflow: Workflow) : CiFinding list =
         let development = workflow.Triggers |> List.exists (fun t -> List.contains t developmentTriggers)
+        let repeating = workflow.Triggers |> List.exists (fun t -> List.contains t repeatingTriggers)
         let pullRequests = workflow.Triggers |> List.exists (fun t -> t = "pull_request" || t = "pull_request_target")
         let at = finding workflow
         let candidates = candidateInputs workflow
 
         [ // CIP-001 and CIP-002: one group per ref, never per commit.
-          if development then
+          if development && workflow.Concurrency.IsNone then
+              yield at "CIP-002" 1 "a push or pull-request workflow has no workflow-level concurrency group, so superseded runs accumulate"
+
+          if repeating then
               match workflow.Concurrency with
-              | None -> yield at "CIP-002" 1 "a push or pull-request workflow has no workflow-level concurrency group, so superseded runs accumulate"
               | Some c when isPerCommit c.Group ->
                   yield at "CIP-001" c.Line $"concurrency group `{c.Group}` is per commit: every push runs in parallel and none is superseded (Rehearsal 6 starvation)"
-              | Some _ -> ()
+              | _ -> ()
 
               for job in workflow.Jobs do
                   match job.Concurrency with
@@ -337,14 +455,23 @@ module CiPolicy =
           // CIP-003: superseded pull-request runs are cancelled.
           if pullRequests then
               match workflow.Concurrency with
-              | Some { CancelInProgress = Some cancel } when cancel = "true" || isExpression cancel -> ()
+              | Some { CancelInProgress = Some cancel } when mayCancel cancel -> ()
               | Some c -> yield at "CIP-003" c.Line "a pull-request workflow does not cancel superseded runs (`cancel-in-progress: true`)"
               | None -> ()
+
+          // CIP-008: groups are repository-wide, so a pull-request workflow's
+          // group must separate refs; a fixed group lets every pull-request
+          // push cancel main's run.
+          if pullRequests then
+              match workflow.Concurrency with
+              | Some c when not (isPerCommit c.Group) && not (refMarkers |> List.exists (normalized c.Group).Contains) ->
+                  yield at "CIP-008" c.Line $"concurrency group `{c.Group}` is shared by every ref: a pull-request push cancels or queues main's run; key it on `github.ref`"
+              | _ -> ()
 
           // CIP-004: cancelled runs must not start jobs.
           for job in workflow.Jobs do
               match job.If with
-              | Some condition when (normalized condition).Contains "always()" ->
+              | Some condition when runsWhenCancelled condition ->
                   yield at "CIP-004" job.Line $"job `{job.Id}`: `if: {condition}` runs even when the run is cancelled; use `!cancelled()`"
               | _ -> ()
 
@@ -359,8 +486,8 @@ module CiPolicy =
 
           // CIP-007: a candidate's verification is cancelled by nothing.
           if not candidates.IsEmpty then
-              if development then
-                  yield at "CIP-007" 1 "a candidate workflow must be dispatch-only: a development push must not start or cancel it"
+              if workflow.Triggers |> List.exists (fun t -> t <> "workflow_dispatch" && t <> "workflow_call") then
+                  yield at "CIP-007" 1 "a candidate workflow must be dispatch-only: no push, pull request or schedule may start or cancel it"
 
               match workflow.Concurrency with
               | None -> yield at "CIP-007" 1 "a candidate workflow needs a concurrency group keyed on its candidate input"
@@ -370,7 +497,7 @@ module CiPolicy =
                   if not (candidates |> List.exists (fun input -> group.Contains $"inputs.{input.ToLowerInvariant()}")) then
                       yield at "CIP-007" c.Line $"candidate concurrency group `{c.Group}` is not keyed on the candidate input, so another candidate can cancel or queue behind it"
 
-                  if c.CancelInProgress |> Option.exists (fun cancel -> cancel = "true" || isExpression cancel) then
+                  if c.CancelInProgress |> Option.exists mayCancel then
                       yield at "CIP-007" c.Line "a candidate workflow must never cancel in progress" ]
 
     /// The verdict over `(path, text)` workflow files.

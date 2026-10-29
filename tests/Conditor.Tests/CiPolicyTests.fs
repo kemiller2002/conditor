@@ -149,6 +149,65 @@ let run (check: string -> bool -> unit) =
     check "ci-policy: comments and quoted keys are read"
         (rules (safe.Replace("on:\n", "\"on\": # triggers\n")) = [])
 
+    // Independent review of WI-0063 (F1..F8): each case it reproduced.
+    let jobOnly = "jobs:\n  b:\n    runs-on: ubuntu-latest\n    timeout-minutes: 5\n    steps:\n      - run: echo\n"
+
+    check "ci-policy: review F1 an `on:` flow mapping is read, and a per-commit group in it is CIP-001"
+        (rules ("on: {push: {branches: [main]}, pull_request: {}}\nconcurrency:\n  group: ci-${{ github.sha }}\n  cancel-in-progress: true\n" + jobOnly) |> List.contains "CIP-001")
+
+    check "ci-policy: review F1 an unfiltered `on:` flow mapping without a group is CIP-002 and CIP-006"
+        (rules ("on: {push: {}, pull_request: {}}\n" + jobOnly) = [ "CIP-002"; "CIP-006" ])
+
+    check "ci-policy: review F1 a multi-line `on:` flow mapping fails closed"
+        (rules ("on: {\n  push: {branches: [main]},\n  pull_request: {}\n}\n" + jobOnly) |> List.contains "CIP-000")
+
+    check "ci-policy: review F2 a group shared by every ref is CIP-008"
+        (rules (safe.Replace("${{ github.workflow }}-${{ github.ref }}", "ci")) = [ "CIP-008" ])
+
+    check "ci-policy: review F3 `success() || cancelled()` is CIP-004"
+        (rules (safe.Replace("if: ${{ !cancelled() }}", "if: success() || cancelled()")) = [ "CIP-004" ])
+
+    check "ci-policy: review F3 `always() && !cancelled()` is not CIP-004"
+        (rules (safe.Replace("if: ${{ !cancelled() }}", "if: always() && !cancelled()")) = [])
+
+    check "ci-policy: review F3 `success() || failure()` is not CIP-004"
+        (rules (safe.Replace("if: ${{ !cancelled() }}", "if: success() || failure()")) = [])
+
+    check "ci-policy: review F4 a candidate named `sha` is a candidate"
+        (rules (candidate.Replace("      candidate:", "      sha:").Replace("inputs.candidate", "inputs.sha")) = [])
+
+    check "ci-policy: review F4 a `sha` dispatch workflow pushes can cancel is CIP-007"
+        (rules (candidate.Replace("      candidate:", "      sha:").Replace("cancel-in-progress: false", "cancel-in-progress: true")) |> List.contains "CIP-007")
+
+    check "ci-policy: review F5 `branches-ignore` does not filter push"
+        (rules (safe.Replace("    branches: [main]\n", "    branches-ignore: [nothing]\n")) = [ "CIP-006" ])
+
+    check "ci-policy: review F5 `branches: ['**']` does not filter push"
+        (rules (safe.Replace("    branches: [main]\n", "    branches: ['**']\n")) = [ "CIP-006" ])
+
+    check "ci-policy: review F5 a flow-form push filter is a filter"
+        (rules (safe.Replace("  push:\n    branches: [main]\n", "  push: {branches: [main]}\n")) = [])
+
+    check "ci-policy: review F6 a per-run group in a workflow_run workflow is CIP-001"
+        (rules ("on:\n  workflow_run:\n    workflows: [CI]\n    types: [completed]\nconcurrency:\n  group: post-${{ github.run_id }}\n" + jobOnly) = [ "CIP-001" ])
+
+    check "ci-policy: review F6 `github['sha']` is per commit" (CiPolicy.isPerCommit "x-${{ github['sha'] }}")
+
+    check "ci-policy: review F7 a job written as a flow mapping fails closed"
+        (rules (safe + "  c: {runs-on: x, if: always(), steps: [{run: echo}]}\n") |> List.contains "CIP-000")
+
+    check "ci-policy: review F8 a flow-mapping concurrency is read"
+        (rules (safe.Replace("concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\n", "concurrency: {group: \"${{ github.workflow }}-${{ github.ref }}\", cancel-in-progress: true}\n")) = [])
+
+    check "ci-policy: review F8 `cancel-in-progress: ${{ false }}` does not cancel"
+        (rules (safe.Replace("cancel-in-progress: true", "cancel-in-progress: ${{ false }}")) = [ "CIP-003" ])
+
+    check "ci-policy: review F8 a candidate with `cancel-in-progress: ${{ false }}` passes"
+        (rules (candidate.Replace("cancel-in-progress: false", "cancel-in-progress: ${{ false }}")) = [])
+
+    check "ci-policy: review a candidate workflow a schedule can start is CIP-007"
+        (rules (candidate.Replace("on:\n  workflow_dispatch:", "on:\n  schedule:\n    - cron: '0 * * * *'\n  workflow_dispatch:")) = [ "CIP-007" ])
+
     // Rehearsal 6's actual workflows.
     let r6 =
         [ "build-and-test.yml"

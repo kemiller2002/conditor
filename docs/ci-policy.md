@@ -13,14 +13,15 @@ conditor ci-policy check [--target PATH] [--json]
 
 | Rule | Finding | Why |
 |---|---|---|
-| CIP-000 | A workflow, or a part of `on`, `concurrency` or a job's keys, that the check cannot read (anchors, aliases, merge keys, misplaced lines) | The check fails closed and never passes what it did not read |
-| CIP-001 | A per-commit or per-run concurrency group (`github.sha`, `github.run_id`, …) in a push or pull-request workflow, at workflow or job level | Every push runs in parallel and none is superseded. This was Rehearsal 6's root cause |
+| CIP-000 | A workflow, or a part of `on`, `concurrency` or a job's keys, that the check cannot read (anchors, aliases, merge keys, misplaced lines, a job or dispatch inputs written as a flow mapping) | The check fails closed and never passes what it did not read |
+| CIP-001 | A per-commit or per-run concurrency group (`github.sha`, `github['sha']`, `github.run_id`, …) in a push, pull-request, merge-group, `workflow_run` or `workflow_call` workflow, at workflow or job level | Every push runs in parallel and none is superseded. This was Rehearsal 6's root cause |
 | CIP-002 | A push or pull-request workflow without a workflow-level concurrency group | Superseded runs accumulate |
-| CIP-003 | A pull-request workflow whose `cancel-in-progress` is not `true` (an expression is accepted) | Superseded pull-request runs keep running |
-| CIP-004 | A job-level `if:` containing `always()` | The job starts even after the run is cancelled; use `!cancelled()` |
+| CIP-003 | A pull-request workflow whose `cancel-in-progress` is not `true` (an expression is accepted, but not `${{ false }}`) | Superseded pull-request runs keep running |
+| CIP-004 | A job-level `if:` containing `always()` (unless it also requires `!cancelled()`) or an un-negated `cancelled()` | The job starts even after the run is cancelled; use `!cancelled()` |
 | CIP-005 | A job that runs steps with no `timeout-minutes` (reusable-workflow calls are exempt) | A stalled job holds a runner for six hours |
-| CIP-006 | An unfiltered `push` together with `pull_request` | Every pull-request push runs twice |
-| CIP-007 | A workflow with a `candidate…` dispatch input that a push can start, whose group is not keyed on that input, or that cancels in progress | Development commits, or another candidate, must never cancel a candidate's verification |
+| CIP-006 | A `push` that is not filtered by `branches` (without a `*` or `**` catch-all) or `tags`, together with `pull_request`; `branches-ignore` is not a filter | Every pull-request push runs twice |
+| CIP-007 | A workflow with a dispatch input whose name contains `candidate` or `sha`, when anything but dispatch can start it, its group is not keyed on that input, or it may cancel in progress | Development commits, a schedule, or another candidate must never cancel a candidate's verification |
+| CIP-008 | A pull-request workflow whose group does not separate refs (`github.ref`, `github.head_ref`, the pull-request number) | Groups are repository-wide: every pull-request push would cancel or queue main's run |
 
 ## What Rehearsal 6 measured
 
@@ -57,3 +58,5 @@ The candidate workflow:
 Integration checks that are too slow for tier 1 belong in the candidate workflow, or in a further workflow keyed the same way, never in a per-commit group.
 
 Every workflow that Conditor scaffolds passes the policy, and a test enforces this.
+
+An independent adversarial review of the first version (F1–F8: flow-mapping triggers read as one trigger, a fixed group shared across refs, `cancelled()` without `!`, candidates named `sha`, `branches-ignore`, `workflow_run`, flow-mapping jobs and concurrency, `${{ false }}`) is covered by regression checks in `tests/Conditor.Tests/CiPolicyTests.fs`.
