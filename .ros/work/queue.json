@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 62,
+  "nextSeq": 63,
   "items": [
     {
       "id": "WI-0001",
@@ -1431,6 +1431,27 @@
       "attachments": [],
       "createdAt": "2026-10-28T16:14:06.750Z",
       "updatedAt": "2026-10-28T17:29:25Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0062",
+      "title": "Unattended-execution readiness: prove a repository can go branch to verified merge receipt without the owner, through Praxis's authorization gate (WI-0104 in praxis)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-10-28T22:19:16.146Z",
+      "updatedAt": "2026-10-28T22:57:30.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

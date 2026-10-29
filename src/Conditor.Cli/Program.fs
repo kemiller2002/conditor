@@ -25,6 +25,7 @@ let private usage () =
     Console.WriteLine "  conditor upgrade --current --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR] [--artifact-mirror DIR] [--offline] [--check | --authorize PLAN-DIGEST]"
     Console.WriteLine "  conditor upgrade --current --check --stepwise --registry DIR [--channel NAME] --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR]"
     Console.WriteLine "  conditor drift --registry DIR [--channel NAME] [--platform RID] [--target PATH] [--json] [--fail-on never|warn|fail]"
+    Console.WriteLine "  conditor unattended-readiness --repository OWNER/REPO --base BRANCH --authorization FILE --trust-store FILE --journal DIR --workdir CLONE [--praxis PATH] [--run-id ID] [--trace TEXT] [--probe-branch NAME] [--poll-seconds N] [--out FILE] [--json]"
     Console.WriteLine "  conditor test-env preflight [--contract PATH] [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env digest    [--contract PATH] [--target PATH]"
     Console.WriteLine "  conditor test-env resolve   [--contract PATH] [--target PATH] [--json | --shell]"
@@ -1878,6 +1879,48 @@ let private runTestEnvironment (args: string array) =
         usage ()
         2
 
+let private runUnattendedReadiness (args: string array) =
+    let required name =
+        match optionValue name args with
+        | Some value when not (String.IsNullOrWhiteSpace value) -> Ok value
+        | _ -> Error $"{name} is required"
+
+    match required "--repository", required "--base", required "--authorization", required "--trust-store", required "--journal", required "--workdir" with
+    | Ok repository, Ok baseBranch, Ok authorization, Ok trustStore, Ok journal, Ok workdir ->
+        let runId = optionValue "--run-id" args |> Option.defaultValue "UNSPECIFIED-RUN"
+        let stamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss")
+        let request: UnattendedReadinessRequest =
+            { Repository = repository
+              BaseBranch = baseBranch
+              Praxis = optionValue "--praxis" args |> Option.defaultValue "praxis" |> fun p -> if p.Contains(Path.DirectorySeparatorChar) then Path.GetFullPath p else p
+              Authorization = Path.GetFullPath authorization
+              TrustStore = Path.GetFullPath trustStore
+              Journal = Path.GetFullPath journal
+              Workdir = Path.GetFullPath workdir
+              RunId = runId
+              Trace = optionValue "--trace" args |> Option.defaultValue $"Work-Item: {runId}"
+              ProbeBranch = optionValue "--probe-branch" args |> Option.defaultValue $"unattended-readiness/{runId.ToLowerInvariant()}-{stamp}"
+              PollSeconds = optionValue "--poll-seconds" args |> Option.map int |> Option.defaultValue 15 }
+
+        let runner: UnattendedReadiness.Runner = fun directory executable arguments -> ProcessRunner.runProcess directory executable arguments
+        let report = UnattendedReadiness.run runner (fun () -> DateTimeOffset.UtcNow) request
+        let json = UnattendedReadiness.toJson report
+        optionValue "--out" args |> Option.iter (fun path -> File.WriteAllText(path, json))
+        if hasFlag "--json" args then Console.Write json else Console.Write(UnattendedReadiness.toText report)
+
+        match report.Verdict with
+        | UnattendedVerdict.Ready -> 0
+        | UnattendedVerdict.Blocked -> 3
+        | UnattendedVerdict.NotRun -> 4
+    | Error e, _, _, _, _, _
+    | _, Error e, _, _, _, _
+    | _, _, Error e, _, _, _
+    | _, _, _, Error e, _, _
+    | _, _, _, _, Error e, _
+    | _, _, _, _, _, Error e ->
+        writeErrors [ e ]
+        2
+
 let private configureSourcePolicy (args: string array) =
     optionValue "--source-mirror" args
     |> Option.iter (fun path ->
@@ -1917,6 +1960,8 @@ let private execute (args: string array) =
             runRequirements args
         elif command = "drift" then
             runDrift args
+        elif command = "unattended-readiness" then
+            runUnattendedReadiness args
         elif command = "test-env" then
             runTestEnvironment args
         else

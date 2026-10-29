@@ -47,6 +47,7 @@
     <Compile Include="RepositorySnapshot.fs" />
     <Compile Include="CurrentUpgrade.fs" />
     <Compile Include="StepwiseUpgrade.fs" />
+    <Compile Include="UnattendedReadiness.fs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../examples/indy-init.conditor.json" LogicalName="Conditor.Presets.indy-init.json" />
