@@ -976,6 +976,105 @@ let runKickoffSet132 (check: string -> bool -> unit) =
                      dependencies.Count = 3
                      && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
 
+[<Literal>]
+let private FormaAsset0120 =
+    "https://github.com/kemiller2002/forma/releases/download/v0.12.0/echelon-foundry-design-system-0.12.0.tgz"
+
+/// echelon-current 1.33.0 linux-x64, byte-identical to the set the Registry's
+/// own tools resolve for the proposed cut (sha256 de658f5a...): the approved
+/// 1.32.0 with Praxis 3.23.0 -> 3.24.0 (owner-authorized autonomous
+/// execution; the starter praxis-validation workflow runs once per ref),
+/// Forma 0.11.0 -> 0.12.0 (A11Y-NONTEXT-CONTRAST and token:status-*) and the
+/// optional Arca 0.6.0 -> 0.7.0 (bounded synchronization scheduling).
+/// OD-INDY-8 approves it only after this Conditor qualification
+/// (DF-CON-2026-A007).
+let private echelonCurrent133 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.33.0-linux-x64.json")
+
+/// The Rehearsal 3 bootstrap manifest moved to the 1.33.0 selections.
+let private kickoffComponents133 =
+    rehearsalComponents
+        .Replace("""{"id":"praxis","version":"3.16.0"}""", """{"id":"praxis","version":"3.24.0"}""")
+        .Replace("""{"id":"ordo","version":"1.17.0"}""", """{"id":"ordo","version":"1.19.0"}""")
+        .Replace("""{"id":"limen","version":"0.9.0"}""", """{"id":"limen","version":"0.9.1"}""")
+        .Replace("""{"id":"forma","version":"0.9.0"}""", """{"id":"forma","version":"0.12.0"}""")
+        .Replace("""{"id":"folio","version":"0.4.0"}""", """{"id":"folio","version":"0.4.1"}""")
+
+let runKickoffSet133 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.33.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent133
+
+        check "the vendored echelon-current 1.33.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "de658f5aba301b7c588787d1ff3ca9fd64aad01852af53d8915eb43804401ac7")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let selected systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+            |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "praxis"; "forma"; "arca"; "ordo"; "dokimos"; "limen"; "percepta-semantic"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.33.0 selects Praxis 3.24.0, Forma 0.12.0 and Arca 0.7.0, and keeps Ordo 1.19.0, Dokimos 0.9.0, Limen 0.9.1, percepta-semantic 0.3.0, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "3.24.0"; Some "0.12.0"; Some "0.7.0"; Some "1.19.0"; Some "0.9.0"; Some "0.9.1"; Some "0.3.0"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.33.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent133 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.33.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation installs Praxis 3.24.0 from 1.33.0 and keeps Ordo 1.19.0, Dokimos 0.9.0 and percepta-semantic 0.3.0"
+                (installed "praxis" |> Option.exists (fun c -> c.Version = "3.24.0" && c.Tag = "v3.24.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.19.0" && c.Tag = "v1.19.0")
+                 && installed "dokimos" |> Option.exists (fun c -> c.Version = "0.9.0" && c.Tag = "dokimos-v0.9.0")
+                 && installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.3.0" && c.Lifecycle.IsNone))
+
+        // Arca has no Conditor descriptor. A repository that declares it takes
+        // the selected release through the release-asset NuGet feed, proved
+        // against the Registry digests (docs/nuget-feed-contract.md).
+        match NugetFeed.loadAll echelonCurrent133 with
+        | Error errors -> check $"""1.33.0's NuGet feed releases load: {String.concat "; " errors}""" false
+        | Ok feeds ->
+            check "1.33.0 serves Arca 0.7.0 through the release-asset feed with the published package digests"
+                (feeds
+                 |> Map.tryFind "arca"
+                 |> Option.exists (fun arca ->
+                     arca.Version = "0.7.0"
+                     && arca.Tag = "v0.7.0"
+                     && arca.ReleaseManifestSha256 = "dca9f0ebd2ab0edc1c2a7a5e902359df45d3a8b664d25b779a6f48cd4189b600"
+                     && (arca.Packages |> List.map (fun p -> p.PackageId, p.Sha256)) =
+                         [ "EchelonFoundry.Arca.Core", "931a1f29c1df1f815104a58daa85cca59d38f68fff6598bd20c0327edafd7622"
+                           "EchelonFoundry.Arca.GitHub", "9f8ef324119e25cba1c3d9dfcfac9c457db31b78ac7f30ddc2eef1499b20bc94"
+                           "EchelonFoundry.Arca.Limen", "966966a23dc85e02bbb69f8dd82525af23336e38daaf542305980f8d853c15e7" ]))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents133 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.33.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: under 1.33.0, Forma 0.12.0 and Folio 0.4.1 are pinned to their Registry release assets"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset0120
+                     && dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.33.0, Limen 0.9.1 keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.1")
+
+                check "under 1.33.0 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true

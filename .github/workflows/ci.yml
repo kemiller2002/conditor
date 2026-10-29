@@ -62,7 +62,7 @@ jobs:
           forma = inventory["forma"]
           assert forma["package"] == "@echelon-foundry/design-system", forma
           assert forma["defaultVersion"] == "0.5.0", forma
-          assert forma["qualifiedVersions"] == ["0.10.0", "0.11.0", "0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0"], forma
+          assert forma["qualifiedVersions"] == ["0.10.0", "0.11.0", "0.12.0", "0.2.0", "0.3.0", "0.4.1", "0.5.0", "0.6.1", "0.9.0"], forma
           folio = inventory["folio"]
           assert folio["package"] == "@echelon-foundry/print-components", folio
           assert folio["qualifiedVersions"] == ["0.3.0", "0.4.0", "0.4.1"], folio
@@ -578,6 +578,40 @@ jobs:
           if grep -F "REFUSED" "$RUNNER_TEMP/chrona-plan-132.txt"; then exit 1; fi
           # Not applied: Chrona stays on 1.31.0 until it migrates to Arca 0.6.0.
           ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
+      - name: Chrona 1.31.0 -> 1.33.0 plans Praxis 3.23.0 -> 3.24.0, Forma 0.10.0 -> 0.12.0 and Arca 0.5.0 -> 0.7.0, and stays on 1.31.0
+        shell: bash
+        env:
+          # The proposed 1.33.0 cut, vendored byte-for-byte as the Registry
+          # tools resolve it; the sha256 is its channel identity. Against
+          # 1.32.0 it moves Praxis 3.23.0 -> 3.24.0, Forma 0.11.0 -> 0.12.0
+          # (A11Y-NONTEXT-CONTRAST, token:status-*) and Arca 0.6.0 -> 0.7.0
+          # (bounded synchronization scheduling). Chrona is still on 1.31.0
+          # because its store code does not compile against Arca 0.6.0's opaque
+          # types, which 0.7.0 keeps, so it stays there: this step proves the
+          # plan names the three transitions with the real release digests, and
+          # does not apply it. Praxis 3.23.0 -> 3.24.0 is applied by the sweep
+          # and Forma 0.11.0 -> 0.12.0 by WebPackageUpgradeTests.echelonCurrent133.
+          SET_133_PATH: tests/fixtures/registry/echelon-current-1.33.0-linux-x64.json
+          SET_133_SHA256: de658f5aba301b7c588787d1ff3ca9fd64aad01852af53d8915eb43804401ac7
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          repo="$RUNNER_TEMP/chrona"
+          home="$RUNNER_TEMP/chrona-home"
+          echo "$SET_133_SHA256  $SET_133_PATH" | sha256sum -c -
+          args=(--home "$home" --target "$repo" --resolved-set "$SET_133_PATH" --resolved-set-sha256 "$SET_133_SHA256")
+          conditor upgrade --current --check "${args[@]}" | tee "$RUNNER_TEMP/chrona-plan-133.txt"
+          actual=$(grep -E '^    [a-z-]+: [0-9.]+ -> [0-9.]+ \[' "$RUNNER_TEMP/chrona-plan-133.txt" | sed -E 's/^ +//; s/ \[.*//' | sort -u | paste -sd';')
+          test "$actual" = "arca: 0.5.0 -> 0.7.0;forma: 0.10.0 -> 0.12.0;praxis: 3.23.0 -> 3.24.0" || { echo "transitions: '$actual'" >&2; exit 1; }
+          grep -F "praxis: 3.23.0 -> 3.24.0 [embedded-qualified-lifecycle]" "$RUNNER_TEMP/chrona-plan-133.txt"
+          grep -F "forma: 0.10.0 -> 0.12.0 [web-package-binding]" "$RUNNER_TEMP/chrona-plan-133.txt"
+          grep -F "arca: 0.5.0 -> 0.7.0 from kemiller2002/arca@v0.7.0" "$RUNNER_TEMP/chrona-plan-133.txt"
+          grep -F "EchelonFoundry.Arca.Core 0.7.0 (sha256:931a1f29c1df1f815104a58daa85cca59d38f68fff6598bd20c0327edafd7622)" "$RUNNER_TEMP/chrona-plan-133.txt"
+          grep -F "EchelonFoundry.Arca.GitHub 0.7.0 (sha256:9f8ef324119e25cba1c3d9dfcfac9c457db31b78ac7f30ddc2eef1499b20bc94)" "$RUNNER_TEMP/chrona-plan-133.txt"
+          grep -F "EchelonFoundry.Arca.Limen 0.7.0 (sha256:966966a23dc85e02bbb69f8dd82525af23336e38daaf542305980f8d853c15e7)" "$RUNNER_TEMP/chrona-plan-133.txt"
+          if grep -F "REFUSED" "$RUNNER_TEMP/chrona-plan-133.txt"; then exit 1; fi
+          # Not applied: Chrona stays on 1.31.0 until it migrates to Arca's opaque types.
+          ( cd "$repo" && "$home/.local/bin/praxis" validate && "$home/.local/bin/ordo" verify --strict && "$home/.local/bin/praxis" verify --strict )
   echelon-current-sweep-qualification:
     needs: build-test
     runs-on: ubuntu-latest
@@ -874,6 +908,11 @@ jobs:
           # declared component moves and Arca is not added.
           SET_132_PATH: tests/fixtures/registry/echelon-current-1.32.0-linux-x64.json
           SET_132_SHA256: bf52d105279f5239697239cd7d57485f632f022f7bb89e2ca89cc852314527d1
+          # 1.33.0 is the proposed cut: Praxis 3.23.0 -> 3.24.0, Forma 0.11.0 ->
+          # 0.12.0 and the optional Arca 0.6.0 -> 0.7.0. This repository
+          # declares Praxis of those, so only Praxis moves and Arca is not added.
+          SET_133_PATH: tests/fixtures/registry/echelon-current-1.33.0-linux-x64.json
+          SET_133_SHA256: de658f5aba301b7c588787d1ff3ca9fd64aad01852af53d8915eb43804401ac7
         run: |
           set -euo pipefail
           conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
@@ -974,6 +1013,11 @@ jobs:
           grep -F "Current upgrade plan: echelon-current@1.32.0" "$RUNNER_TEMP/sweep-1.32.0.txt"
           grep -F "version transitions: none" "$RUNNER_TEMP/sweep-1.32.0.txt"
           if grep -E "REFUSED|arca" "$RUNNER_TEMP/sweep-1.32.0.txt"; then exit 1; fi
+          # 1.32.0 -> 1.33.0 moves only Praxis 3.23.0 -> 3.24.0 with the real
+          # release, which then verifies the swept repository.
+          step 1.33.0 "$SET_133_PATH" "$SET_133_SHA256" "praxis: 3.23.0 -> 3.24.0" 1.19.0 3.24.0
+          "$home/.local/bin/praxis" --root "$repo" verify --strict
+          ( cd "$repo" && "$home/.local/bin/ordo" verify --strict )
 
   # Indy-init OD-INDY-8: the kickoff set is approved in the Registry only after
   # Conditor qualifies it (DF-CON-2026-A007). The workstation installs every
@@ -1178,6 +1222,68 @@ jobs:
           grep -E "^percepta 0\.3\.0([+ ]|$)" "$RUNNER_TEMP/percepta-version.txt"
           "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
           jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_131_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.9.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
+          rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
+          grep -F "evidence plan --request F" <<< "$dokimos_usage"
+          grep -F -- "--checkpoint incremental|release" <<< "$dokimos_usage"
+
+  # Indy-init OD-INDY-8: echelon-current 1.33.0 is proposed as the next kickoff
+  # set, approved only after this qualification. Against 1.32.0 its only
+  # native host-tool change is Praxis 3.23.0 -> 3.24.0 (owner-authorized
+  # autonomous execution, praxis autonomy). The workstation installs every
+  # native host tool of the set from the real published release bytes and
+  # verifies each receipt.
+  echelon-current-1-33-0-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_133_PATH: tests/fixtures/registry/echelon-current-1.33.0-linux-x64.json
+      SET_133_SHA256: de658f5aba301b7c588787d1ff3ca9fd64aad01852af53d8915eb43804401ac7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.33.0 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_133_SHA256  $SET_133_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_133_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_133_PATH" --resolved-set-sha256 "$SET_133_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.24.0"
+          # The installed Praxis carries autonomy, and keeps work evidence,
+          # streams check, inbox admit-plan and the requirements-preservation
+          # gate (exit 2 without inputs).
+          rc=0; autonomy=$("$home/.local/bin/praxis" autonomy 2>&1) || rc=$?
+          grep -F "autonomy policy check --policy FILE" <<< "$autonomy"
+          grep -F "autonomy merge --repository OWNER/REPO --pr N --candidate SHA" <<< "$autonomy"
+          rc=0; usage=$("$home/.local/bin/praxis" inbox 2>&1) || rc=$?
+          grep -F "inbox admit-plan CLAIM-ID" <<< "$usage"
+          rc=0; gate=$("$home/.local/bin/praxis" requirements preservation verify 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements preservation verify requires --baseline FILE" <<< "$gate"
+          rc=0; evidence=$("$home/.local/bin/praxis" work evidence 2>&1) || rc=$?
+          grep -F "Usage: praxis work evidence --id ID --kind" <<< "$evidence"
+          rc=0; streams=$("$home/.local/bin/praxis" streams 2>&1) || rc=$?
+          grep -F "streams check [--stream ID]*" <<< "$streams"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.19.0"
+          "$home/.local/bin/ordo" verification --help | grep -F -- "--reuse-context FILE"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          "$home/.local/bin/percepta" --version | tee "$RUNNER_TEMP/percepta-version.txt"
+          grep -E "^percepta 0\.3\.0([+ ]|$)" "$RUNNER_TEMP/percepta-version.txt"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_133_PATH")" '
             (with_entries(.key |= ascii_downcase)) as $v
             | $v.releaseversion == "0.9.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
           rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
