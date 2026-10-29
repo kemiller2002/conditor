@@ -1,0 +1,1579 @@
+name: Build and test
+
+# The candidate pipeline. Every job publishes its own results as soon as it finishes; an unrelated failure never
+# hides another job's evidence.
+#
+#   reuse        Dokimos 0.8.0 `dokimos evidence plan`: which producers may skip re-running on a branch / PR because
+#                their declared inputs are byte-identical to an earlier passing run (acceptance/reuse.json).
+#                Main always runs everything; live is never reused; reuse never becomes acceptance evidence.
+#   core         .NET build + every xunit test in App.slnx (TRX)                        -> core-results
+#   lock-gate    T11 stack lock and compatibility gate vs echelon-current 1.32.0        -> lock-gate
+#   site         npm install, kernel type-check, `npm run build` when defined           -> site
+#   browser      Playwright suite without @live tests (JSON)                            -> browser-results
+#   live         Playwright @live tests on main (CAUSA_GITHUB_TOKEN / CAUSA_TEST_REPO);
+#                never uploads traces; refuses to keep any file containing the token    -> live-results
+#   wasm-smoke   the engine in .NET WebAssembly loads the three historical cases (required)  -> wasm-smoke
+#   preservation-gate  praxis requirements preservation verify, re-run as recorded (G0)       -> preservation-gate
+#   percepta     percepta verify-app against the built site (G5; not produced until bindings + dist exist) -> percepta
+#   build-and-test   the required check: every mandatory job passed
+#   start-smoke  the built site starts in Chromium (production and test builds)            -> start-smoke
+#   deploy / deployed-smoke   GitHub Pages on main (DEPLOY_TARGET=github-pages) after core, site and start-smoke
+#                (not after build-and-test; see the deploy job); proves the served SHA
+#   acceptance   evidence bundle + causa.acceptance-ledger/2 at the deployed SHA, computed verdict from
+#                Indy-init's compute-acceptance-verdict.py AND `requirements-compiler verify-plan`
+#                -> acceptance-evidence (the verdict never fails this job; an uncomputable verdict does)
+
+on:
+  pull_request:
+  push:
+    branches: [main, "r5/**"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  # Main: one group per commit, so a later push neither cancels a running candidate nor replaces a queued one; every
+  # main commit gets a complete result (coordinator request, 2026-10-28). Branches and PRs keep one group per ref and
+  # cancel superseded runs.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  # Indy-init (requirements authority): verifiers, plan VP-8ef1c8dca656 (v3), baseline r6 and approvals history.
+  INDY_INIT_REF: 8747179886c7e1a35df60720ae4a841c67aa5245
+  # The verification plan at INDY_INIT_REF. These three change together, only when the requirements owner applies a
+  # plan curation (acceptance/README.md, "Plan curation"); acceptance.sh refuses any other plan.
+  PLAN_ID: VP-8ef1c8dca656
+  PLAN_PATH: requirements-compiled/v3/verification-plan.json
+  CA: dotnet tools/acceptance/Causa.Acceptance/bin/Release/net10.0/causa-acceptance.dll
+  IS_MAIN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+jobs:
+  reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      core: ${{ steps.decide.outputs.core }}
+      site: ${{ steps.decide.outputs.site }}
+      browser: ${{ steps.decide.outputs.browser }}
+      lock-gate: ${{ steps.decide.outputs.lock-gate }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build causa-acceptance
+        run: dotnet build tools/acceptance/Causa.Acceptance -c Release
+      - name: Install Dokimos (verified against the pinned channel)
+        id: dokimos
+        run: echo "exe=$(tools/acceptance/ci/install-dokimos.sh "$RUNNER_TEMP/dokimos")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        with:
+          path: .reuse/prior/core
+          key: dokimos-prov-core-${{ github.sha }}
+          restore-keys: dokimos-prov-core-
+      - uses: actions/cache/restore@v4
+        with:
+          path: .reuse/prior/site
+          key: dokimos-prov-site-${{ github.sha }}
+          restore-keys: dokimos-prov-site-
+      - uses: actions/cache/restore@v4
+        with:
+          path: .reuse/prior/browser
+          key: dokimos-prov-browser-${{ github.sha }}
+          restore-keys: dokimos-prov-browser-
+      - uses: actions/cache/restore@v4
+        with:
+          path: .reuse/prior/lock-gate
+          key: dokimos-prov-lock-gate-${{ github.sha }}
+          restore-keys: dokimos-prov-lock-gate-
+      - name: Dokimos evidence plan
+        run: |
+          mkdir -p "$RUNNER_TEMP/reuse"
+          prior=$(find .reuse/prior -name provenance.json 2>/dev/null | sort)
+          tools/acceptance/ci/changed-since-prior.sh $prior > "$RUNNER_TEMP/reuse/changed.txt"
+          args=""
+          for p in $prior; do args="$args --prior $p"; done
+          $CA reuse-request --config acceptance/reuse.json --revision "$GITHUB_SHA" --changed "$RUNNER_TEMP/reuse/changed.txt" $args --out "$RUNNER_TEMP/reuse/request.json"
+          # The checkout must be exactly the revision: move the restored records out of the tree first.
+          if [ -d .reuse ]; then mv .reuse "$RUNNER_TEMP/reuse/prior"; fi
+          "${{ steps.dokimos.outputs.exe }}" evidence plan --request "$RUNNER_TEMP/reuse/request.json" --root . > "$RUNNER_TEMP/reuse/plan.json"
+          jq -r '.Tests[] | "\(.TestId): \(.Decision) \([.Reasons[].Code] | join(","))"' "$RUNNER_TEMP/reuse/plan.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          for t in core site browser lock-gate; do
+            $CA provenance --plan "$RUNNER_TEMP/reuse/plan.json" --test "$t" --revision "$GITHUB_SHA" --run-id "$GITHUB_RUN_ID" --outcome passed --out "$RUNNER_TEMP/reuse/provenance/$t/provenance.json"
+          done
+      - name: Decide
+        id: decide
+        run: |
+          for t in core site browser lock-gate; do
+            d=$($CA reuse-decision --plan "$RUNNER_TEMP/reuse/plan.json" --test "$t")
+            # Main and manual runs produce acceptance evidence: nothing is reused there.
+            if [ "$IS_MAIN" = true ] || [ "${{ github.event_name }}" = workflow_dispatch ]; then d=run; fi
+            echo "$t=$d" >> "$GITHUB_OUTPUT"
+            echo "$t: $d" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reuse-plan
+          path: ${{ runner.temp }}/reuse/
+          retention-days: 30
+
+  core:
+    needs: reuse
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      ran: ${{ steps.test.outcome == 'success' }}
+    steps:
+      - name: Reused
+        if: needs.reuse.outputs.core == 'reuse'
+        run: echo "Inputs identical to an earlier passing run (Dokimos Reusable); not re-run. Not acceptance evidence." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v4
+        if: needs.reuse.outputs.core != 'reuse'
+      # The engine's fixture-replay tests (T15) read the frozen Causa storage
+      # contract v1.0.0 fixtures and the historical-v1 workspace. Pinned to a
+      # commit whose frozen paths equal tag causa-storage-v1.0.0.
+      - uses: actions/checkout@v4
+        if: needs.reuse.outputs.core != 'reuse'
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: causa-data
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        if: needs.reuse.outputs.core != 'reuse'
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v4
+        if: needs.reuse.outputs.core != 'reuse'
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.fsproj', '**/*.csproj', 'Directory.Build.props', 'NuGet.config') }}
+      # Warnings are errors (Directory.Build.props), so this also gates warning regressions.
+      - name: Build
+        if: needs.reuse.outputs.core != 'reuse'
+        run: dotnet build App.slnx -c Release
+      - name: Test
+        id: test
+        if: needs.reuse.outputs.core != 'reuse'
+        shell: bash
+        env:
+          CAUSA_DATA_DIR: ${{ github.workspace }}/causa-data
+        run: |
+          set -uo pipefail
+          # The bound .NET acceptance suites run in their own jobs: Causa.Acceptance.Deterministic in
+          # acceptance-deterministic, Causa.Acceptance.Live (provider secrets) in live. core is the build and the unit
+          # and engine tests, which deploy depends on.
+          output=$(dotnet test App.slnx -c Release --no-build --filter "FullyQualifiedName!~Causa.Acceptance.Live.&FullyQualifiedName!~Causa.Acceptance.Deterministic." --logger "trx;LogFilePrefix=core" --results-directory TestResults/dotnet 2>&1)
+          status=$?
+          echo "$output"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          if ! echo "$output" | grep -qE 'Passed:[[:space:]]*[1-9]'; then
+            echo "::error::No test passed. An empty test run is not a pass."; exit 1
+          fi
+          if echo "$output" | grep -qE 'Skipped:[[:space:]]*[1-9]'; then
+            echo "::error::Tests were skipped. A run that skips tests is not a pass."; exit 1
+          fi
+      - name: Publish the core results
+        if: always() && needs.reuse.outputs.core != 'reuse'
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-results
+          path: TestResults/dotnet/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Record provenance of this pass for reuse
+        if: success() && needs.reuse.outputs.core != 'reuse'
+        uses: actions/download-artifact@v4
+        with:
+          name: reuse-plan
+          path: .reuse-plan
+      # Saved under the same path the reuse job restores (a cache entry is bound to its path).
+      - name: Stage the provenance record
+        if: success() && needs.reuse.outputs.core != 'reuse'
+        run: mkdir -p .reuse/prior/core && cp .reuse-plan/provenance/core/provenance.json .reuse/prior/core/ || true
+      - if: success() && needs.reuse.outputs.core != 'reuse' && hashFiles('.reuse/prior/core/provenance.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .reuse/prior/core
+          key: dokimos-prov-core-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+  lock-gate:
+    needs: reuse
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      verdict: ${{ steps.gate.outputs.verdict }}
+    steps:
+      - name: Reused
+        if: needs.reuse.outputs.lock-gate == 'reuse'
+        run: echo "Inputs identical to an earlier passing run; not re-run. Not acceptance evidence." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v4
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+      - uses: actions/setup-dotnet@v4
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        with:
+          node-version: "22"
+      - name: Install npm dependencies
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Restore and build (project.assets.json, causa-acceptance)
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        run: dotnet build App.slnx -c Release
+      # Every host tool exactly as the channel resolves it (SHA-256 verified), so the gate observes real versions.
+      - name: Install the host tools onto PATH
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        run: |
+          for t in "praxis praxis" "ordo ordo" "dokimos dokimos" "percepta-semantic percepta" "percepta percepta-repo"; do
+            set -- $t
+            tools/acceptance/ci/install-host-tool.sh "$1" "$2" "$RUNNER_TEMP/host-tools" >> "$GITHUB_PATH"
+          done
+      - name: The pinned channel copy equals the registry file at the pinned commit
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        run: |
+          repo=$(jq -r .registry.repository acceptance/stack/pin.json)
+          commit=$(jq -r .registry.commit acceptance/stack/pin.json)
+          path=$(jq -r .registry.path acceptance/stack/pin.json)
+          curl -fsSL --retry 3 "https://raw.githubusercontent.com/$repo/$commit/$path" -o "$RUNNER_TEMP/channel.json"
+          cmp "$RUNNER_TEMP/channel.json" "$(jq -r .channelFile acceptance/stack/pin.json)"
+      - name: Stack lock and compatibility gate (T11, VER-008)
+        id: gate
+        if: needs.reuse.outputs.lock-gate != 'reuse'
+        run: |
+          set +e
+          $CA lock-gate --root . --stack acceptance/stack/echelon-current-1.32.0.linux-x64.json --pin acceptance/stack/pin.json \
+            --require-host-tool praxis --require-host-tool ordo --require-host-tool dokimos \
+            --require-host-tool percepta --require-host-tool percepta-repo --out TestResults/lock-gate/lock-gate.json \
+            --context "sourceSha=$GITHUB_SHA" --context "runId=$GITHUB_RUN_ID"
+          status=$?
+          set -e
+          echo "verdict=$(jq -r .verdict TestResults/lock-gate/lock-gate.json)" >> "$GITHUB_OUTPUT"
+          jq -r '.checks[] | select(.status != "PASS") | "- \(.status) \(.subject): expected \(.expected), actual \(.actual) (\(.detail))"' TestResults/lock-gate/lock-gate.json >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+      - name: Publish the lock gate record
+        if: always() && needs.reuse.outputs.lock-gate != 'reuse'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lock-gate
+          path: TestResults/lock-gate/
+          if-no-files-found: warn
+          retention-days: 30
+      - if: success() && needs.reuse.outputs.lock-gate != 'reuse'
+        uses: actions/download-artifact@v4
+        with:
+          name: reuse-plan
+          path: .reuse-plan
+      # Saved under the same path the reuse job restores (a cache entry is bound to its path).
+      - name: Stage the provenance record
+        if: success() && needs.reuse.outputs.lock-gate != 'reuse'
+        run: mkdir -p .reuse/prior/lock-gate && cp .reuse-plan/provenance/lock-gate/provenance.json .reuse/prior/lock-gate/ || true
+      - if: success() && needs.reuse.outputs.lock-gate != 'reuse' && hashFiles('.reuse/prior/lock-gate/provenance.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .reuse/prior/lock-gate
+          key: dokimos-prov-lock-gate-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+  site:
+    needs: reuse
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # actions: read only to download the previous main run's traceability for the published proof page.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      built: ${{ steps.build.outputs.built }}
+      site-test-sha256: ${{ steps.build.outputs.site-test-sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+      # The pinned verification plan (CAUSA_PLAN) for the published proof page (S21).
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          sparse-checkout: requirements-compiled/v3
+          persist-credentials: false
+      - name: Move the Indy-init checkout out of the tree
+        run: mv .indy-init "$RUNNER_TEMP/indy-init"
+      # CAUSA_TRACEABILITY: this run's tests have not run yet when the site is built, so the proof page publishes the
+      # traceability of the latest COMPLETED main run (its acceptance-evidence artifact, labelled with that run's id
+      # and commit from the file's own context). Never the committed acceptance/traceability.json: with no such run
+      # available the page publishes "not published".
+      - name: Traceability of the latest completed main run
+        id: trace
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dir="$RUNNER_TEMP/previous-acceptance"
+          target="$RUNNER_TEMP/previous-traceability.json"
+          ids=$(gh run list -R "$GITHUB_REPOSITORY" -w build-and-test.yml -b main --status completed -L 20 --json databaseId -q '.[].databaseId' || true)
+          for id in $ids; do
+            [ "$id" = "$GITHUB_RUN_ID" ] && continue
+            rm -rf "$dir"
+            if gh run download "$id" -R "$GITHUB_REPOSITORY" -n acceptance-evidence -D "$dir" > /dev/null 2>&1 && [ -f "$dir/bundle/traceability.json" ]; then
+              cp "$dir/bundle/traceability.json" "$target"
+              echo "from run $id: $(jq -c '.context' "$target")" | tee -a "$GITHUB_STEP_SUMMARY"
+              break
+            fi
+          done
+          if [ ! -f "$target" ]; then
+            echo "::notice::no completed main run with acceptance evidence; the proof page publishes traceability as not published"
+            target="$RUNNER_TEMP/no-traceability-published.json"
+          fi
+          echo "path=$target" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.fsproj', '**/*.csproj', 'Directory.Build.props', 'NuGet.config') }}
+      - name: Install npm dependencies
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "::warning::package-lock.json is not committed; installing without a lockfile. Commit it so every run installs the same tree."
+            npm install --no-audit --no-fund
+          fi
+      - name: Type-check the browser kernel
+        run: npm run check
+      # npm run build publishes the .NET WebAssembly application (src/wasm).
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+      # The deployable site is whatever `npm run build` writes to dist/ (DEPLOYMENT.md). The build stamps the SHA it
+      # was built from into dist/version.json so the deployment can be proved to serve this exact commit.
+      - name: Build the site
+        id: build
+        env:
+          CAUSA_PLAN: ${{ runner.temp }}/indy-init/${{ env.PLAN_PATH }}
+          CAUSA_TRACEABILITY: ${{ steps.trace.outputs.path }}
+        run: |
+          if jq -e '.scripts.build' package.json > /dev/null; then
+            npm run build
+            test -f dist/index.html || { echo "::error::npm run build must write dist/index.html"; exit 1; }
+            printf '{"sha":"%s","run_id":"%s"}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > dist/version.json
+            echo "built=true" >> "$GITHUB_OUTPUT"
+            # The test configuration's content digest (build-info.json contentSha256): every job that downloads it
+            # proves it tests these exact bytes (conditor.test-environment.json artifact.sha256Variable).
+            echo "site-test-sha256=$(jq -r .contentSha256 obj/site-test/build-info.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No build script yet; no deployable site in this candidate."
+            echo "built=false" >> "$GITHUB_OUTPUT"
+          fi
+      # ESO-R6-08 build order: Release build, then limen wasm-check on the built .NET guest assemblies (the Mono
+      # interpreter's per-method frame limit), before any browser test runs.
+      - name: limen wasm-check (the .NET guest against the WebAssembly interpreter's frame limit)
+        if: steps.build.outputs.built == 'true'
+        run: |
+          mkdir -p TestResults/wasm-check
+          npx limen wasm-check src/wasm/bin/Release/net10.0 --json > TestResults/wasm-check/wasm-check.json
+          npx limen wasm-check src/wasm/bin/Release/net10.0 --top 5 | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Publish the wasm-check record
+        if: always() && steps.build.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-check
+          path: TestResults/wasm-check/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Publish the built site
+        if: steps.build.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/
+          retention-days: 7
+      # `npm run build` also writes the test configuration (its own .NET publish with the test-only exports and the
+      # Percepta state hook). Never deployed; the browser, live and percepta jobs serve it on 4322.
+      - name: Publish the test configuration
+        if: steps.build.outputs.built == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-test
+          path: obj/site-test/
+          if-no-files-found: error
+          retention-days: 7
+          # build-info.json's contentSha256 covers every file, .nojekyll included.
+          include-hidden-files: true
+
+  browser:
+    needs: [reuse, site]
+    if: ${{ !cancelled() && needs.site.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # Three shards in parallel (playwright --shard): the suite with the bound acceptance specs outgrew one job.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    outputs:
+      ran: ${{ steps.mocked.outputs.ran }}
+    steps:
+      - name: Reused
+        if: needs.reuse.outputs.browser == 'reuse'
+        run: echo "Inputs identical to an earlier passing run (Dokimos Reusable); not re-run. Not acceptance evidence." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v4
+        if: needs.reuse.outputs.browser != 'reuse'
+      # Real historical cases are read from causa-data at runtime, unaltered (never bundled).
+      - uses: actions/checkout@v4
+        if: needs.reuse.outputs.browser != 'reuse'
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: causa-data
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: needs.reuse.outputs.browser != 'reuse'
+        with:
+          node-version: "22"
+      - name: Install npm dependencies
+        if: needs.reuse.outputs.browser != 'reuse'
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Built site
+        if: needs.reuse.outputs.browser != 'reuse' && needs.site.outputs.built == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+      # The test configuration, as the site job built it (its own .NET publish; never deployed).
+      - name: Built test configuration
+        if: needs.reuse.outputs.browser != 'reuse' && needs.site.outputs.built == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site-test
+          path: obj/site-test
+      # percepta.spec.js runs `percepta verify-app`: the CLI exactly as the pinned channel resolves it (SHA-256 verified).
+      - name: Install the Percepta CLI and its browser
+        if: needs.reuse.outputs.browser != 'reuse'
+        timeout-minutes: 12
+        run: |
+          dir=$(tools/acceptance/ci/install-host-tool.sh percepta-semantic percepta "$RUNNER_TEMP/host-tools")
+          echo "$dir" >> "$GITHUB_PATH"
+          "$dir/percepta" version
+          timeout 600 "$dir/percepta" install-browser
+      - name: Chromium for the installed Playwright version
+        if: needs.reuse.outputs.browser != 'reuse'
+        id: playwright
+        run: |
+          echo "version=$(node -p "require('./node_modules/playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+          # Browsers the config's projects use (WebKit only when a project needs it).
+          browsers=chromium
+          if grep -qiE 'webkit|devices\[.(Desktop Safari|iPad|iPhone)' playwright.config.js; then browsers="chromium webkit"; fi
+          echo "browsers=$browsers" >> "$GITHUB_OUTPUT"
+          # Spec files: tests/browser/live/ and live-*.spec.js belong to the live job only.
+          echo "specs=$(find tests/browser -name '*.spec.js' -not -path 'tests/browser/live/*' -not -name 'live-*' | LC_ALL=C sort | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        if: needs.reuse.outputs.browser != 'reuse'
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: "2"
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ steps.playwright.outputs.browsers }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+      # Never --with-deps (apt has no overall deadline); ldd proves the OS libraries offline.
+      - name: Install the browsers and verify their OS libraries
+        if: needs.reuse.outputs.browser != 'reuse'
+        timeout-minutes: 15
+        env:
+          BROWSERS: ${{ steps.playwright.outputs.browsers }}
+        run: |
+          timeout 300 npx playwright install $BROWSERS
+          printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/99-bounded-network > /dev/null
+          missing=$(find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell \) -print0 | xargs -0 --no-run-if-empty ldd | awk '/not found/ { print $1 }' | sort -u)
+          if [ -n "$missing" ]; then timeout 300 npx playwright install-deps chromium || true; fi
+          # WebKit's system libraries are not on the runner image.
+          case " $BROWSERS " in *" webkit "*) timeout 600 npx playwright install-deps webkit ;; esac
+          # The contract's browser (conditor.test-environment.json browsers[chromium].executableVariable).
+          echo "CAUSA_CHROMIUM_PATH=$(find ~/.cache/ms-playwright -path '*/chromium-*/chrome-linux*/chrome' -type f | head -n 1)" >> "$GITHUB_ENV"
+      # ESO-R6-08: conditor test-env preflight proves the machine matches the test-environment contract (port,
+      # configuration, the exact candidate artifact by content digest, browser and its libraries) before any browser
+      # starts; the endpoints the suite uses are the ones `conditor test-env resolve` reports.
+      - name: conditor test-env preflight and resolve
+        if: needs.reuse.outputs.browser != 'reuse'
+        env:
+          CAUSA_SITE_TEST_SHA256: ${{ needs.site.outputs.site-test-sha256 }}
+        run: |
+          dir=$(tools/acceptance/ci/install-conditor.sh "$RUNNER_TEMP/conditor")
+          "$dir/conditor" test-env resolve --json | tee TestResults-resolve.json
+          "$dir/conditor" test-env preflight
+          mkdir -p TestResults/test-environment && mv TestResults-resolve.json TestResults/test-environment/resolve.json
+          echo "Playwright endpoints: $(jq -c '{baseUrl, applicationEndpoint, port}' TestResults/test-environment/resolve.json)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify the pages in a real browser (mocked; no @live tests)
+        id: mocked
+        if: needs.reuse.outputs.browser != 'reuse'
+        env:
+          CAUSA_DATA_DIR: causa-data
+          PLAYWRIGHT_JSON_OUTPUT_FILE: TestResults/playwright/browser-results-${{ matrix.shard }}.json
+        run: |
+          set +e
+          npx playwright test ${{ steps.playwright.outputs.specs }} --grep-invert @live --shard=${{ matrix.shard }}/3 --reporter=list,json
+          status=$?
+          set -e
+          ran=$(jq '[.. | objects | select(has("results")) | .results[]?] | length' TestResults/playwright/browser-results-${{ matrix.shard }}.json 2>/dev/null || echo 0)
+          echo "ran=$([ "$ran" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [ "$status" -eq 0 ] && [ "$ran" -eq 0 ]; then echo "::error::No browser test ran. An empty run is not a pass."; exit 1; fi
+          if jq -e '.stats.skipped > 0' TestResults/playwright/browser-results-${{ matrix.shard }}.json > /dev/null 2>&1; then echo "::error::Browser tests were skipped. A run that skips tests is not a pass."; exit 1; fi
+          exit $status
+      - name: Publish the browser results
+        if: always() && needs.reuse.outputs.browser != 'reuse'
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-results-${{ matrix.shard }}
+          path: TestResults/playwright/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Publish the test-environment preflight
+        if: always() && needs.reuse.outputs.browser != 'reuse'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-environment-${{ matrix.shard }}
+          path: TestResults/test-environment/
+          if-no-files-found: warn
+          retention-days: 30
+      # Traces of the mocked suite only (no real token is ever present here).
+      - name: Upload browser traces on failure
+        if: failure() && steps.mocked.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+      - if: success() && needs.reuse.outputs.browser != 'reuse'
+        uses: actions/download-artifact@v4
+        with:
+          name: reuse-plan
+          path: .reuse-plan
+      # Saved under the same path the reuse job restores (a cache entry is bound to its path).
+      - name: Stage the provenance record
+        if: success() && needs.reuse.outputs.browser != 'reuse'
+        run: mkdir -p .reuse/prior/browser && cp .reuse-plan/provenance/browser/provenance.json .reuse/prior/browser/ || true
+      - if: success() && needs.reuse.outputs.browser != 'reuse' && hashFiles('.reuse/prior/browser/provenance.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .reuse/prior/browser
+          key: dokimos-prov-browser-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+
+  # The live provider journey: real GitHub, the CAUSA_GITHUB_TOKEN secret, the isolated CAUSA_TEST_REPO. Tests tagged
+  # @live. Runs on main pushes and manual runs, always in full (live evidence is never reused). Traces are off and
+  # never uploaded; nothing containing the token leaves the runner.
+  # Runs after deployed-smoke (PF-016-O2 reads its exact-SHA screenshots); when there is no deployment it still runs,
+  # and the tests that need the deployment fail BLOCKED.
+  live:
+    needs: [reuse, site, browser, deploy, deployed-smoke]
+    if: ${{ !cancelled() && needs.site.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      ran: ${{ steps.live.outputs.ran }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: causa-data
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - shell: bash
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Built site
+        if: needs.site.outputs.built == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+      # Playwright serves both builds (dist/ on 4321, obj/site-test/ on 4322), as the site job built them.
+      - name: Built test configuration
+        if: needs.site.outputs.built == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site-test
+          path: obj/site-test
+      # PF-011-O2: the UI level's own results (every browser shard's Playwright JSON), in one directory.
+      - name: The browser job's results (all shards)
+        if: needs.browser.result != 'skipped'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: browser-results-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/ui-results
+      - name: The deployed exact-SHA screenshots (deployed-smoke)
+        if: needs.deployed-smoke.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: deployed-results
+          path: ${{ runner.temp }}/deployed
+      - name: Install the browsers
+        timeout-minutes: 15
+        run: |
+          browsers=chromium
+          if grep -qiE 'webkit|devices\[.(Desktop Safari|iPad|iPhone)' playwright.config.js; then browsers="chromium webkit"; fi
+          timeout 300 npx playwright install $browsers
+          case " $browsers " in *" webkit "*) timeout 600 npx playwright install-deps webkit ;; esac
+      # DEC-R6-010: CAUSA_GITHUB_TOKEN is read-only (authenticated reads); CAUSA_WRITE_TOKEN is contents:write on the
+      # test repository only (live writes). Both are given to the live steps only.
+      - name: Live .NET acceptance tests (Causa.Acceptance.Live; a missing credential fails as BLOCKED)
+        id: live-dotnet
+        env:
+          CAUSA_LIVE: "1"
+          CAUSA_DATA_DIR: ${{ github.workspace }}/causa-data
+          CAUSA_DATA_GIT: ${{ github.workspace }}/causa-data
+          CAUSA_GITHUB_TOKEN: ${{ secrets.CAUSA_GITHUB_TOKEN }}
+          CAUSA_WRITE_TOKEN: ${{ secrets.CAUSA_WRITE_TOKEN }}
+          CAUSA_TEST_REPO: ${{ secrets.CAUSA_TEST_REPO || vars.CAUSA_TEST_REPO }}
+          CAUSA_LIVE_EVIDENCE_DIR: ${{ github.workspace }}/TestResults/live/evidence
+          CAUSA_UI_RESULTS: ${{ needs.browser.result != 'skipped' && format('{0}/ui-results', runner.temp) || '' }}
+          CAUSA_EXPECTED_SHA: ${{ github.sha }}
+          CAUSA_PAGES_URL: ${{ needs.deploy.outputs.url }}
+          CAUSA_DEPLOYED_SCREENSHOTS: ${{ needs.deployed-smoke.result == 'success' && format('{0}/deployed/screenshots', runner.temp) || '' }}
+        run: |
+          export CAUSA_TEST_REPO="$(printf %s "$CAUSA_TEST_REPO" | tr -d '[:space:]')"
+          if [ ! -d tests/Causa.Acceptance.Live ]; then
+            echo "::warning::tests/Causa.Acceptance.Live does not exist yet; no live .NET result in this run"; exit 0
+          fi
+          dotnet test tests/Causa.Acceptance.Live -c Release --logger "trx;LogFilePrefix=live" --results-directory TestResults/live/dotnet
+      - name: Live suite against the real test repository
+        id: live
+        if: always()
+        env:
+          CAUSA_LIVE: "1"
+          CAUSA_DATA_DIR: causa-data
+          CAUSA_GITHUB_TOKEN: ${{ secrets.CAUSA_GITHUB_TOKEN }}
+          CAUSA_WRITE_TOKEN: ${{ secrets.CAUSA_WRITE_TOKEN }}
+          CAUSA_TEST_REPO: ${{ secrets.CAUSA_TEST_REPO || vars.CAUSA_TEST_REPO }}
+          PLAYWRIGHT_JSON_OUTPUT_FILE: TestResults/live/live-results.json
+        run: |
+          export CAUSA_TEST_REPO="$(printf %s "$CAUSA_TEST_REPO" | tr -d '[:space:]')"
+          specs=$( (ls tests/browser/live-*.spec.js 2>/dev/null; find tests/browser/live -name '*.spec.js' 2>/dev/null) | LC_ALL=C sort | tr '\n' ' ')
+          count=0
+          [ -n "$specs" ] && count=$(npx playwright test $specs --list --grep @live 2>/dev/null | grep -cE '^\s+\[' || true)
+          if [ "${count:-0}" -eq 0 ]; then
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No @live test exists yet; the live producer is NOT produced (G6 stays NOT_RUN)."
+            exit 0
+          fi
+          if [ -z "$CAUSA_GITHUB_TOKEN" ] || [ -z "$CAUSA_TEST_REPO" ]; then
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "::error::CAUSA_GITHUB_TOKEN / CAUSA_TEST_REPO are not available to this workflow"; exit 1
+          fi
+          echo "ran=true" >> "$GITHUB_OUTPUT"
+          npx playwright test $specs --grep @live --trace off --reporter=list,json
+      # PF-015: nothing that leaves the runner may contain the real token. Fails closed and removes the files.
+      - name: Refuse to keep any file that contains a token
+        if: always()
+        env:
+          CAUSA_GITHUB_TOKEN: ${{ secrets.CAUSA_GITHUB_TOKEN }}
+          CAUSA_WRITE_TOKEN: ${{ secrets.CAUSA_WRITE_TOKEN }}
+        run: |
+          rm -rf test-results playwright-report
+          leaked=""
+          for t in "$CAUSA_GITHUB_TOKEN" "$CAUSA_WRITE_TOKEN"; do
+            [ -n "$t" ] && leaked="$leaked $(grep -rlF -- "$t" TestResults 2>/dev/null || true)"
+          done
+          leaked=$(echo $leaked)
+          if [ -n "$leaked" ]; then
+            echo "$leaked" | xargs rm -f
+            echo "::error::Files containing the token were found and deleted before upload."; exit 1
+          fi
+      - name: Publish the live results (JSON only, never traces)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-results
+          path: |
+            TestResults/live/live-results.json
+            TestResults/live/dotnet/*.trx
+            TestResults/live/evidence/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The engine compiled to .NET WebAssembly loads the three historical cases (read from causa-data at run time) to
+  # their catalog state digests and returns typed faults (R4 D-HIST-WASM). Required; never reused.
+  wasm-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: causa-data
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-wasm-${{ runner.os }}-${{ hashFiles('**/*.fsproj', '**/*.csproj', 'Directory.Build.props', 'NuGet.config') }}
+      - name: Install the wasm-tools workload
+        run: dotnet workload install wasm-tools
+      - name: Build the WASM smoke
+        run: dotnet build -c Release tests/Engine.WasmSmoke
+      - name: Load the three historical cases in .NET WebAssembly
+        env:
+          CAUSA_DATA_DIR: ${{ github.workspace }}/causa-data
+        run: |
+          mkdir -p TestResults/wasm-smoke
+          set -o pipefail
+          node tests/Engine.WasmSmoke/run.mjs 2>&1 | tee TestResults/wasm-smoke/wasm-smoke.log
+      - name: Publish the WASM smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-smoke
+          path: TestResults/wasm-smoke/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # G0: the requirements preservation gate, re-run exactly as recorded in
+  # requirements/preservation/gate-command.txt against the same pinned inputs
+  # (Indy-init at INDY_INIT_REF and at the baseline source commit 856157a, Praxis 3.23.0 from the pinned channel).
+  preservation-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      status: ${{ steps.gate.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Indy-init at the pinned ref and at the baseline source commit, outside the checkout
+        run: |
+          mv .indy-init "$RUNNER_TEMP/indy-init"
+          git -C "$RUNNER_TEMP/indy-init" worktree add --detach "$RUNNER_TEMP/indy-init-856157a" 856157a78d47946d264ec49ee8325fcf996ae9b9
+      - name: Install Praxis (verified against the pinned channel)
+        run: tools/acceptance/ci/install-host-tool.sh praxis praxis "$RUNNER_TEMP/host-tools" >> "$GITHUB_PATH"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build causa-acceptance (the independent derivation check)
+        run: dotnet build tools/acceptance/Causa.Acceptance -c Release
+      # Two independent checks of the same derived package against the same pinned inputs. G0's producer succeeds
+      # only when both pass: the Praxis gate (as recorded) and causa-acceptance derivation-check (AR-002-O2:
+      # verbatim carriage, which also catches value and role swaps the Praxis 3.23.0 gate does not detect).
+      - name: praxis requirements preservation verify (as recorded) and the derivation check
+        id: gate
+        env:
+          INDY_INIT: ${{ runner.temp }}/indy-init
+          INDY_INIT_SOURCE: ${{ runner.temp }}/indy-init-856157a
+          OUT_DIR: TestResults/preservation
+        run: |
+          set +e
+          tools/acceptance/ci/preservation-gate.sh | tee -a "$GITHUB_STEP_SUMMARY"
+          praxis_status=$?
+          $CA derivation-check --baseline "$INDY_INIT/requirements/causa-requirements-baseline-r6.json" \
+            --baseline-sha256 40599abe92724dae6796ee0d6a9bf5711c4db882fc79c77b38a43d0f0960befd \
+            --derived requirements/derived --disposition requirements/preservation/disposition.json \
+            --approvals "$INDY_INIT/kickoff/rehearsal-006/approvals.causa.json" \
+            --approvals-sha256 a69618f5bc34b1eabb98c79ecd4b98a7bf560e619f7b9d500988320940dcec39 \
+            --out TestResults/preservation/derivation-check.json | tee -a "$GITHUB_STEP_SUMMARY"
+          derivation_status=$?
+          set -e
+          praxis=$(cat TestResults/preservation/status 2>/dev/null || echo failure)
+          if [ "$praxis" = success ] && [ "$derivation_status" -eq 0 ]; then status=success; else status=failure; fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          cat TestResults/preservation/compare.txt
+          [ "$status" = success ]
+      - name: Publish the preservation gate record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preservation-gate
+          path: TestResults/preservation/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Adversarial tests of the preservation gate (AR-002, PF-018, WDL-015): the recorded command against mutated copies
+  # of the derived package (omission, negation, weakening, value and role swaps). Not required: a mutation the gate
+  # does not catch is a finding about the gate, recorded as a failing obligation, not a defect of this candidate.
+  preservation-adversarial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Indy-init at the pinned ref and at the baseline source commit, outside the checkout
+        run: |
+          mv .indy-init "$RUNNER_TEMP/indy-init"
+          git -C "$RUNNER_TEMP/indy-init" worktree add --detach "$RUNNER_TEMP/indy-init-856157a" 856157a78d47946d264ec49ee8325fcf996ae9b9
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install Praxis (verified against the pinned channel)
+        run: tools/acceptance/ci/install-host-tool.sh praxis praxis "$RUNNER_TEMP/host-tools" >> "$GITHUB_PATH"
+      - name: Mutations of the derived package against the recorded gate
+        env:
+          INDY_INIT: ${{ runner.temp }}/indy-init
+          INDY_INIT_SOURCE: ${{ runner.temp }}/indy-init-856157a
+        run: |
+          dotnet build tools/acceptance/Causa.Acceptance.RunTests -c Release
+          dotnet test tools/acceptance/Causa.Acceptance.RunTests -c Release --no-build --filter "job=preservation" \
+            --logger "trx;LogFilePrefix=preservation-adversarial" --results-directory TestResults/preservation-adversarial
+      - name: Publish the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preservation-adversarial-results
+          path: TestResults/preservation-adversarial/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Coverage tracking (not evidence): every application-test binding of plan v3 against the tests that exist in this
+  # candidate, discovered without running them (playwright --list, dotnet test --list-tests), by exact identity.
+  # Not required; the JSON is published for the coordinator.
+  bindings-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          sparse-checkout: requirements-compiled/v3
+          persist-credentials: false
+      - name: Move the Indy-init checkout out of the tree
+        run: mv .indy-init "$RUNNER_TEMP/indy-init"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.fsproj', '**/*.csproj', 'Directory.Build.props', 'NuGet.config') }}
+      - name: Install npm dependencies
+        run: npm ci
+      - name: Build the test projects and causa-acceptance
+        run: |
+          dotnet build App.slnx -c Release
+          dotnet build tools/acceptance/Causa.Acceptance -c Release
+      - name: Discover the tests (no test runs)
+        run: |
+          mkdir -p TestResults/bindings-coverage
+          npx playwright test --list --reporter=json > TestResults/bindings-coverage/playwright-list.json
+          dotnet test App.slnx -c Release --no-build --list-tests > TestResults/bindings-coverage/dotnet-list.txt 2>&1
+          for p in tests/Causa.Acceptance.Deterministic tests/Causa.Acceptance.Live; do
+            [ -d "$p" ] && dotnet test "$p" -c Release --list-tests >> TestResults/bindings-coverage/dotnet-list.txt 2>&1 || true
+          done
+      - name: causa-acceptance bindings-check
+        run: |
+          $CA bindings-check --plan "$RUNNER_TEMP/indy-init/$PLAN_PATH" \
+            --playwright-list TestResults/bindings-coverage/playwright-list.json \
+            --dotnet-list TestResults/bindings-coverage/dotnet-list.txt \
+            --out TestResults/bindings-coverage/bindings-coverage.json \
+            --context "sourceSha=$GITHUB_SHA" --context "runId=$GITHUB_RUN_ID" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.summary.bySuite | to_entries[] | "- \(.key): \(.value.discovered) of \(.value.bound) bound tests discovered"' \
+            TestResults/bindings-coverage/bindings-coverage.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the bindings coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-coverage
+          path: TestResults/bindings-coverage/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # G5: `percepta verify-app` against the test configuration of the built site (obj/site-test, built from dist/ with
+  # the Percepta state hook) with the committed .percepta/bindings.json and contracts. A contract counts as
+  # NOT-APPLICABLE only by an owner decision: `--allow-not-applicable` is passed only when every notApplicable binding
+  # cites an existing, accepted research/decisions/DF-… record (causa-acceptance percepta-na-check); an uncited one fails.
+  # Producer status:
+  #   success       exit 0, 0 FAIL, 0 NOT-BOUND, no orphan bindings (NOT-APPLICABLE only as above)
+  #   not-produced  exit 3 (incomplete: NOT-BOUND contracts remain) with no FAIL, or no site / no bindings
+  #   failure       anything else (a FAIL, an uncited NOT-APPLICABLE, an error, no report)
+  percepta:
+    needs: site
+    if: ${{ !cancelled() && needs.site.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      status: ${{ steps.verify.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Built site
+        if: needs.site.outputs.built == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+      - name: Built test configuration
+        if: needs.site.outputs.built == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: site-test
+          path: obj/site-test
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Not-applicable contracts cite accepted owner decisions
+        id: na
+        run: |
+          dotnet build tools/acceptance/Causa.Acceptance -c Release > /dev/null
+          if [ ! -f .percepta/bindings.json ]; then echo "allow-not-applicable=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          $CA percepta-na-check --root . --bindings .percepta/bindings.json | tee -a "$GITHUB_STEP_SUMMARY" | grep '^allow-not-applicable=' >> "$GITHUB_OUTPUT"
+      - name: percepta verify-app
+        id: verify
+        timeout-minutes: 20
+        env:
+          BUILT: ${{ needs.site.outputs.built }}
+        run: |
+          mkdir -p TestResults/percepta
+          if [ "$BUILT" != true ] || [ ! -f .percepta/bindings.json ]; then
+            echo "status=not-produced" >> "$GITHUB_OUTPUT"
+            echo "::warning::percepta verify-app not run: needs the built site (dist/) and .percepta/bindings.json (built=$BUILT). G5 stays NOT_RUN."
+            exit 0
+          fi
+          npm ci
+          test -f obj/site-test/index.html || { echo "::error::the site job published no test configuration"; exit 1; }
+          export PATH="$(tools/acceptance/ci/install-host-tool.sh percepta-semantic percepta "$RUNNER_TEMP/host-tools"):$PATH"
+          percepta version | tee TestResults/percepta/percepta-version.txt
+          timeout 600 percepta install-browser
+          (node scripts/serve.mjs obj/site-test 4330 > /dev/null 2>&1 &)
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:4330/index.html && break; sleep 1; done
+          set +e
+          allow=""
+          [ "${{ steps.na.outputs.allow-not-applicable }}" = true ] && allow="--allow-not-applicable"
+          percepta verify-app --base-url http://127.0.0.1:4330/ --bindings .percepta/bindings.json --contracts .percepta/contracts \
+            $allow --out TestResults/percepta/verify-app.json > TestResults/percepta/verify-app.log 2>&1
+          code=$?
+          set -e
+          cat TestResults/percepta/verify-app.log
+          echo "$code" > TestResults/percepta/exit-code
+          report=TestResults/percepta/verify-app.json
+          counts=$(jq -c '.counts' "$report" 2>/dev/null || echo none)
+          echo "percepta verify-app: exit $code, complete $(jq -r .complete "$report" 2>/dev/null), counts $counts" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -eq 0 ] && jq -e '.complete == true and .counts.FAIL == 0 and .counts["NOT-BOUND"] == 0 and (.orphanBindings // []) == []' "$report" > /dev/null 2>&1; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          elif [ "$code" -eq 3 ] && jq -e '.counts.FAIL == 0 and (.orphanBindings // []) == []' "$report" > /dev/null 2>&1; then
+            echo "status=not-produced" >> "$GITHUB_OUTPUT"
+            echo "::notice::verify-app is incomplete (NOT-BOUND contracts remain; no FAIL): G5 stays NOT_RUN."
+          else
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+      - name: Publish the Percepta evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: percepta
+          path: TestResults/percepta/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The provider-conformance layer (PF-011-O3/O5, T18/T21): the persistence tool (src/persistence/Tool, owned by the
+  # persist stream) records real GitHub behaviour against CAUSA_TEST_REPO (create, append, re-read, conflict, rejected
+  # credential, unknown-outcome reconciliation; writes only under workspaces/demo/rec-<run id>/) and loads the
+  # historical catalog with the workflow's read-only token. Main pushes and manual runs only, required on main like
+  # live. Secrets are given to the one step that needs them; a missing secret is BLOCKED (non-zero), never a pass.
+  # The tool sanitizes its own output by an allow-list; nothing is uploaded.
+  provider-conformance:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # Shared with persist's persistence-provider.yml: no two runs write to the test repository at once.
+    concurrency:
+      group: persistence-provider
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build the recorder
+        run: dotnet build src/persistence/Tool/Causa.Persistence.Tool.fsproj -c Release
+      # Exit 0 PASS, 1 FAIL, 2 BLOCKED (missing secret or variable, or the canonical data repository as target),
+      # 3 aborted before printing a secret. Writes only workspaces/demo/rec-<run id>[-app]/ on CAUSA_TEST_REPO.
+      - name: Record provider behaviour and run the live write path
+        id: record
+        env:
+          CAUSA_GITHUB_TOKEN: ${{ secrets.CAUSA_GITHUB_TOKEN }}
+          CAUSA_WRITE_TOKEN: ${{ secrets.CAUSA_WRITE_TOKEN }}
+          CAUSA_TEST_REPO_SECRET: ${{ secrets.CAUSA_TEST_REPO }}
+          CAUSA_TEST_REPO_VAR: ${{ vars.CAUSA_TEST_REPO }}
+          # DC-004: the workflow's own read-only token, which cannot write to the test repository.
+          CAUSA_READONLY_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/provider"
+          # The repository variable was saved with a trailing CR/LF; an owner/name never contains whitespace.
+          export CAUSA_TEST_REPO_SECRET="$(printf %s "$CAUSA_TEST_REPO_SECRET" | tr -d '[:space:]')"
+          export CAUSA_TEST_REPO_VAR="$(printf %s "$CAUSA_TEST_REPO_VAR" | tr -d '[:space:]')"
+          set +e
+          dotnet src/persistence/Tool/bin/Release/net10.0/causa-persistence.dll record | tee "$RUNNER_TEMP/provider/record.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "$status" > "$RUNNER_TEMP/provider/record.exit"
+          exit "$status"
+      # T25 / EXT-DATA-013 / PF-014: the active historical catalog through the application's own Sync program, with
+      # the workflow's read-only token (DEC-025: no anonymous mode); nothing is written.
+      - name: Load the historical catalog live
+        if: always()
+        env:
+          CAUSA_CATALOG_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/provider"
+          set +e
+          dotnet src/persistence/Tool/bin/Release/net10.0/causa-persistence.dll catalog | tee "$RUNNER_TEMP/provider/catalog.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "$status" > "$RUNNER_TEMP/provider/catalog.exit"
+          exit "$status"
+      # The evidence record, parsed from the tool's own sanitized output: the observation and check lines between its
+      # markers, the catalog case lines and both RESULT lines. Never the environment. A record that contains the
+      # token is deleted and fails the job (PF-015).
+      - name: Provider-conformance evidence record
+        if: always()
+        env:
+          CAUSA_GITHUB_TOKEN: ${{ secrets.CAUSA_GITHUB_TOKEN }}
+          CAUSA_WRITE_TOKEN: ${{ secrets.CAUSA_WRITE_TOKEN }}
+        run: |
+          d="$RUNNER_TEMP/provider"; mkdir -p TestResults/provider-conformance
+          out=TestResults/provider-conformance/provider-conformance.json
+          obs=$(sed -n '/^=== CAUSA-PROVIDER-OBSERVATIONS BEGIN ===$/,/^=== CAUSA-PROVIDER-OBSERVATIONS END ===$/p' "$d/record.log" 2>/dev/null | grep '^{' | jq -s -c '.' 2>/dev/null || echo '[]')
+          cases=$(grep '^{' "$d/catalog.log" 2>/dev/null | jq -s -c 'map(select(has("case")))' 2>/dev/null || echo '[]')
+          jq -n --arg run "${{ github.run_id }}-${{ github.run_attempt }}" --arg sha "${{ github.sha }}" \
+            --arg recordExit "$(cat "$d/record.exit" 2>/dev/null || echo none)" --arg catalogExit "$(cat "$d/catalog.exit" 2>/dev/null || echo none)" \
+            --arg recordResult "$(grep '^RESULT: ' "$d/record.log" 2>/dev/null | tail -n 1)" \
+            --arg catalogResult "$(grep '^RESULT: ' "$d/catalog.log" 2>/dev/null | tail -n 1)" \
+            --argjson observations "$obs" --argjson cases "$cases" \
+            '{schema: "causa.provider-conformance/1", run: $run, sourceSha: $sha,
+              record: {exit: $recordExit, result: $recordResult,
+                       checks: [$observations[] | select(.check? // "" | startswith("live."))],
+                       observations: [$observations[] | select((.check? // "" | startswith("live.")) | not)]},
+              catalog: {exit: $catalogExit, result: $catalogResult, cases: $cases}}' > "$out"
+          jq -r '.record.result, .catalog.result, (.record.checks[] | "\(.check) \(.passed)")' "$out"
+          if { [ -n "$CAUSA_GITHUB_TOKEN" ] && grep -qF -- "$CAUSA_GITHUB_TOKEN" "$out"; } || { [ -n "$CAUSA_WRITE_TOKEN" ] && grep -qF -- "$CAUSA_WRITE_TOKEN" "$out"; }; then
+            rm -f "$out"; echo "::error::the record contained the token and was deleted"; exit 1
+          fi
+      - name: Publish the evidence record (parsed record only; no log, no trace)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-conformance
+          path: TestResults/provider-conformance/provider-conformance.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The bound deterministic .NET acceptance tests (tests/Causa.Acceptance.Deterministic), under their exact plan
+  # identities. Required by build-and-test; not by deploy (they fail honestly while being written).
+  acceptance-deterministic:
+    needs: site
+    if: ${{ !cancelled() && needs.site.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      ran: ${{ steps.test.outputs.ran }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: causa-data
+          persist-credentials: false
+      # The pinned verification plan (CAUSA_PLAN, VER-010-O1).
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          sparse-checkout: requirements-compiled/v3
+          persist-credentials: false
+      - name: Move the Indy-init checkout out of the tree
+        run: mv .indy-init "$RUNNER_TEMP/indy-init"
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install npm dependencies
+        run: npm ci
+      # VER-006-O1: the pinned host tools on PATH, exactly as the channel resolves them (SHA-256 verified), as in
+      # lock-gate.
+      - name: Install the host tools onto PATH
+        run: |
+          for t in "praxis praxis" "ordo ordo" "dokimos dokimos" "percepta-semantic percepta" "percepta percepta-repo"; do
+            set -- $t
+            tools/acceptance/ci/install-host-tool.sh "$1" "$2" "$RUNNER_TEMP/host-tools" >> "$GITHUB_PATH"
+          done
+      # The production artifact exactly as the site job built it (the one deploy publishes): AR-030, VER-006/007.
+      - name: The built production site
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.fsproj', '**/*.csproj', 'Directory.Build.props', 'NuGet.config') }}
+      - name: Deterministic .NET acceptance tests
+        id: test
+        env:
+          CAUSA_DATA_DIR: ${{ github.workspace }}/causa-data
+          CAUSA_DATA_GIT: ${{ github.workspace }}/causa-data
+          CAUSA_DIST: ${{ github.workspace }}/dist
+          CAUSA_PLAN: ${{ runner.temp }}/indy-init/${{ env.PLAN_PATH }}
+          CAUSA_EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          if [ ! -d tests/Causa.Acceptance.Deterministic ]; then
+            echo "ran=false" >> "$GITHUB_OUTPUT"; echo "::warning::tests/Causa.Acceptance.Deterministic does not exist yet"; exit 0
+          fi
+          echo "ran=true" >> "$GITHUB_OUTPUT"
+          set +e
+          output=$(dotnet test tests/Causa.Acceptance.Deterministic -c Release --logger "trx;LogFilePrefix=acceptance-deterministic" --results-directory TestResults/acceptance-deterministic 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          if [ "$status" -ne 0 ]; then exit "$status"; fi
+          if echo "$output" | grep -qE 'Skipped:[[:space:]]*[1-9]'; then
+            echo "::error::Tests were skipped. A run that skips tests is not a pass."; exit 1
+          fi
+      - name: Publish the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-deterministic-results
+          path: TestResults/acceptance-deterministic/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # The required check. Passes only when every mandatory job passed: core, lock-gate, site, browser, and on main
+  # pushes the live suite. A job that reused an identical earlier pass (branches only) counts as passed here and as
+  # not produced in the acceptance ledger. (The persistence-provider workflow is deliberately not required here.)
+  build-and-test:
+    needs: [reuse, core, lock-gate, site, browser, live, provider-conformance, wasm-smoke, acceptance-deterministic]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          REUSE: ${{ needs.reuse.result }}
+          CORE: ${{ needs.core.result }}
+          LOCK: ${{ needs.lock-gate.result }}
+          SITE: ${{ needs.site.result }}
+          BROWSER: ${{ needs.browser.result }}
+          LIVE: ${{ needs.live.result }}
+          WASM: ${{ needs.wasm-smoke.result }}
+          PROVIDER: ${{ needs.provider-conformance.result }}
+          ACCDET: ${{ needs.acceptance-deterministic.result }}
+        run: |
+          echo "reuse=$REUSE core=$CORE lock-gate=$LOCK site=$SITE browser=$BROWSER wasm-smoke=$WASM live=$LIVE (live required: $IS_MAIN)"
+          echo "acceptance-deterministic=$ACCDET"
+          for r in "$REUSE" "$CORE" "$LOCK" "$SITE" "$BROWSER" "$WASM" "$ACCDET"; do [ "$r" = success ] || exit 1; done
+          if [ "$IS_MAIN" = true ]; then [ "$LIVE" = success ] || exit 1; [ "$PROVIDER" = success ] || exit 1; fi
+
+  # The deployable artifact started in a real browser: the start smoke alone (tests/browser/start-smoke.spec.js, the
+  # production and test builds on every primary route with no engine fault), as the site job built it.
+  start-smoke:
+    needs: site
+    if: ${{ !cancelled() && needs.site.result == 'success' && needs.site.outputs.built == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install npm dependencies
+        run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-test
+          path: obj/site-test
+      - name: Chromium
+        timeout-minutes: 10
+        run: timeout 300 npx playwright install chromium
+      - name: Start smoke (production and test builds)
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: TestResults/start-smoke/start-smoke.json
+        run: npx playwright test tests/browser/start-smoke.spec.js --project=chromium --reporter=list,json
+      - name: Publish the start smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: start-smoke
+          path: TestResults/start-smoke/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Deploy depends only on the jobs that build the deployable artifact and prove it sound: core (build and unit
+  # tests), site (Release build and limen wasm-check) and start-smoke. It does NOT wait for build-and-test (live,
+  # provider-conformance, the bound acceptance suites): during the rehearsal those fail honestly for hours while the
+  # acceptance tests are being written, and the first milestone needs a deployed, SHA-identified slice (coordinator
+  # decision, 2026-10-28). This weakens no gate: the deployed exact-SHA evidence (deployed-smoke) feeds the acceptance
+  # job of the same run, whose computed verdict still requires every gate, build-and-test's jobs included.
+  # The production-artifact check (AR-030) does gate deploy: it runs inside the site job's "Build the site" step
+  # (scripts/build-site.mjs refuses a dist/ that contains any test-only symbol), so a failing check fails the site job
+  # and deploy, which needs site to succeed, does not run. Decoupling recorded as a deliberate decision in docs/r6.
+  deploy:
+    needs: [core, site, start-smoke]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_TARGET == 'github-pages' && needs.core.result == 'success' && needs.site.result == 'success' && needs.start-smoke.result == 'success' && needs.site.outputs.built == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      url: ${{ steps.deployment.outputs.page_url }}
+      deployed: ${{ steps.deployment.outcome == 'success' }}
+    steps:
+      # Main runs run in parallel (one concurrency group per commit), so an older commit's run can reach this job after
+      # a newer one deployed. Deploy only when the commit Pages serves is this commit or an ancestor of it; never
+      # replace a newer deployment with an older one.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Only move the deployment forward
+        id: forward
+        env:
+          PAGES: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/version.json
+        run: |
+          served=$(curl -fsSL "$PAGES?ts=$(date +%s)" 2>/dev/null | jq -r '.sha // empty' 2>/dev/null || true)
+          if [ -z "$served" ] || [ "$served" = "$GITHUB_SHA" ] || git merge-base --is-ancestor "$served" "$GITHUB_SHA" 2>/dev/null; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"; echo "Pages serves ${served:-nothing}; deploying $GITHUB_SHA"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Pages already serves $served, which is not an ancestor of $GITHUB_SHA (a newer commit deployed first); not deploying"
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.forward.outputs.deploy == 'true'
+        with:
+          name: site
+          path: dist
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.forward.outputs.deploy == 'true'
+        with:
+          path: dist
+      - id: deployment
+        if: steps.forward.outputs.deploy == 'true'
+        uses: actions/deploy-pages@v4
+
+  # Proves the deployment serves this exact commit (dist/version.json stamped by the site job) before the ledger may
+  # name a deployed SHA.
+  deployed-smoke:
+    needs: deploy
+    if: needs.deploy.result == 'success' && needs.deploy.outputs.deployed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      sha: ${{ steps.smoke.outputs.sha }}
+    steps:
+      - id: smoke
+        env:
+          URL: ${{ needs.deploy.outputs.url }}
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            served=$(curl -fsSL "${URL%/}/version.json?ts=$(date +%s)" | jq -r .sha || true)
+            [ "$served" = "$GITHUB_SHA" ] && break
+            sleep 15
+          done
+          [ "$served" = "$GITHUB_SHA" ] || { echo "::error::deployment serves '$served', not $GITHUB_SHA"; exit 1; }
+          curl -fsSL -o /dev/null "${URL%/}/"
+          echo "sha=$served" >> "$GITHUB_OUTPUT"
+      # The deployed site at this exact SHA, in a browser, without credentials: every artifact file served byte for
+      # byte, the application starts, and screenshots at desktop, iPad portrait/landscape and mobile sizes
+      # (tools/acceptance/deployed). Published as deployed-results for the acceptance evidence.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The deployed site artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: ${{ runner.temp }}/site
+      - name: Install Playwright and Chromium
+        timeout-minutes: 10
+        run: |
+          npm ci
+          timeout 300 npx playwright install chromium
+      - name: Verify the deployment in a browser and capture screenshots
+        env:
+          DEPLOYED_URL: ${{ needs.deploy.outputs.url }}
+          EXPECTED_SHA: ${{ github.sha }}
+          SITE_DIR: ${{ runner.temp }}/site
+          SCREENSHOT_DIR: TestResults/deployed/screenshots
+          PLAYWRIGHT_JSON_OUTPUT_FILE: TestResults/deployed/deployed-results.json
+        run: npx playwright test -c tools/acceptance/deployed/playwright.config.js
+      - name: Publish the deployed results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-results
+          path: TestResults/deployed/
+          if-no-files-found: warn
+          retention-days: 90
+
+  acceptance:
+    # actions: read only to record this run's per-layer job timings (PF-012-O3); pull-requests: read to observe the
+    # owner's and the reviewer's pull-request reviews in this run (kickoff/rehearsal-006/README.md, ESO-R6-05).
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    needs: [reuse, core, lock-gate, site, browser, live, provider-conformance, wasm-smoke, preservation-gate, preservation-adversarial, percepta, bindings-coverage, start-smoke, acceptance-deterministic, build-and-test, deploy, deployed-smoke]
+    if: ${{ !cancelled() && needs.reuse.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          fetch-depth: 0
+          persist-credentials: false
+      # The frozen fixture set whose lock digest the ledger records (same pin as the core job).
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: .causa-data
+          persist-credentials: false
+      # 10.0.402 is the SDK Indy-init's global.json pins (rollForward: disable) for the plan verifier.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            10.0.402
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The test assemblies are rebuilt at the same paths so trait tags can be read from their metadata. The plan
+      # verifier is built outside this repository so this repository's Directory.Build.props does not apply to it.
+      - name: Build the candidate and the plan verifier
+        run: |
+          dotnet build App.slnx -c Release
+          dotnet build tools/acceptance/Causa.Acceptance.RunTests -c Release
+          mv .indy-init "$RUNNER_TEMP/indy-init"
+          mv .causa-data "$RUNNER_TEMP/causa-data"
+          (cd "$RUNNER_TEMP/indy-init" && dotnet build tools/requirements-compiler/src -c Release)
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "{core-results,browser-results-*,live-results,lock-gate,preservation-gate,percepta,wasm-smoke,deployed-results,preservation-adversarial-results,reuse-plan,provider-conformance,wasm-check,test-environment-*,bindings-coverage,acceptance-deterministic-results}"
+          path: collected
+        continue-on-error: true
+      - name: Collect the results of this run
+        run: |
+          mkdir -p TestResults/dotnet TestResults/playwright TestResults/live TestResults/lock-gate
+          [ -d collected/core-results ] && cp -r collected/core-results/. TestResults/dotnet/ || true
+          [ -d collected/acceptance-deterministic-results ] && mkdir -p TestResults/acceptance-deterministic && cp -r collected/acceptance-deterministic-results/. TestResults/acceptance-deterministic/ || true
+          for d in collected/browser-results-*; do [ -d "$d" ] && cp -r "$d"/. TestResults/playwright/; done
+          [ -d collected/live-results ] && cp -r collected/live-results/. TestResults/live/ || true
+          [ -d collected/live-results/evidence ] && mkdir -p gate-records && cp -r collected/live-results/evidence gate-records/live-evidence || true
+          [ -d collected/lock-gate ] && cp -r collected/lock-gate/. TestResults/lock-gate/ || true
+          # Gate records that are not test results are kept beside the evidence, never scanned as results.
+          mkdir -p gate-records
+          [ -d collected/preservation-gate ] && cp -r collected/preservation-gate gate-records/ || true
+          [ -d collected/percepta ] && cp -r collected/percepta gate-records/ || true
+          [ -d collected/wasm-smoke ] && cp -r collected/wasm-smoke gate-records/ || true
+          [ -d collected/reuse-plan ] && cp -r collected/reuse-plan gate-records/ || true
+          [ -d collected/provider-conformance ] && cp -r collected/provider-conformance gate-records/ || true
+          [ -d collected/wasm-check ] && cp -r collected/wasm-check gate-records/ || true
+          for d in collected/test-environment-*; do [ -d "$d" ] && mkdir -p gate-records/test-environment && cp -r "$d" gate-records/test-environment/; done
+          [ -d collected/bindings-coverage ] && cp -r collected/bindings-coverage gate-records/ || true
+          [ -d collected/preservation-adversarial-results ] && mkdir -p TestResults/preservation-adversarial && cp -r collected/preservation-adversarial-results/. TestResults/preservation-adversarial/ || true
+          [ -d collected/deployed-results ] && mkdir -p TestResults/deployed && cp collected/deployed-results/deployed-results.json TestResults/deployed/ 2>/dev/null || true
+          [ -d collected/deployed-results/screenshots ] && cp -r collected/deployed-results/screenshots gate-records/deployed-screenshots || true
+          find TestResults -type f | sort
+      - name: Producers of this run
+        env:
+          CORE: ${{ needs.core.result == 'success' && needs.core.outputs.ran == 'true' && 'success' || needs.core.result == 'failure' && 'failure' || 'not-produced' }}
+          LOCK: ${{ needs.lock-gate.outputs.verdict == 'PASS' && 'success' || needs.lock-gate.outputs.verdict == 'FAIL' && 'failure' || 'not-produced' }}
+          SITE: ${{ needs.site.result == 'success' && needs.site.outputs.built == 'true' && 'success' || needs.site.result == 'failure' && 'failure' || 'not-produced' }}
+          BROWSER: ${{ needs.browser.result == 'success' && needs.browser.outputs.ran == 'true' && 'success' || needs.browser.result == 'failure' && 'failure' || 'not-produced' }}
+          LIVE: ${{ needs.live.result == 'success' && needs.live.outputs.ran == 'true' && 'success' || needs.live.result == 'failure' && 'failure' || 'not-produced' }}
+          DEPLOY: ${{ needs.deploy.result == 'success' && needs.deploy.outputs.deployed == 'true' && 'success' || needs.deploy.result == 'failure' && 'failure' || 'not-produced' }}
+          SMOKE: ${{ needs.deployed-smoke.result == 'success' && 'success' || needs.deployed-smoke.result == 'failure' && 'failure' || 'not-produced' }}
+          WASM: ${{ needs.wasm-smoke.result == 'success' && 'success' || needs.wasm-smoke.result == 'failure' && 'failure' || 'not-produced' }}
+          PROVIDER: ${{ needs.provider-conformance.result == 'success' && 'success' || needs.provider-conformance.result == 'failure' && 'failure' || 'not-produced' }}
+          PRESERVATION: ${{ needs.preservation-gate.outputs.status == 'success' && 'success' || needs.preservation-gate.result == 'failure' && 'failure' || 'not-produced' }}
+          PERCEPTA: ${{ needs.percepta.outputs.status == 'success' && 'success' || needs.percepta.result == 'failure' && 'failure' || 'not-produced' }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg core "$CORE" --arg lock "$LOCK" --arg site "$SITE" --arg browser "$BROWSER" --arg live "$LIVE" \
+                --arg deploy "$DEPLOY" --arg smoke "$SMOKE" --arg pres "$PRESERVATION" --arg percepta "$PERCEPTA" --arg wasm "$WASM" --arg provider "$PROVIDER" \
+                --arg run "$RUN" '{producers: [
+            {id: "core", status: $core, command: "dotnet test App.slnx -c Release (\($run))", record: "TestResults/dotnet"},
+            {id: "lock-gate", status: $lock, command: "causa-acceptance lock-gate (\($run))", record: "TestResults/lock-gate/lock-gate.json"},
+            {id: "site", status: $site, command: "npm run build (\($run))"},
+            {id: "browser", status: $browser, command: "npx playwright test --grep-invert @live (\($run))", record: "TestResults/playwright/browser-results-*.json (three shards)"},
+            {id: "live", status: $live, command: "npx playwright test --grep @live (\($run))", record: "TestResults/live/live-results.json"},
+            {id: "deploy", status: $deploy, command: "actions/deploy-pages (\($run))"},
+            {id: "deployed-smoke", status: $smoke, command: "version.json at the deployed URL equals the source SHA (\($run))"},
+            {id: "provider-conformance", status: $provider, command: "causa-persistence record && causa-persistence catalog (\($run))", record: "gate-records/provider-conformance/provider-conformance.json"},
+            {id: "wasm-smoke", status: $wasm, command: "dotnet build -c Release tests/Engine.WasmSmoke && node tests/Engine.WasmSmoke/run.mjs (\($run))", record: "gate-records/wasm-smoke/wasm-smoke.log"},
+            {id: "preservation-gate", status: $pres, command: "tools/acceptance/ci/preservation-gate.sh: praxis requirements preservation verify as recorded (\($run))", record: "gate-records/preservation-gate/gate.json"},
+            {id: "percepta-verify-app", status: $percepta, command: "percepta verify-app --base-url <built site> (\($run))", record: "gate-records/percepta/verify-app.json"}
+          ]}' > "$RUNNER_TEMP/producers.json"
+          cat "$RUNNER_TEMP/producers.json"
+      # PF-012-O3: measured time and outcome of every layer's job in this run (from the run's own job records).
+      # Budgets are set only after a baseline of such measurements exists; none is invented here.
+      - name: Per-layer timing of this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs?per_page=100" \
+            | jq --arg run "${{ github.run_id }}-${{ github.run_attempt }}" --arg sha "${{ github.sha }}" '
+              def layer: {"core":"domain","browser":"ui","site":"build","wasm-smoke":"wasm","lock-gate":"dependencies",
+                "provider-conformance":"provider-conformance","live":"live-integration","deployed-smoke":"deployed",
+                "preservation-gate":"requirements","preservation-adversarial":"requirements","percepta":"ui-contracts",
+                "reuse":"reuse","deploy":"deploy","build-and-test":"required-check"}[.] // "other";
+              {schema: "causa.layer-timings/1", run: $run, sourceSha: $sha, budgets: null,
+               budgetsNote: "no budget is set before a baseline of measured runs exists (PF-012-O3)",
+               jobs: [.jobs[] | select(.name != "acceptance") | {name, layer: (.name | layer), status, conclusion,
+                 startedAt: .started_at, completedAt: .completed_at,
+                 seconds: (if .started_at and .completed_at then ((.completed_at | fromdate) - (.started_at | fromdate)) else null end)}]}' \
+            > gate-records/layer-timings.json
+          jq -r '.jobs[] | "\(.layer)\t\(.name)\t\(.conclusion)\t\(.seconds)s"' gate-records/layer-timings.json | tee -a "$GITHUB_STEP_SUMMARY"
+      # ESO-R6-05: every pull request's reviews, observed by this run, as indy-init.owner-attestations/1; verify-plan
+      # trusts them only with this run's id (acceptance.sh passes them with --process-trusted-run-id).
+      - name: Owner and reviewer attestations observed by this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/$REPO/pulls?state=all&per_page=100" --jq '.[].number' |
+            while read -r n; do
+              gh api --paginate "repos/$REPO/pulls/$n/reviews?per_page=100" | jq -s --argjson n "$n" '{number: $n, reviews: add}'
+            done | jq -s . > "$RUNNER_TEMP/pulls.json"
+          dotnet "$RUNNER_TEMP/indy-init/tools/requirements-compiler/src/bin/Release/net10.0/requirements-compiler.dll" review-attestations \
+            --repository "$REPO" --run-id "${{ github.run_id }}" --candidate "${{ github.sha }}" \
+            --pulls "$RUNNER_TEMP/pulls.json" --out "$RUNNER_TEMP/attestations.json"
+          mkdir -p gate-records/attestations && cp "$RUNNER_TEMP/pulls.json" "$RUNNER_TEMP/attestations.json" gate-records/attestations/
+          echo "pull requests observed: $(jq length "$RUNNER_TEMP/pulls.json")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install Ordo (verified against the pinned channel) for the verification schedule
+        run: tools/acceptance/ci/install-host-tool.sh ordo ordo "$RUNNER_TEMP/host-tools" >> "$GITHUB_PATH"
+      - name: The built site (the artifact Pages deploys)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: site
+          path: ${{ runner.temp }}/site
+      # Tests of this run's evidence and of the pinned verifiers against it (tools/acceptance/Causa.Acceptance.RunTests):
+      # their TRX joins this run's results before the bundle is built. A failing test is evidence (its obligations
+      # FAIL); the job is failed at the end, after the evidence is published.
+      - name: Tests of this run's evidence and verifiers
+        id: runtests
+        env:
+          INDY_INIT: ${{ runner.temp }}/indy-init
+          CAUSA_DATA_DIR: ${{ runner.temp }}/causa-data
+          RESULTS: TestResults
+          PRODUCERS: ${{ runner.temp }}/producers.json
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          SOURCE_SHA: ${{ github.sha }}
+          DEPLOYED_SHA: ${{ needs.deployed-smoke.outputs.sha }}
+          GATE_RECORDS: gate-records
+          SITE_DIR: ${{ runner.temp }}/site
+          PLAN_ID: ${{ env.PLAN_ID }}
+          PLAN_PATH: ${{ env.PLAN_PATH }}
+        run: |
+          set +e
+          dotnet test tools/acceptance/Causa.Acceptance.RunTests -c Release --no-build --filter "job!=preservation" \
+            --logger "trx;LogFilePrefix=acceptance-run" --results-directory TestResults/acceptance-run
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Evidence bundle, ledger and computed verdict
+        env:
+          INDY_INIT: ${{ runner.temp }}/indy-init
+          CAUSA_DATA_DIR: ${{ runner.temp }}/causa-data
+          PLAN_ID: ${{ env.PLAN_ID }}
+          PLAN_PATH: ${{ env.PLAN_PATH }}
+          RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          SOURCE_SHA: ${{ github.sha }}
+          DEPLOYED_SHA: ${{ needs.deployed-smoke.outputs.sha }}
+          PRODUCERS: ${{ runner.temp }}/producers.json
+          ATTESTATIONS: ${{ runner.temp }}/attestations.json
+          TRUSTED_RUN_ID: ${{ github.run_id }}
+          OUT: evidence-out
+        run: |
+          tools/acceptance/ci/acceptance.sh
+          cp TestResults/lock-gate/lock-gate.json evidence-out/ 2>/dev/null || true
+          cp -r gate-records evidence-out/ 2>/dev/null || true
+          cat evidence-out/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-evidence
+          path: evidence-out/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Publish the acceptance-run test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-run-results
+          path: TestResults/acceptance-run/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Fail when a test of this run's evidence failed
+        if: steps.runtests.outputs.status != '0'
+        run: |
+          echo "::error::tests of this run's evidence failed (exit ${{ steps.runtests.outputs.status }}); their obligations are FAIL in the ledger"
+          exit 1

@@ -19,6 +19,7 @@
     <Compile Include="SourceCache.fs" />
     <Compile Include="Requirements.fs" />
     <Compile Include="BranchProtection.fs" />
+    <Compile Include="CiPolicy.fs" />
     <Compile Include="WebPackageRelease.fs" />
     <Compile Include="Scaffolding.fs" />
     <Compile Include="Planner.fs" />

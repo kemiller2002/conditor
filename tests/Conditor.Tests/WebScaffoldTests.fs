@@ -70,6 +70,7 @@ let private expectedPaths =
       "playwright.config.js"
       "tests/browser/smoke.spec.js"
       ".github/workflows/build-and-test.yml"
+      ".github/workflows/candidate-acceptance.yml"
       ".github/workflows/echelon-foundations.yml"
       ".github/workflows/deploy-pages.yml"
       ".github/branch-protection.json"
@@ -88,6 +89,16 @@ let run (check: string -> bool -> unit) =
         | Error errors -> check $"web scaffold plans: {joined errors}" false
         | Ok plan ->
             let files = scaffoldFiles plan
+
+            // Indy-init R7-REM-004: no scaffolded workflow can starve CI.
+            let ciPolicy =
+                files
+                |> Map.toList
+                |> List.filter (fun (path, _) -> path.StartsWith(".github/workflows/", StringComparison.Ordinal))
+                |> CiPolicy.evaluate
+
+            let ciFindings = ciPolicy.Findings |> List.map (fun f -> $"{f.Rule} {f.Path}:{f.Line}") |> String.concat "; "
+            check $"every scaffolded web workflow passes the CI policy [{ciFindings}]" ciPolicy.Passed
             let has needle path = contains needle files path
             let build = ".github/workflows/build-and-test.yml"
             let deploy = ".github/workflows/deploy-pages.yml"

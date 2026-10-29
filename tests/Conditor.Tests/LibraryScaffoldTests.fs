@@ -73,6 +73,16 @@ let run (check: string -> bool -> unit) =
             check $"library scaffold plans: {joined errors}" false
         | Ok plan ->
             let files = scaffoldFiles plan
+
+            // Indy-init R7-REM-004: no scaffolded workflow can starve CI.
+            let ciPolicy =
+                files
+                |> Map.toList
+                |> List.filter (fun (path, _) -> path.StartsWith(".github/workflows/", StringComparison.Ordinal))
+                |> CiPolicy.evaluate
+
+            let ciFindings = ciPolicy.Findings |> List.map (fun f -> $"{f.Rule} {f.Path}:{f.Line}") |> String.concat "; "
+            check $"every scaffolded library workflow passes the CI policy [{ciFindings}]" ciPolicy.Passed
             let has needle path = contains needle files path
 
             check "library scaffold emits exactly the package repository surface" (Set.ofList expectedPaths = (files |> Map.keys |> Set.ofSeq))

@@ -973,6 +973,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -987,12 +988,20 @@ jobs:
     let private foundationsWorkflow =
         """name: Echelon foundations
 
+# One run per ref: a push to a pull request's branch runs only through
+# `pull_request`, and a newer push cancels the superseded run (Indy-init
+# R7-REM-004; Rehearsal 6 ran this twice per push on every branch).
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   foundations:
@@ -1087,6 +1096,7 @@ jobs:
   version:
     name: Resolve the release version
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.read.outputs.version }}
       publishable: ${{ steps.read.outputs.publishable }}
@@ -1114,6 +1124,7 @@ jobs:
     name: Build, test, pack and describe the release
     needs: version
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -1173,6 +1184,7 @@ jobs:
     needs: [version, build]
     if: github.event_name != 'pull_request' && needs.version.outputs.publishable == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
       id-token: write
@@ -1550,49 +1562,10 @@ test("the application page renders its first control", async ({ page }) => {
           fi
 """
 
-    let private webBuildWorkflow =
-        """name: Build and test
-
-# Every pull request and every push to main builds the F# engine and runs its
-# tests, type-checks the browser kernel, and drives the pages in a real
-# browser. Branch protection requires this job (.github/branch-protection.json).
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    # A normal run takes a few minutes. Anything that stalls fails here
-    # instead of holding a runner for the six-hour default.
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      # Warnings are errors (Directory.Build.props), so this also gates
-      # warning regressions.
-      - name: Build
-        run: dotnet build App.slnx -c Release
-@@TEST_STEP@@@@NPM_INSTALL@@
-      - name: Type-check the browser kernel
-        run: npm run check
-
-      # Chromium is never installed with `--with-deps`: that runs `sudo
+    /// The Chromium setup both browser workflows share: cached by Playwright
+    /// version, never `--with-deps`, OS libraries proved present offline.
+    let private chromiumSteps =
+        """      # Chromium is never installed with `--with-deps`: that runs `sudo
       # apt-get update` on every run, and apt has no overall deadline, so an
       # unanswered mirror hung browser suites until the six-hour job limit
       # (signal#21, signal#22, summa#21; fixed in signal#24). The browser is
@@ -1649,7 +1622,51 @@ jobs:
           fi
           echo "Every shared library Chromium links against is present."
 
-      - name: Verify the pages in a real browser
+"""
+
+    let private webBuildWorkflow =
+        """name: Build and test
+
+# Every pull request and every push to main builds the F# engine and runs its
+# tests, type-checks the browser kernel, and drives the pages in a real
+# browser. Branch protection requires this job (.github/branch-protection.json).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # A normal run takes a few minutes. Anything that stalls fails here
+    # instead of holding a runner for the six-hour default.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Warnings are errors (Directory.Build.props), so this also gates
+      # warning regressions.
+      - name: Build
+        run: dotnet build App.slnx -c Release
+@@TEST_STEP@@@@NPM_INSTALL@@
+      - name: Type-check the browser kernel
+        run: npm run check
+
+@@CHROMIUM_STEPS@@      - name: Verify the pages in a real browser
         run: npx playwright test
 
       - name: Upload browser traces on failure
@@ -1657,6 +1674,113 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-traces
+          path: test-results/
+          retention-days: 7
+"""
+
+    /// Tier 3 (Indy-init R7-REM-004): one pinned release candidate, verified
+    /// by a run nothing else can cancel. Tier 1 is build-and-test on every
+    /// pull request and push to main, superseded runs cancelled.
+    let private candidateAcceptanceWorkflow =
+        """name: Candidate acceptance
+
+# Tier 3 of the CI (Indy-init R7-REM-004). Verifies one release candidate,
+# pinned by its full SHA on main. It runs only when dispatched, never on a
+# push, and its concurrency group is the candidate itself: development
+# commits cannot cancel or starve it, and two candidates never cancel each
+# other. Tier 1 (build-and-test) gives fast feedback on every pull request
+# and push to main, cancelling superseded runs; this workflow repeats it on
+# exactly the candidate's tree and records which SHA it verified.
+# `conditor ci-policy check` enforces these shapes (CIP-001..CIP-007).
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Full 40-character SHA of the release candidate on main
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidate-acceptance-${{ inputs.candidate }}
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Refuse anything but a full SHA on main
+        id: pin
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+        run: |
+          if ! [[ "$CANDIDATE" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::candidate must be a full 40-character commit SHA, got '$CANDIDATE'"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$CANDIDATE" origin/main; then
+            echo "::error::$CANDIDATE is not on main"
+            exit 1
+          fi
+          echo "sha=$CANDIDATE" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.pin.outputs.sha }}
+      - name: Prove the checkout is the candidate
+        env:
+          CANDIDATE: ${{ needs.pin.outputs.sha }}
+        run: test "$(git rev-parse HEAD)" = "$CANDIDATE"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build
+        run: dotnet build App.slnx -c Release
+@@TEST_STEP@@@@NPM_INSTALL@@
+      - name: Type-check the browser kernel
+        run: npm run check
+
+@@CHROMIUM_STEPS@@      - name: Verify the pages in a real browser
+        run: npx playwright test
+
+      - name: Record the verified candidate
+        env:
+          CANDIDATE: ${{ needs.pin.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          printf '{"schema":"conditor.candidate-verification/1","candidate":"%s","run":"%s","attempt":%s}\n' \
+            "$CANDIDATE" "$RUN_URL" "${{ github.run_attempt }}" > candidate-verification.json
+          cat candidate-verification.json
+
+      - name: Upload the verification record
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-verification-${{ needs.pin.outputs.sha }}
+          path: candidate-verification.json
+          retention-days: 90
+
+      - name: Upload browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-playwright-traces
           path: test-results/
           retention-days: 7
 """
@@ -1803,7 +1927,8 @@ same change.
 
         let render =
             fill
-                [ "@@TEST_STEP@@", dotnetTestStep "App.slnx"
+                [ "@@CHROMIUM_STEPS@@", chromiumSteps
+                  "@@TEST_STEP@@", dotnetTestStep "App.slnx"
                   "@@NPM_INSTALL@@", npmInstallStep
                   "@@PRAXIS_REF@@", PraxisFoundationsRef
                   "@@NS@@", ns ]
@@ -1848,6 +1973,7 @@ same change.
           yield! playwrightFiles
           "tests/browser/smoke.spec.js", webSmokeSpec
           ".github/workflows/build-and-test.yml", render webBuildWorkflow
+          ".github/workflows/candidate-acceptance.yml", render candidateAcceptanceWorkflow
           ".github/workflows/echelon-foundations.yml", render foundationsWorkflow
           ".github/workflows/deploy-pages.yml", render webDeployWorkflow
           BranchProtection.RelativePath, BranchProtection.render webBranchProtection

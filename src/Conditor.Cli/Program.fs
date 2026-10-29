@@ -26,6 +26,7 @@ let private usage () =
     Console.WriteLine "  conditor upgrade --current --check --stepwise --registry DIR [--channel NAME] --resolved-set PATH --resolved-set-sha256 SHA256 [--target PATH] [--home DIR]"
     Console.WriteLine "  conditor drift --registry DIR [--channel NAME] [--platform RID] [--target PATH] [--json] [--fail-on never|warn|fail]"
     Console.WriteLine "  conditor unattended-readiness --repository OWNER/REPO --base BRANCH --authorization FILE --trust-store FILE --journal DIR --workdir CLONE [--praxis PATH] [--run-id ID] [--trace TEXT] [--probe-branch NAME] [--poll-seconds N] [--out FILE] [--json]"
+    Console.WriteLine "  conditor ci-policy check [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env preflight [--contract PATH] [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env digest    [--contract PATH] [--target PATH]"
     Console.WriteLine "  conditor test-env resolve   [--contract PATH] [--target PATH] [--json | --shell]"
@@ -1879,6 +1880,45 @@ let private runTestEnvironment (args: string array) =
         usage ()
         2
 
+/// `conditor ci-policy check`: the repository's workflows against the CI
+/// policy (CIP-000..CIP-007, Indy-init R7-REM-004). Exit 0 when it passes,
+/// 3 on any finding, 2 for a bad invocation.
+let private runCiPolicy (args: string array) =
+    match args |> Array.tryItem 1 with
+    | Some "check" ->
+        let target =
+            optionValue "--target" args
+            |> Option.defaultValue (Directory.GetCurrentDirectory())
+            |> Path.GetFullPath
+
+        let files = CiPolicy.workflowFiles target
+
+        let directory = Path.Combine(target, ".github", "workflows")
+
+        if files.IsEmpty then
+            Console.Error.WriteLine $"conditor ci-policy: no workflows under {directory}"
+            3
+        else
+            let report = CiPolicy.evaluate files
+
+            if hasFlag "--json" args then
+                Console.Write(CiPolicy.toJson report)
+            else
+                report.Findings
+                |> List.iter (fun f -> Console.WriteLine $"{f.Rule} {f.Path}:{f.Line} {f.Message}")
+
+                Console.WriteLine(
+                    if report.Passed then
+                        $"CI policy: PASS ({files.Length} workflows)"
+                    else
+                        $"CI policy: FAIL ({report.Findings.Length} findings in {files.Length} workflows)"
+                )
+
+            if report.Passed then 0 else 3
+    | _ ->
+        Console.Error.WriteLine "usage: conditor ci-policy check [--target PATH] [--json]"
+        2
+
 let private runUnattendedReadiness (args: string array) =
     let required name =
         match optionValue name args with
@@ -1962,6 +2002,8 @@ let private execute (args: string array) =
             runDrift args
         elif command = "unattended-readiness" then
             runUnattendedReadiness args
+        elif command = "ci-policy" then
+            runCiPolicy args
         elif command = "test-env" then
             runTestEnvironment args
         else
