@@ -154,7 +154,7 @@ withTarget
                         check $"scaffold plan succeeds: {details}" false
                     | Ok plan ->
                         check "scaffold application bindings resolve" (plan.Components.Length = 4)
-                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 28)
+                        check "scaffold plans foundation-ready project files" (plan.Actions |> List.filter (fun action -> action.Kind = ScaffoldFile) |> List.length = 29)
                         check "scaffold does not execute a package-manager Limen lifecycle" (plan.Actions |> List.exists (fun action -> action.ComponentId = "limen" && action.Kind = VerifyLifecycle) |> not)
 
                         let packageJson =
@@ -1223,6 +1223,7 @@ WebScaffoldTests.runTestEnvironmentOptIn check ComponentSchemaTests.validateTest
 TestEnvironmentTests.run check ComponentSchemaTests.validateTestEnvironmentContract ComponentSchemaTests.validateTestEnvironmentReport
 BranchProtectionTests.run check
 UnattendedReadinessTests.run check
+CiPolicyTests.run check
 RepositoryCreationTests.run check
 SupervisorTests.run check
 RequirementsImportTests.run check

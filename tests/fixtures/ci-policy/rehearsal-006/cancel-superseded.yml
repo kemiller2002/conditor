@@ -1,0 +1,50 @@
+# Force-cancels superseded Build and test runs (coordinator tool, Rehearsal 6; dispatched by hand, never on push).
+#
+# Runs started from build-and-test.yml revisions whose jobs used job-level `if: always()` ignore a normal cancel (a
+# cancelled run still starts those jobs). This tool force-cancels every queued, waiting, pending or in-progress Build and
+# test run except one to keep (by default the newest build-and-test.yml run on main). It uses only the workflow's own
+# token with actions: write; no secret is read.
+name: Cancel superseded runs
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "Run id to keep (default: the newest build-and-test.yml run on main)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: cancel-superseded
+  cancel-in-progress: false
+
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Force-cancel every unfinished Build and test run but the one kept
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          KEEP: ${{ inputs.keep }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEEP" ]; then
+            KEEP=$(gh run list -R "$REPO" -w build-and-test.yml -b main -L 1 --json databaseId -q '.[0].databaseId')
+          fi
+          echo "keeping run $KEEP"
+          ids=$(for s in queued in_progress waiting pending; do
+                  gh run list -R "$REPO" -w build-and-test.yml -s "$s" -L 200 --json databaseId -q '.[].databaseId'
+                done | sort -u | grep -vx "$KEEP" || true)
+          count=0
+          for id in $ids; do
+            echo "force-cancel $id"
+            gh api -X POST "repos/$REPO/actions/runs/$id/force-cancel" > /dev/null || echo "::warning::force-cancel of $id was refused"
+            count=$((count + 1))
+          done
+          echo "force-cancel requested for $count run(s); kept $KEEP" | tee -a "$GITHUB_STEP_SUMMARY"

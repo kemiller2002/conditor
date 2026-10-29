@@ -1,0 +1,250 @@
+# Final acceptance of a candidate (WI-R6-A6; dispatched by hand, never on push).
+#
+# The process, owner and review obligations are decided from Praxis records that NAME the candidate (release selection,
+# the independent review attested on the candidate, the final disposition). A commit cannot contain records naming its
+# own SHA, so the acceptance job of the candidate's own run can never verify them. This workflow accepts candidate C
+# from its own completed main build-and-test run (tests, ledger inputs, deployment: all C), and reads the process
+# records from the current main tip M, which must be a descendant of C that changed ONLY record paths
+# (.ros/, docs/r6/, evidence/, acceptance/reviews/final/). verify-plan keeps C as the trusted candidate and checks every
+# record's commit against C's own ancestry (git rev-list C): requirements-compiler verify-plan --process-events/
+# --process-executions/--process-ancestry in place of --process-repo. Nothing in the verifier changes.
+name: Acceptance (final)
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: "Full 40-character SHA of the release candidate C"
+        required: true
+        type: string
+      run_id:
+        description: "Id of C's completed main build-and-test run"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: acceptance-final
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  INDY_INIT_REF: 8747179886c7e1a35df60720ae4a841c67aa5245
+  PLAN_ID: VP-8ef1c8dca656
+  PLAN_PATH: requirements-compiled/v3/verification-plan.json
+  CA: dotnet tools/acceptance/Causa.Acceptance/bin/Release/net10.0/causa-acceptance.dll
+
+jobs:
+  final:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Refuse anything but C's own completed main run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CANDIDATE: ${{ inputs.candidate }}
+          RUN: ${{ inputs.run_id }}
+        run: |
+          [[ "$CANDIDATE" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::candidate must be a full 40-character SHA"; exit 2; }
+          [[ "$RUN" =~ ^[0-9]+$ ]] || { echo "::error::run_id must be a run id"; exit 2; }
+          r=$(gh api "repos/$REPO/actions/runs/$RUN")
+          jq -c '{head_sha, event, head_branch, status, conclusion, run_attempt, path}' <<< "$r"
+          [ "$(jq -r .head_sha <<< "$r")" = "$CANDIDATE" ] || { echo "::error::run $RUN is not at $CANDIDATE"; exit 2; }
+          [ "$(jq -r .event <<< "$r")" = push ] && [ "$(jq -r .head_branch <<< "$r")" = main ] || { echo "::error::run $RUN is not a push to main"; exit 2; }
+          [ "$(jq -r .path <<< "$r")" = ".github/workflows/build-and-test.yml" ] || { echo "::error::run $RUN is not a Build and test run"; exit 2; }
+          [ "$(jq -r .status <<< "$r")" = completed ] || { echo "::error::run $RUN has not completed"; exit 2; }
+          echo "attempt=$(jq -r .run_attempt <<< "$r")" >> "$GITHUB_OUTPUT"
+      # M: the current main tip, which holds the records that name C.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: The records commit M is a records-only descendant of C
+        id: records
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+        run: |
+          M=$(git rev-parse HEAD)
+          git merge-base --is-ancestor "$CANDIDATE" "$M" || { echo "::error::$CANDIDATE is not an ancestor of main ($M)"; exit 2; }
+          mkdir -p "$RUNNER_TEMP/records" gate-records-final
+          git diff --name-only "$CANDIDATE" "$M" > "$RUNNER_TEMP/records/changed-paths.txt"
+          offending=$(grep -vE '^(\.ros/|docs/r6/|evidence/|acceptance/reviews/final/)' "$RUNNER_TEMP/records/changed-paths.txt" || true)
+          if [ -n "$offending" ]; then
+            echo "::error::main changed more than records after the candidate:"; echo "$offending"; exit 2
+          fi
+          # The records as M has them, and C's own ancestry.
+          cp .ros/events/events.jsonl "$RUNNER_TEMP/records/events.jsonl"
+          cp -r .ros/executions "$RUNNER_TEMP/records/executions"
+          [ -f acceptance/reviews/final/review-tag-changes.json ] && cp acceptance/reviews/final/review-tag-changes.json "$RUNNER_TEMP/records/review-tag-changes.json" || true
+          git rev-list "$CANDIDATE" > "$RUNNER_TEMP/records/ancestry.txt"
+          jq -n --arg c "$CANDIDATE" --arg m "$M" --rawfile paths "$RUNNER_TEMP/records/changed-paths.txt" \
+            '{schema: "causa.final-acceptance-records/1", candidate: $c, recordsCommit: $m,
+              changedPaths: ($paths | split("\n") | map(select(. != ""))),
+              allowed: "^(\\.ros/|docs/r6/|evidence/|acceptance/reviews/final/)"}' > "$RUNNER_TEMP/records/records-commit.json"
+          echo "m=$M" >> "$GITHUB_OUTPUT"
+          echo "records commit $M; $(wc -l < "$RUNNER_TEMP/records/changed-paths.txt") record path(s) changed after $CANDIDATE" >> "$GITHUB_STEP_SUMMARY"
+          # Everything else is C's.
+          git checkout -q --detach "$CANDIDATE"
+          git rev-parse HEAD
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/Indy-init
+          ref: ${{ env.INDY_INIT_REF }}
+          path: .indy-init
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: kemiller2002/causa-data
+          ref: dcb8cb994eab81d0384b9c8abc5f0b593f398442
+          path: .causa-data
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            10.0.402
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the candidate and the plan verifier
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.candidate }}"
+          dotnet build App.slnx -c Release
+          dotnet build tools/acceptance/Causa.Acceptance.RunTests -c Release
+          mv .indy-init "$RUNNER_TEMP/indy-init"
+          mv .causa-data "$RUNNER_TEMP/causa-data"
+          (cd "$RUNNER_TEMP/indy-init" && dotnet build tools/requirements-compiler/src -c Release)
+      # C's run's own results and records, exactly as its acceptance job collects them.
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          pattern: "{core-results,browser-results-*,live-results,lock-gate,preservation-gate,percepta,wasm-smoke,deployed-results,preservation-adversarial-results,reuse-plan,provider-conformance,wasm-check,test-environment-*,bindings-coverage,acceptance-deterministic-results,acceptance-evidence}"
+          path: collected
+      - name: Collect the results of the candidate's run
+        run: |
+          mkdir -p TestResults/dotnet TestResults/playwright TestResults/live TestResults/lock-gate
+          [ -d collected/core-results ] && cp -r collected/core-results/. TestResults/dotnet/ || true
+          [ -d collected/acceptance-deterministic-results ] && mkdir -p TestResults/acceptance-deterministic && cp -r collected/acceptance-deterministic-results/. TestResults/acceptance-deterministic/ || true
+          for d in collected/browser-results-*; do [ -d "$d" ] && cp -r "$d"/. TestResults/playwright/; done
+          [ -d collected/live-results ] && cp -r collected/live-results/. TestResults/live/ || true
+          mkdir -p gate-records
+          [ -d collected/live-results/evidence ] && cp -r collected/live-results/evidence gate-records/live-evidence || true
+          [ -d collected/lock-gate ] && cp -r collected/lock-gate/. TestResults/lock-gate/ || true
+          [ -d collected/preservation-gate ] && cp -r collected/preservation-gate gate-records/ || true
+          [ -d collected/percepta ] && cp -r collected/percepta gate-records/ || true
+          [ -d collected/wasm-smoke ] && cp -r collected/wasm-smoke gate-records/ || true
+          [ -d collected/reuse-plan ] && cp -r collected/reuse-plan gate-records/ || true
+          [ -d collected/provider-conformance ] && cp -r collected/provider-conformance gate-records/ || true
+          [ -d collected/wasm-check ] && cp -r collected/wasm-check gate-records/ || true
+          for d in collected/test-environment-*; do [ -d "$d" ] && mkdir -p gate-records/test-environment && cp -r "$d" gate-records/test-environment/; done
+          [ -d collected/bindings-coverage ] && cp -r collected/bindings-coverage gate-records/ || true
+          [ -d collected/preservation-adversarial-results ] && mkdir -p TestResults/preservation-adversarial && cp -r collected/preservation-adversarial-results/. TestResults/preservation-adversarial/ || true
+          [ -d collected/deployed-results ] && mkdir -p TestResults/deployed && cp collected/deployed-results/deployed-results.json TestResults/deployed/ 2>/dev/null || true
+          [ -d collected/deployed-results/screenshots ] && cp -r collected/deployed-results/screenshots gate-records/deployed-screenshots || true
+          # The candidate run's own per-layer timings and the deployment it proved.
+          [ -f collected/acceptance-evidence/gate-records/layer-timings.json ] && cp collected/acceptance-evidence/gate-records/layer-timings.json gate-records/ || true
+          cp -r "$RUNNER_TEMP/records" gate-records/final-acceptance-records
+          find TestResults -type f | sort
+      # The producers the candidate run's acceptance job computed from its own jobs (workflow-reported ids only; the
+      # computed gate producers are recomputed by acceptance.sh), and the SHA its deployed-smoke proved.
+      - name: Producers and deployed SHA of the candidate's run
+        id: producers
+        run: |
+          ev=collected/acceptance-evidence
+          test -f "$ev/producers.json" || { echo "::error::run ${{ inputs.run_id }} published no acceptance evidence"; exit 2; }
+          jq '{producers: [.producers[] | select(.id as $i | ["core","lock-gate","site","browser","live","deploy","deployed-smoke","provider-conformance","wasm-smoke","preservation-gate","percepta-verify-app"] | index($i))]}' \
+            "$ev/producers.json" > "$RUNNER_TEMP/producers.json"
+          cat "$RUNNER_TEMP/producers.json"
+          deployed=$(jq -r '.deployed_commit_sha // empty' "$ev/bundle/ledger.json")
+          echo "deployed=$deployed" >> "$GITHUB_OUTPUT"
+          echo "deployed SHA proved by run ${{ inputs.run_id }}: ${deployed:-none}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Owner and reviewer attestations observed by this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/$REPO/pulls?state=all&per_page=100" --jq '.[].number' |
+            while read -r n; do
+              gh api --paginate "repos/$REPO/pulls/$n/reviews?per_page=100" | jq -s --argjson n "$n" '{number: $n, reviews: add}'
+            done | jq -s . > "$RUNNER_TEMP/pulls.json"
+          dotnet "$RUNNER_TEMP/indy-init/tools/requirements-compiler/src/bin/Release/net10.0/requirements-compiler.dll" review-attestations \
+            --repository "$REPO" --run-id "${{ github.run_id }}" --candidate "${{ inputs.candidate }}" \
+            --pulls "$RUNNER_TEMP/pulls.json" --out "$RUNNER_TEMP/attestations.json"
+          mkdir -p gate-records/attestations && cp "$RUNNER_TEMP/pulls.json" "$RUNNER_TEMP/attestations.json" gate-records/attestations/
+          echo "pull requests observed: $(jq length "$RUNNER_TEMP/pulls.json")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install Ordo (verified against the pinned channel) for the verification schedule
+        run: tools/acceptance/ci/install-host-tool.sh ordo ordo "$RUNNER_TEMP/host-tools" >> "$GITHUB_PATH"
+      - name: The built site (the artifact Pages deployed)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          name: site
+          path: ${{ runner.temp }}/site
+      - name: Tests of the candidate's evidence and verifiers
+        id: runtests
+        env:
+          INDY_INIT: ${{ runner.temp }}/indy-init
+          CAUSA_DATA_DIR: ${{ runner.temp }}/causa-data
+          RESULTS: TestResults
+          PRODUCERS: ${{ runner.temp }}/producers.json
+          RUN_ID: ${{ inputs.run_id }}-${{ steps.run.outputs.attempt }}
+          SOURCE_SHA: ${{ inputs.candidate }}
+          DEPLOYED_SHA: ${{ steps.producers.outputs.deployed }}
+          GATE_RECORDS: gate-records
+          SITE_DIR: ${{ runner.temp }}/site
+          PLAN_ID: ${{ env.PLAN_ID }}
+          PLAN_PATH: ${{ env.PLAN_PATH }}
+        run: |
+          set +e
+          dotnet test tools/acceptance/Causa.Acceptance.RunTests -c Release --no-build --filter "job!=preservation" \
+            --logger "trx;LogFilePrefix=acceptance-run" --results-directory TestResults/acceptance-run
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Evidence bundle, ledger and computed verdict (process records from M)
+        env:
+          INDY_INIT: ${{ runner.temp }}/indy-init
+          CAUSA_DATA_DIR: ${{ runner.temp }}/causa-data
+          PLAN_ID: ${{ env.PLAN_ID }}
+          PLAN_PATH: ${{ env.PLAN_PATH }}
+          RUN_ID: ${{ inputs.run_id }}-${{ steps.run.outputs.attempt }}
+          SOURCE_SHA: ${{ inputs.candidate }}
+          DEPLOYED_SHA: ${{ steps.producers.outputs.deployed }}
+          PRODUCERS: ${{ runner.temp }}/producers.json
+          ATTESTATIONS: ${{ runner.temp }}/attestations.json
+          TRUSTED_RUN_ID: ${{ github.run_id }}
+          REVIEW_TAG_CHANGES: ${{ runner.temp }}/records/review-tag-changes.json
+          PROCESS_EVENTS: ${{ runner.temp }}/records/events.jsonl
+          PROCESS_EXECUTIONS: ${{ runner.temp }}/records/executions
+          PROCESS_ANCESTRY: ${{ runner.temp }}/records/ancestry.txt
+          OUT: evidence-out
+        run: |
+          tools/acceptance/ci/acceptance.sh
+          cp TestResults/lock-gate/lock-gate.json evidence-out/ 2>/dev/null || true
+          cp -r gate-records evidence-out/ 2>/dev/null || true
+          echo "records commit: ${{ steps.records.outputs.m }}" >> "$GITHUB_STEP_SUMMARY"
+          cat evidence-out/report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the final acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-final-${{ inputs.candidate }}
+          path: |
+            evidence-out/
+            TestResults/acceptance-run/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Fail when a test of the candidate's evidence failed
+        if: steps.runtests.outputs.status != '0'
+        run: |
+          echo "::error::tests of the candidate's evidence failed (exit ${{ steps.runtests.outputs.status }}); their obligations are FAIL in the ledger"
+          exit 1

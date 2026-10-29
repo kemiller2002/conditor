@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 63,
+  "nextSeq": 64,
   "items": [
     {
       "id": "WI-0001",
@@ -1453,6 +1453,31 @@
       "createdAt": "2026-10-28T22:19:16.146Z",
       "updatedAt": "2026-10-28T22:57:30.000Z",
       "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0063",
+      "title": "R7-REM-004: conditor ci-policy check (CI starvation guard) and tier-3 candidate-acceptance template",
+      "description": "Intake: .praxis/inbox/documents/2026-10-29-R7-REM-004-ci-policy.md. Rehearsal 6 CI starvation: per-commit concurrency groups on main, job-level always(), duplicate push+PR runs.",
+      "tags": [
+        "conditor",
+        "ci",
+        "r7-remediation"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-29T10:45:00Z",
+      "updatedAt": "2026-10-29T10:46:00Z",
+      "createdBy": "anthropic/claude-code",
       "createdByActor": {
         "kind": "agent",
         "id": "anthropic/claude-code",

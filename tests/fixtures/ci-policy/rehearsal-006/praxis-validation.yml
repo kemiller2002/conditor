@@ -1,0 +1,61 @@
+name: Praxis validation
+
+# Praxis validation reads the tree and the diff against the base, so the pass record is keyed by the tree
+# (tools/acceptance/ci/fingerprint.sh), the base commit and the commit messages of the range: an identical input
+# (a re-run, or the push and pull_request events of the same content and base) is not validated twice. Any other
+# change validates again. A skipped "validate" reports as passing to branch protection.
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+      passed: ${{ steps.lookup.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: key
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          range=$(git log --format=%B "$BASE..HEAD" 2>/dev/null | sha256sum | cut -d' ' -f1 || true)
+          echo "key=praxis-pass-$(tools/acceptance/ci/fingerprint.sh --salt "base $BASE" --salt "range $range")" >> "$GITHUB_OUTPUT"
+      - id: lookup
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci-pass
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+
+  validate:
+    needs: fingerprint
+    if: needs.fingerprint.outputs.passed != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # ./praxis installs and runs the Praxis version this project pins; it
+      # needs only a POSIX shell and curl (no Node.js, npm or .NET).
+      - run: ./praxis registry check
+      - run: ./praxis validate
+        env:
+          PRAXIS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          # Compatibility: Praxis releases pinned from before the rename read
+          # only the legacy name (DF-ROS-2026-A050).
+          ROS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: mkdir .ci-pass && echo "${{ needs.fingerprint.outputs.key }} passed in run ${{ github.run_id }}" > .ci-pass/record
+      - uses: actions/cache/save@v4
+        with:
+          path: .ci-pass
+          key: ${{ needs.fingerprint.outputs.key }}

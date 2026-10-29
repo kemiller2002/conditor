@@ -1,0 +1,72 @@
+name: Echelon foundations
+
+# The foundations verifier reads only files (project, source and manifest files; it ignores docs/ and research/),
+# so a content fingerprint of those inputs plus the pinned verifier decides whether this exact input already passed
+# (tools/acceptance/ci/fingerprint.sh). A pass is recorded as a cache entry keyed by the fingerprint; when it exists
+# the heavy verification is skipped and the gate job reports the required check "foundations / verify-foundations"
+# as passed. Any change to an input, or to the pinned verifier, runs the full verification.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PRAXIS_REF: 398af6dd1509afc93d0f3aa2612ba2d2f5c9c32e
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+      passed: ${{ steps.lookup.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: key
+        run: echo "key=foundations-pass-$(tools/acceptance/ci/fingerprint.sh --salt "$PRAXIS_REF" --exclude 'docs/**' --exclude 'research/**' --exclude '**/*.md' --exclude 'evidence/**' --exclude 'acceptance/traceability.json')" >> "$GITHUB_OUTPUT"
+      - id: lookup
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci-pass
+          key: ${{ steps.key.outputs.key }}
+          lookup-only: true
+      - run: echo "Fingerprint ${{ steps.key.outputs.key }}; already passed - ${{ steps.lookup.outputs.cache-hit == 'true' }}" >> "$GITHUB_STEP_SUMMARY"
+
+  foundations:
+    needs: fingerprint
+    if: needs.fingerprint.outputs.passed != 'true'
+    uses: kemiller2002/praxis/.github/workflows/foundations-verify.yml@398af6dd1509afc93d0f3aa2612ba2d2f5c9c32e
+    with:
+      praxis_ref: 398af6dd1509afc93d0f3aa2612ba2d2f5c9c32e
+
+  record-pass:
+    needs: [fingerprint, foundations]
+    if: needs.foundations.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: mkdir .ci-pass && echo "${{ needs.fingerprint.outputs.key }} passed in run ${{ github.run_id }}" > .ci-pass/record
+      - uses: actions/cache/save@v4
+        with:
+          path: .ci-pass
+          key: ${{ needs.fingerprint.outputs.key }}
+
+  # Branch protection requires "foundations / verify-foundations". A skipped reusable-workflow job reports only as
+  # "foundations", so this gate carries the required name: it passes when the verifier passed in this run, or when it
+  # was skipped because this exact input already passed; it fails otherwise.
+  gate:
+    name: foundations / verify-foundations
+    needs: [fingerprint, foundations]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          PASSED_BEFORE: ${{ needs.fingerprint.outputs.passed }}
+          RESULT: ${{ needs.foundations.result }}
+        run: |
+          echo "verifier: $RESULT; input passed before: ${PASSED_BEFORE:-false}"
+          [ "$RESULT" = success ] || { [ "$RESULT" = skipped ] && [ "$PASSED_BEFORE" = true ]; }
