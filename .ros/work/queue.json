@@ -1473,10 +1473,10 @@
         "r7-remediation"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-10-29T10:45:00Z",
-      "updatedAt": "2026-10-29T10:46:00Z",
+      "updatedAt": "2026-10-29T18:56:49.000Z",
       "createdBy": "anthropic/claude-code",
       "createdByActor": {
         "kind": "agent",
