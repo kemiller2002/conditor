@@ -6,6 +6,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <DebugType>portable</DebugType>
-    <Version>0.10.17</Version>
+    <Version>0.10.18</Version>
   </PropertyGroup>
 </Project>
