@@ -48,6 +48,14 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
 
 ## The three steps
 
+For a Causa rehearsal, complete the workspace preflight before the timed start:
+
+```bash
+conditor rehearsal init --target . --manifest ./conditor.json --json
+```
+
+This is preparation evidence only. A READY receipt does not activate the Praxis mission, launch an agent, or start the competition clock. The person must make the event's explicit timed-execution transition after reviewing the receipt.
+
 ```bash
 # 1. Create the repository: initialize, publish, protect, enable GitHub Pages
 mkdir ~/indy-app && cd ~/indy-app && git init -b main \

@@ -1,0 +1,23 @@
+{
+  "$schema": "../schemas/conditor.schema.json",
+  "schemaVersion": 1,
+  "name": "indy-init-demonstration-rehearsal-006",
+  "components": [],
+  "rehearsal": {
+    "id": "006",
+    "application": "causa",
+    "receipt": ".conditor/evidence/rehearsal-006-readiness.json",
+    "workspace": {
+      "repository": "kemiller2002/causa-data",
+      "branch": "main",
+      "template": "demonstration-v1",
+      "name": "rehearsal-006",
+      "checkout": "../causa-data",
+      "toolProject": "tools/src/Causa.Tool/Causa.Tool.fsproj",
+      "dotnetExecutable": "dotnet",
+      "create": true,
+      "publish": true,
+      "verify": true
+    }
+  }
+}
