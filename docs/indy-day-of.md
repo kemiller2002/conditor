@@ -8,7 +8,7 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
 
 - Install the Conditor release that contains `conditor requirements import`
   and `conditor supervise` (0.6.0 or later).
-- Install Praxis 3.23.0, Ordo 1.19.0 and percepta-repo 0.1.0 on the day-of
+- Install Praxis 3.24.0, Ordo 1.19.0 and percepta-repo 0.1.0 on the day-of
   host. These are the versions the preset pins.
 - Install the kickoff release set's native host tools from the Registry set
   (Indy-init OD-INDY-8, `DF-CON-2026-A007`). Use the approved kickoff version
@@ -17,15 +17,17 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.32.0, once the Registry approves it
-  (1.31.0 is the approved set until then). 1.32.0 installs the same native
-  host tools as 1.31.0; it moves only the application bindings Forma 0.10.0
-  -> 0.11.0 (typography roles, `data-ef-type`) and the optional Arca 0.5.0 ->
-  0.6.0 (only a provider can confirm a write; a breaking API change, see
-  Arca's CHANGELOG). It installs Praxis 3.23.0, which
+  The kickoff set is echelon-current 1.33.0, once the Registry approves it
+  (1.32.0 is the approved set until then). Against 1.32.0 it moves Praxis
+  3.23.0 -> 3.24.0, the application binding Forma 0.11.0 -> 0.12.0 (workflow
+  diagrams are validated for non-text contrast, `A11Y-NONTEXT-CONTRAST`, and
+  gain the `token:status-*` colours; a document that validated before can now
+  fail, see Forma's CHANGELOG) and the optional Arca 0.6.0 -> 0.7.0 (bounded
+  synchronization scheduling; additive). It installs Praxis 3.24.0, which
   carries the requirements-preservation gate, admits compiled verification
-  plans (`praxis inbox admit-plan`) and records process evidence in the work
-  event log (`praxis work evidence`); Ordo 1.19.0, which orders the admitted
+  plans (`praxis inbox admit-plan`), records process evidence in the work
+  event log (`praxis work evidence`) and adds owner-authorized autonomous
+  execution (`praxis autonomy`); Ordo 1.19.0, which orders the admitted
   plan (`sde verification schedule`) and binds evidence freshness per policy
   and per obligation acceptance contract; and Dokimos 0.9.0, which attested
   verified completion with Praxis 3.17.0 and later needs, which adds evidence

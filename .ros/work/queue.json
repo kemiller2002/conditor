@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 64,
+  "nextSeq": 65,
   "items": [
     {
       "id": "WI-0001",
@@ -1478,6 +1478,30 @@
       "createdAt": "2026-10-29T10:45:00Z",
       "updatedAt": "2026-10-29T10:46:00Z",
       "createdBy": "anthropic/claude-code",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0064",
+      "title": "Qualify echelon-current 1.33.0: Forma 0.12.0 (A11Y-NONTEXT-CONTRAST, status tokens), Praxis 3.24.0 and Arca 0.7.0 (no Conditor descriptor); request 0.10.18",
+      "description": null,
+      "tags": [
+        "release",
+        "qualification"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-10-29T15:39:54.751Z",
+      "updatedAt": "2026-10-29T15:40:02.000Z",
+      "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
         "id": "anthropic/claude-code",

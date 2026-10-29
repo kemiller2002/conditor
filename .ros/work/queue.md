@@ -68,4 +68,5 @@
 | WI-0060 | Qualify echelon-current 1.31.0: Praxis 3.23.0, Ordo 1.19.0, Dokimos 0.9.0, Limen 0.9.1 (generated from the registry tools, proposed cut); move the Indy preset; request 0.10.16 | complete | release, qualification | high |
 | WI-0061 | Qualify echelon-current 1.32.0: Forma 0.11.0 (typography roles) and Arca 0.6.0 (persistence safety, no Conditor descriptor); request 0.10.17 | complete | release, qualification | high |
 | WI-0062 | Unattended-execution readiness: prove a repository can go branch to verified merge receipt without the owner, through Praxis's authorization gate (WI-0104 in praxis) | complete |  | medium |
-| WI-0063 | R7-REM-004: conditor ci-policy check (CI starvation guard) and tier-3 candidate-acceptance template | ready | conditor, ci, r7-remediation | high |
+| WI-0063 | R7-REM-004: conditor ci-policy check (CI starvation guard) and tier-3 candidate-acceptance template | active | conditor, ci, r7-remediation | high |
+| WI-0064 | Qualify echelon-current 1.33.0: Forma 0.12.0 (A11Y-NONTEXT-CONTRAST, status tokens), Praxis 3.24.0 and Arca 0.7.0 (no Conditor descriptor); request 0.10.18 | ready | release, qualification | high |
