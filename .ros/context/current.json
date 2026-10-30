@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-29T18:56:49.000Z",
+  "updatedAt": "2026-10-29T16:49:56.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -2878,52 +2878,13 @@
     {
       "id": "WI-0063",
       "type": "task",
-      "state": "complete",
-      "semanticState": "complete",
-      "evidence": [
-        {
-          "type": "implementation",
-          "path": "src/Conditor.Core/CiPolicy.fs"
-        },
-        {
-          "type": "implementation",
-          "path": "src/Conditor.Core/Scaffolding.fs"
-        },
-        {
-          "type": "tests",
-          "path": "tests/Conditor.Tests/CiPolicyTests.fs"
-        },
-        {
-          "type": "documentation",
-          "path": "docs/ci-policy.md"
-        }
-      ],
-      "updatedAt": "2026-10-29T18:56:49.000Z",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-10-29T10:47:00Z",
       "telemetryExecutionIds": [
         "EXE-20261029T093153544Z-21abc6f7"
-      ],
-      "latestCheckpoint": {
-        "id": "0aa510991f6d2ff49302a2bb",
-        "recordedAt": "2026-10-29T18:56:47.000Z",
-        "executionId": "EXE-20261029T093153544Z-21abc6f7",
-        "repository": "conditor",
-        "branch": "claude/close-wi-0063",
-        "commit": "2d6ae48ee5017379a866fd09df86ff325e0ba4e7",
-        "remote": {
-          "name": "origin",
-          "url": "https://github.com/kemiller2002/conditor"
-        },
-        "remoteBranch": "claude/close-wi-0063",
-        "remoteCommit": "2d6ae48ee5017379a866fd09df86ff325e0ba4e7",
-        "summary": "ci-policy check and tier-3 candidate-acceptance template merged in conditor#122 (merge 92412909b9a2b0578ab8a664048c461284a84afa; all 23 CI checks success incl. build-test, validate, native-cli-smoke) and released in Conditor v0.10.18 (tag at 2d6ae48ee5017379a866fd09df86ff325e0ba4e7; release run 40906236445 success, 8 native binaries + checksums.txt + echelon-release.json); v0.10.18 qualifies echelon-current 1.33.0, registered in echelon-registry#104 (7a2c27a3db7cab4337ea47536f3e1fc22d257f03)",
-        "nextAction": "Complete WI-0063 and commit the Praxis state",
-        "verification": {
-          "status": "verified",
-          "mechanism": "git-remote-observation"
-        }
-      },
-      "completedAt": "2026-10-29T18:56:49.000Z",
-      "conclusion": "Merged in conditor#122 (92412909b9a2b0578ab8a664048c461284a84afa; CI all success); released in Conditor v0.10.18 (2d6ae48ee5017379a866fd09df86ff325e0ba4e7; release run 40906236445 success); Conditor 0.10.18 qualifies echelon-current 1.33.0, registered in echelon-registry#104 (7a2c27a3db7cab4337ea47536f3e1fc22d257f03)"
+      ]
     },
     {
       "id": "WI-0064",
@@ -3001,6 +2962,48 @@
         }
       },
       "completedAt": "2026-10-29T15:47:55.000Z"
+    },
+    {
+      "id": "WI-0065",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Rehearsal.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/RehearsalTests.fs"
+        }
+      ],
+      "updatedAt": "2026-10-29T16:49:56.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261029T164739919Z-af708cc6"
+      ],
+      "latestCheckpoint": {
+        "id": "48029f14dedaafd635917993",
+        "recordedAt": "2026-10-29T16:49:49.000Z",
+        "executionId": "EXE-20261029T164739919Z-af708cc6",
+        "stepId": "STEP-20261029T164757000Z-e9933503",
+        "repository": "conditor",
+        "branch": "codex/causa-rehearsal-preflight-v3",
+        "commit": "34f1c9997e5932b830a0252d5e0f5cede41f0945",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor.git"
+        },
+        "remoteBranch": "codex/causa-rehearsal-preflight-v3",
+        "remoteCommit": "34f1c9997e5932b830a0252d5e0f5cede41f0945",
+        "summary": "Causa rehearsal preflight integrated onto Conditor 0.10.18, built, tested against current-main baseline, and pushed",
+        "nextAction": "Complete WI-0065, validate Praxis state, open and merge the PR",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-10-29T16:49:56.000Z"
     }
   ]
 }

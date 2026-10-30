@@ -31,6 +31,7 @@
     <Compile Include="Readiness.fs" />
     <Compile Include="Status.fs" />
     <Compile Include="TestEnvironment.fs" />
+    <Compile Include="Rehearsal.fs" />
     <Compile Include="Doctor.fs" />
     <Compile Include="Repair.fs" />
     <Compile Include="Upgrade.fs" />
