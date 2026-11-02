@@ -1075,6 +1075,96 @@ let runKickoffSet133 (check: string -> bool -> unit) =
                      dependencies.Count = 3
                      && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
 
+[<Literal>]
+let private FormaAsset0130 =
+    "https://github.com/kemiller2002/forma/releases/download/v0.13.0/echelon-foundry-design-system-0.13.0.tgz"
+
+/// echelon-current 1.34.0 linux-x64, byte-identical to the set the Registry's
+/// own tools resolve for the proposed cut (sha256 7765bdb3...): the approved
+/// 1.33.0 with only Ordo 1.19.0 -> 1.20.0 (opt-in ordo.decision-event/1
+/// decision events; no change to the lifecycle commands or the installed .sde
+/// payload) and Forma 0.12.0 -> 0.13.0 (layout reliability, LRP-001).
+/// OD-INDY-8 approves it only after this Conditor qualification
+/// (DF-CON-2026-A007).
+let private echelonCurrent134 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.34.0-linux-x64.json")
+
+/// The Rehearsal 3 bootstrap manifest moved to the 1.34.0 selections.
+let private kickoffComponents134 =
+    rehearsalComponents
+        .Replace("""{"id":"praxis","version":"3.16.0"}""", """{"id":"praxis","version":"3.24.0"}""")
+        .Replace("""{"id":"ordo","version":"1.17.0"}""", """{"id":"ordo","version":"1.20.0"}""")
+        .Replace("""{"id":"limen","version":"0.9.0"}""", """{"id":"limen","version":"0.9.1"}""")
+        .Replace("""{"id":"forma","version":"0.9.0"}""", """{"id":"forma","version":"0.13.0"}""")
+        .Replace("""{"id":"folio","version":"0.4.0"}""", """{"id":"folio","version":"0.4.1"}""")
+
+let runKickoffSet134 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.34.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent134
+
+        check "the vendored echelon-current 1.34.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "7765bdb328792c8b77dc198d531dcd0e19fee50d6b4ddc5a850518f40063aceb")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let selected systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+            |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "ordo"; "forma"; "praxis"; "arca"; "dokimos"; "limen"; "percepta-semantic"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.34.0 selects Ordo 1.20.0 and Forma 0.13.0, and keeps Praxis 3.24.0, Arca 0.7.0, Dokimos 0.9.0, Limen 0.9.1, percepta-semantic 0.3.0, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "1.20.0"; Some "0.13.0"; Some "3.24.0"; Some "0.7.0"; Some "0.9.0"; Some "0.9.1"; Some "0.3.0"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.34.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent134 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.34.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation installs Ordo 1.20.0 from 1.34.0 with the published linux-x64 asset digest"
+                (installed "ordo"
+                 |> Option.exists (fun c ->
+                     c.Version = "1.20.0"
+                     && c.Tag = "v1.20.0"
+                     && c.Assets
+                        |> Map.tryFind "linux-x64"
+                        |> Option.exists (fun asset ->
+                            asset.Name = "ordo-linux-x64.tar.gz"
+                            && asset.Sha256 = "c5851a5bead4145d6bb5bb56bfab67927c9db06c84960136f677bc94fc84e3cf")))
+
+            check "the workstation keeps Praxis 3.24.0, Dokimos 0.9.0 and percepta-semantic 0.3.0 from 1.34.0"
+                (installed "praxis" |> Option.exists (fun c -> c.Version = "3.24.0" && c.Tag = "v3.24.0")
+                 && installed "dokimos" |> Option.exists (fun c -> c.Version = "0.9.0" && c.Tag = "dokimos-v0.9.0")
+                 && installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.3.0" && c.Lifecycle.IsNone))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents134 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.34.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: under 1.34.0, Forma 0.13.0 and Folio 0.4.1 are pinned to their Registry release assets"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset0130
+                     && dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.34.0, Limen 0.9.1 keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.1")
+
+                check "under 1.34.0 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true

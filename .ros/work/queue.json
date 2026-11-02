@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 66,
+  "nextSeq": 67,
   "items": [
     {
       "id": "WI-0001",
@@ -1529,6 +1529,30 @@
         "provider": "openai",
         "model": "unknown",
         "runtime": "codex"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0066",
+      "title": "Qualify echelon-current 1.34.0: Ordo 1.20.0 (decision events, integrity-only gate) and Forma 0.13.0; request 0.10.19",
+      "description": null,
+      "tags": [
+        "release",
+        "qualification"
+      ],
+      "priority": "high",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-11-02T13:55:40.236Z",
+      "updatedAt": "2026-11-02T13:55:46.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
       },
       "source": "manual",
       "sourceReference": null
