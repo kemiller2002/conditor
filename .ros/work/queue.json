@@ -1565,10 +1565,10 @@
         "release,qualification"
       ],
       "priority": "high",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-11-02T21:29:55.571Z",
-      "updatedAt": "2026-11-02T21:30:02.000Z",
+      "updatedAt": "2026-11-02T21:35:15.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

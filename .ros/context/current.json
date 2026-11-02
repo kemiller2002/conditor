@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-02T21:30:02.000Z",
+  "updatedAt": "2026-11-02T21:35:15.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3165,13 +3165,56 @@
     {
       "id": "WI-0067",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-11-02T21:30:02.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "implementation",
+          "path": "tests/fixtures/registry/echelon-current-1.35.0-linux-x64.json"
+        },
+        {
+          "type": "implementation",
+          "path": "docs/indy-day-of.md"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+        }
+      ],
+      "updatedAt": "2026-11-02T21:35:15.000Z",
       "telemetryExecutionIds": [
         "EXE-20261102T213003022Z-3be94c19"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "4a5b403799306f4e8de5560d",
+        "recordedAt": "2026-11-02T21:35:13.000Z",
+        "executionId": "EXE-20261102T213003022Z-3be94c19",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.35.0",
+        "commit": "0173b90aa93b301ccd578217be9fd8bd54a94af2",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.35.0",
+        "remoteCommit": "0173b90aa93b301ccd578217be9fd8bd54a94af2",
+        "summary": "echelon-current 1.35.0 qualified: set vendored, runKickoffSet135, CI kickoff job, docs; 1493 checks pass; job script passes against real releases",
+        "nextAction": "Owner reviews the draft PR; Registry approval of 1.35.0 (OD-INDY-8) follows separately",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-02T21:35:15.000Z",
+      "conclusion": "echelon-current 1.35.0 qualified on Conditor 0.10.19 without a release: 1493 checks pass and the kickoff job passes against the published releases"
     }
   ]
 }
