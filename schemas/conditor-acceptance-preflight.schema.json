@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echelonfoundry.com/schemas/conditor/acceptance-preflight/1",
+  "title": "Conditor acceptance-trust preflight contract (conditor.acceptance.json)",
+  "description": "Pins the inputs the acceptance verifier will trust at the end of a timed run and names that verifier. `conditor acceptance preflight` runs the verifier's own --preflight mode; Conditor adds no acceptance rule (CON-ACC-PREFLIGHT).",
+  "type": "object",
+  "required": ["schema", "verifier", "baseline", "approvals", "trustedOperators"],
+  "properties": {
+    "schema": { "const": "conditor.acceptance-preflight/1" },
+    "description": { "type": "string" },
+    "verifier": {
+      "description": "Command of the authoritative acceptance verifier, run from the target directory. It must implement --preflight and answer causa.acceptance-preflight/1.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "baseline": { "$ref": "#/$defs/pinned" },
+    "baselineSource": { "type": "string", "description": "Git checkout holding the baseline's source commit (default '.')." },
+    "approvals": { "$ref": "#/$defs/pinned" },
+    "trustedOperators": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "requiredInputs": {
+      "type": "array",
+      "items": {
+        "allOf": [ { "$ref": "#/$defs/pinned" } ],
+        "required": ["id"],
+        "properties": { "id": { "type": "string", "minLength": 1 } }
+      }
+    }
+  },
+  "$defs": {
+    "pinned": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Pinned here; never computed from the file at preflight time." }
+      }
+    }
+  }
+}
