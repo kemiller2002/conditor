@@ -17,12 +17,12 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.34.0, once the Registry approves it
-  (1.33.0 is the approved set until then). Against 1.33.0 it moves only Ordo
-  1.19.0 -> 1.20.0 (opt-in decision events) and the application binding
-  Forma 0.12.0 -> 0.13.0 (layout reliability: a token too long for its line,
-  such as a URL, SHA or path, now breaks inside Forma containers instead of
-  escaping them; see Forma's CHANGELOG). It installs Praxis 3.24.0, which
+  The kickoff set is echelon-current 1.35.0, once the Registry owner
+  approves it after Conditor qualifies it (1.34.0 is the approved set until
+  then). Against 1.34.0 it moves only Dokimos 0.9.0 -> 0.10.0 (the
+  verification compiler) and the Percepta semantic CLI 0.3.0 -> 0.4.0
+  (specification preflight); neither is a `conditor.json` component, so the
+  preset is unchanged. It installs Praxis 3.24.0, which
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`), records process evidence in the work
   event log (`praxis work evidence`) and adds owner-authorized autonomous
@@ -31,13 +31,17 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   and per obligation acceptance contract, and records opt-in decision events
   (`ordo.decision-event/1`: `ordo ecir recognize --events FILE` or
   `ORDO_DECISION_EVENTS`, and `ordo events record-execution`,
-  `record-verification` and `summarize`); and Dokimos 0.9.0, which attested
+  `record-verification` and `summarize`); and Dokimos 0.10.0, which attested
   verified completion with Praxis 3.17.0 and later needs, which adds evidence
-  reuse (`dokimos evidence plan`) and whose release checkpoint refuses reuse
-  (`--checkpoint release`, mandatory final verification). It also installs
-  the Percepta semantic CLI 0.3.0 (`percepta`), which produces the UI
-  completion evidence and checks a served application
-  (`percepta verify-app`). Then run
+  reuse (`dokimos evidence plan`), whose release checkpoint refuses reuse
+  (`--checkpoint release`, mandatory final verification), and which turns
+  the frozen verification plan into test-writing work and reports which
+  obligations are verified for a candidate SHA (`dokimos verification
+  compile`, `scaffold`, `coverage` and `probe`). It also installs the
+  Percepta semantic CLI 0.4.0 (`percepta`), which produces the UI completion
+  evidence, checks a served application (`percepta verify-app`) and finds
+  contradictory and incomplete specifications before implementation
+  (`percepta spec-preflight`, `percepta.specification-preflight/1`). Then run
   `percepta install-browser`.
   The semantic CLI is not a `conditor.json` component: the Registry set pins
   it.

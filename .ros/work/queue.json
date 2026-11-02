@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 67,
+  "nextSeq": 68,
   "items": [
     {
       "id": "WI-0001",
@@ -1546,6 +1546,29 @@
       "attachments": [],
       "createdAt": "2026-11-02T13:55:40.236Z",
       "updatedAt": "2026-11-02T14:04:36.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0067",
+      "title": "Qualify echelon-current 1.35.0 kickoff set: Dokimos 0.10.0 and percepta-semantic 0.4.0 (no Conditor descriptor, no release)",
+      "description": null,
+      "tags": [
+        "release,qualification"
+      ],
+      "priority": "high",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-02T21:29:55.571Z",
+      "updatedAt": "2026-11-02T21:35:15.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
