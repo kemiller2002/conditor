@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-10-30T21:32:51.000Z",
+  "updatedAt": "2026-11-02T00:46:39Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3043,6 +3043,47 @@
         }
       },
       "completedAt": "2026-10-29T16:49:56.000Z"
+    },
+    {
+      "id": "CON-ACC-PREFLIGHT",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/AcceptancePreflight.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/AcceptancePreflightTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-02T00:46:39Z",
+      "telemetryExecutionIds": [
+        "EXE-20261102T001513984Z-3bb7ce3b"
+      ],
+      "latestCheckpoint": {
+        "id": "241b7927e9d27e8bd60d2390",
+        "recordedAt": "2026-11-02T00:46:38Z",
+        "executionId": "EXE-20261102T001513984Z-3bb7ce3b",
+        "repository": "conditor",
+        "branch": "claude/acceptance-preflight",
+        "commit": "c45685c40e30167ac2233dade28bcc459d36d159",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/acceptance-preflight",
+        "remoteCommit": "c45685c40e30167ac2233dade28bcc459d36d159",
+        "summary": "acceptance preflight implemented and tested (1471 PASS)",
+        "nextAction": "owner review of PR; owner fixes approvals",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-02T00:46:39Z"
     }
   ]
 }

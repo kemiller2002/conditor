@@ -28,6 +28,7 @@ let private usage () =
     Console.WriteLine "  conditor unattended-readiness --repository OWNER/REPO --base BRANCH --authorization FILE --trust-store FILE --journal DIR --workdir CLONE [--praxis PATH] [--run-id ID] [--trace TEXT] [--probe-branch NAME] [--poll-seconds N] [--out FILE] [--json]"
     Console.WriteLine "  conditor ci-policy check [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env preflight [--contract PATH] [--target PATH] [--json]"
+    Console.WriteLine "  conditor acceptance preflight [--contract PATH] [--target PATH] [--json]"
     Console.WriteLine "  conditor rehearsal init [--manifest PATH] [--target PATH] [--json]"
     Console.WriteLine "  conditor test-env digest    [--contract PATH] [--target PATH]"
     Console.WriteLine "  conditor test-env resolve   [--contract PATH] [--target PATH] [--json | --shell]"
@@ -1819,6 +1820,39 @@ let private runDrift (args: string array) =
 
             Drift.exitCodeFor failOn report.Level
 
+/// `conditor acceptance preflight` (CON-ACC-PREFLIGHT): the authoritative
+/// acceptance verifier's trust check, before T0. Exit 0 READY, 3 INVALID,
+/// 2 when the contract cannot be read.
+let private runAcceptance (args: string array) =
+    let target =
+        optionValue "--target" args
+        |> Option.defaultValue (Directory.GetCurrentDirectory())
+        |> Path.GetFullPath
+
+    let contractPath =
+        optionValue "--contract" args
+        |> Option.map Path.GetFullPath
+        |> Option.defaultValue (Path.Combine(target, AcceptancePreflight.DefaultContractPath))
+
+    match args |> Array.tryItem 1 with
+    | Some "preflight" ->
+        match AcceptancePreflight.preflight target contractPath AcceptancePreflight.processVerifier with
+        | Error errors ->
+            writeErrors errors
+            2
+        | Ok report ->
+            Console.Write(
+                if hasFlag "--json" args then AcceptancePreflight.toJson report
+                else AcceptancePreflight.toText report
+            )
+
+            match report.Verdict with
+            | AcceptancePreflight.Ready -> 0
+            | AcceptancePreflight.Invalid -> 3
+    | _ ->
+        eprintfn "Usage: conditor acceptance preflight [--contract PATH] [--target PATH] [--json]"
+        2
+
 /// `conditor test-env preflight|digest|resolve` (CON-368..375; resolve: WI-0059): the test-environment
 /// contract's preflight. Exit 0 when a browser run can be trusted, 3 when a
 /// finding refuses it, 2 when the contract cannot be read.
@@ -2045,6 +2079,8 @@ let private execute (args: string array) =
             runUnattendedReadiness args
         elif command = "ci-policy" then
             runCiPolicy args
+        elif command = "acceptance" then
+            runAcceptance args
         elif command = "test-env" then
             runTestEnvironment args
         elif command = "rehearsal" then

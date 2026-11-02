@@ -138,6 +138,35 @@ module Doctor =
                       Detail = $"{finding.What} ({finding.Where})"
                       Remediation = finding.Fix })
 
+    /// The acceptance-trust preflight, only when the repository opted in with a
+    /// `conditor.acceptance.json` contract (CON-ACC-PREFLIGHT).
+    let acceptanceFindings (target: string) runVerifier =
+        let path = Path.Combine(target, AcceptancePreflight.DefaultContractPath)
+
+        if not (File.Exists path) then
+            []
+        else
+            match AcceptancePreflight.preflight target path runVerifier with
+            | Result.Error errors ->
+                errors
+                |> List.map (fun error ->
+                    { Code = "COND-DOC-ACC-CONTRACT"
+                      Severity = Error
+                      Area = "acceptance"
+                      Detail = error
+                      Remediation = Some "Make conditor.acceptance.json conform to schemas/conditor-acceptance-preflight.schema.json." })
+            | Ok report ->
+                report.Findings
+                |> List.map (fun finding ->
+                    { Code = "COND-DOC-" + finding.Code.Substring("COND-".Length)
+                      Severity =
+                        match finding.Severity with
+                        | AcceptancePreflight.Passing -> Info
+                        | AcceptancePreflight.Blocking -> Error
+                      Area = "acceptance"
+                      Detail = $"{finding.Subject}: {finding.Detail}"
+                      Remediation = finding.OwnerAction })
+
     let inspect target manifestPath manifest =
         let findings = ResizeArray<Finding>()
 
@@ -150,6 +179,9 @@ module Doctor =
         |> List.iter findings.Add
 
         testEnvironmentFindings target TestEnvironment.processEnvironment
+        |> List.iter findings.Add
+
+        acceptanceFindings target AcceptancePreflight.processVerifier
         |> List.iter findings.Add
 
         let result = List.ofSeq findings
