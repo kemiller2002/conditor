@@ -1394,6 +1394,84 @@ jobs:
           grep -F "evidence plan --request F" <<< "$dokimos_usage"
           grep -F -- "--checkpoint incremental|release" <<< "$dokimos_usage"
 
+  # Indy-init OD-INDY-8: echelon-current 1.35.0 is proposed as the next kickoff
+  # set, approved only after this qualification. Against 1.34.0 its only
+  # changes are Dokimos 0.9.0 -> 0.10.0 (`dokimos verification compile |
+  # scaffold | coverage | probe`) and percepta-semantic 0.3.0 -> 0.4.0
+  # (`percepta spec-preflight`), both native host tools without a Conditor
+  # descriptor. The workstation installs every native host tool of the set
+  # from the real published release bytes and verifies each receipt.
+  echelon-current-1-35-0-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_135_PATH: tests/fixtures/registry/echelon-current-1.35.0-linux-x64.json
+      SET_135_SHA256: bc0f95150a2abc1850340bfddc3b94814820aa1ed0ed10687ecd029ec9398aab
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.35.0 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_135_SHA256  $SET_135_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_135_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_135_PATH" --resolved-set-sha256 "$SET_135_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.24.0"
+          rc=0; autonomy=$("$home/.local/bin/praxis" autonomy 2>&1) || rc=$?
+          grep -F "autonomy policy check --policy FILE" <<< "$autonomy"
+          rc=0; usage=$("$home/.local/bin/praxis" inbox 2>&1) || rc=$?
+          grep -F "inbox admit-plan CLAIM-ID" <<< "$usage"
+          rc=0; gate=$("$home/.local/bin/praxis" requirements preservation verify 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements preservation verify requires --baseline FILE" <<< "$gate"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.20.0"
+          "$home/.local/bin/ordo" verification --help | grep -F -- "--reuse-context FILE"
+          # Ordo 1.20.0 (unchanged from 1.34.0) carries the opt-in decision
+          # events: --events on ecir recognize, and the events commands.
+          rc=0; recognize=$("$home/.local/bin/ordo" ecir recognize 2>&1) || rc=$?
+          grep -F -- "[--events FILE]" <<< "$recognize"
+          rc=0; events=$("$home/.local/bin/ordo" events 2>&1) || rc=$?
+          grep -F "sde events record-execution" <<< "$events"
+          grep -F "sde events record-verification" <<< "$events"
+          grep -F "sde events summarize" <<< "$events"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          # percepta-semantic 0.4.0 reports its version and source commit, and
+          # carries spec-preflight: with no inputs (an empty directory) it
+          # emits an unblocked percepta.specification-preflight/1 report,
+          # where 0.3.0 printed its usage.
+          percepta_commit=$(jq -r '.components[] | select(.systemId == "percepta-semantic") | .commit' "$SET_135_PATH")
+          "$home/.local/bin/percepta" version | tee "$RUNNER_TEMP/percepta-version.txt"
+          grep -Fx "percepta 0.4.0+$percepta_commit" "$RUNNER_TEMP/percepta-version.txt"
+          preflight="$RUNNER_TEMP/spec-preflight"; mkdir -p "$preflight"
+          ( cd "$preflight" && "$home/.local/bin/percepta" spec-preflight ) > "$RUNNER_TEMP/spec-preflight.json"
+          jq -e '.schema == "percepta.specification-preflight/1" and .blocked == false' "$RUNNER_TEMP/spec-preflight.json"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_135_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.10.0" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
+          rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
+          grep -F "evidence plan --request F" <<< "$dokimos_usage"
+          grep -F -- "--checkpoint incremental|release" <<< "$dokimos_usage"
+          # Dokimos 0.10.0 carries the verification command: bare, it is an
+          # invalid invocation (exit 2) whose usage names the four
+          # subcommands, where 0.9.0 printed its top-level usage.
+          rc=0; verification=$("$home/.local/bin/dokimos" verification 2>&1) || rc=$?
+          test "$rc" = 2
+          jq -e '.Code == "invalid-arguments" and (.Message | startswith("usage: dokimos verification compile"))' <<< "$verification"
+          for sub in compile scaffold coverage probe; do grep -F "dokimos verification $sub" <<< "$verification"; done
+
   host-tool-upgrade-boundary:
     needs: build-test
     runs-on: ubuntu-latest

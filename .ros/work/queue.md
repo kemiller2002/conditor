@@ -73,3 +73,4 @@
 | WI-0064 | Qualify echelon-current 1.33.0: Forma 0.12.0 (A11Y-NONTEXT-CONTRAST, status tokens), Praxis 3.24.0 and Arca 0.7.0 (no Conditor descriptor); request 0.10.18 | complete | release, qualification | high |
 | WI-0065 | Integrate the completed Causa rehearsal preflight onto current Conditor main and merge it | complete |  | medium |
 | WI-0066 | Qualify echelon-current 1.34.0: Ordo 1.20.0 (decision events, integrity-only gate) and Forma 0.13.0; request 0.10.19 | complete | release, qualification | high |
+| WI-0067 | Qualify echelon-current 1.35.0 kickoff set: Dokimos 0.10.0 and percepta-semantic 0.4.0 (no Conditor descriptor, no release) | ready | release,qualification | high |
