@@ -1251,6 +1251,97 @@ let runKickoffSet135 (check: string -> bool -> unit) =
                      dependencies.Count = 3
                      && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
 
+/// echelon-current 1.36.0 linux-x64, byte-identical to the set the Registry's
+/// own tools resolve for the proposed cut (echelon-registry#108, sha256
+/// 1189bc9b...): the approved 1.35.0 with only Praxis 3.24.0 -> 3.25.0 (the
+/// requirement catalog compiler, `praxis requirements manifest compile |
+/// check`) and Dokimos 0.10.0 -> 0.11.0 (manifest-driven requirement
+/// verification, `dokimos verification requirements`). Dokimos has no Conditor
+/// component descriptor, so the web-package selections are 1.35.0's. OD-INDY-8
+/// approves it only after this Conditor qualification (DF-CON-2026-A007).
+let private echelonCurrent136 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.36.0-linux-x64.json")
+
+/// The Rehearsal 3 bootstrap manifest moved to the 1.36.0 selections.
+let private kickoffComponents136 =
+    kickoffComponents134.Replace("""{"id":"praxis","version":"3.24.0"}""", """{"id":"praxis","version":"3.25.0"}""")
+
+let runKickoffSet136 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.36.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent136
+
+        check "the vendored echelon-current 1.36.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "1189bc9bcb90dbc375d3af829569455349f17e2be3941da46230e57d83161797")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let selected systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+            |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "praxis"; "dokimos"; "percepta-semantic"; "ordo"; "forma"; "arca"; "limen"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.36.0 selects Praxis 3.25.0 and Dokimos 0.11.0, and keeps percepta-semantic 0.4.0, Ordo 1.20.0, Forma 0.13.0, Arca 0.7.0, Limen 0.9.1, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "3.25.0"; Some "0.11.0"; Some "0.4.0"; Some "1.20.0"; Some "0.13.0"; Some "0.7.0"; Some "0.9.1"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.36.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent136 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.36.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            let publishes version tag assetName sha256 (c: Workstation.ProfileComponent) =
+                c.Version = version
+                && c.Tag = tag
+                && c.Assets
+                   |> Map.tryFind "linux-x64"
+                   |> Option.exists (fun asset -> asset.Name = assetName && asset.Sha256 = sha256)
+
+            check "the workstation installs Praxis 3.25.0 from 1.36.0 with the published linux-x64 asset digest"
+                (installed "praxis"
+                 |> Option.exists (
+                     publishes "3.25.0" "v3.25.0" "praxis-linux-x64.tar.gz"
+                         "98e2ecaccac3f0502d755569bf2dddef852947b43a7989c570fcfff25f82d0c8"
+                 ))
+
+            check "the workstation installs Dokimos 0.11.0 from 1.36.0 with the published linux-x64 asset digest"
+                (installed "dokimos"
+                 |> Option.exists (
+                     publishes "0.11.0" "dokimos-v0.11.0" "dokimos-linux-x64.tar.gz"
+                         "a2e9927f774e71f937bcdf6c61965399689923594996f1030bfc7442d0add9c3"
+                 ))
+
+            check "the workstation keeps percepta-semantic 0.4.0 and Ordo 1.20.0 from 1.36.0"
+                (installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.4.0" && c.Tag = "percepta-semantic-v0.4.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.20.0" && c.Tag = "v1.20.0"))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents136 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.36.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: under 1.36.0, Forma 0.13.0 and Folio 0.4.1 are pinned to their Registry release assets"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset0130
+                     && dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.36.0, Limen 0.9.1 keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.1")
+
+                check "under 1.36.0 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true
