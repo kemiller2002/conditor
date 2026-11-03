@@ -1,19 +1,19 @@
 /// The Registry echelon-current channel, as Conditor's tests pin it.
 module EchelonCurrent
 
-/// The linux-x64 selection of echelon-current 1.35.0 (the proposed cut,
+/// The linux-x64 selection of echelon-current 1.36.0 (the proposed cut,
 /// resolved with the Registry's own tools, channels/echelon-current/linux-x64.json,
-/// sha256 bc0f9515...) for every system that Conditor carries a component
-/// descriptor for. Against 1.34.0 (sha256 7765bdb3...) it moves only Dokimos
-/// 0.9.0 -> 0.10.0 and percepta-semantic 0.3.0 -> 0.4.0, neither of which has
-/// a descriptor, so this list is 1.34.0's. Arca, Dokimos,
+/// sha256 1189bc9b...) for every system that Conditor carries a component
+/// descriptor for. Against 1.35.0 (sha256 bc0f9515...) it moves Praxis 3.24.0
+/// -> 3.25.0 and Dokimos 0.10.0 -> 0.11.0; Dokimos has no descriptor, so only
+/// Praxis changes in this list. Arca, Dokimos,
 /// Percepta Semantic, Strata, Fides, Summa Contracts and Limen F# are selected
 /// but have no Conditor descriptor (Conditor installs Arca through the
 /// release-asset NuGet feed on Registry authority). When the channel moves,
 /// update this list in the same change that qualifies the new versions and
 /// moves the presets that follow the channel.
 let selections =
-    [ "praxis", "3.24.0"
+    [ "praxis", "3.25.0"
       "ordo", "1.20.0"
       "percepta", "0.1.0"
       "visual-engineering", "1.0.1"
