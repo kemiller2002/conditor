@@ -17,12 +17,12 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.36.0, once the Registry owner
-  approves it after Conditor qualifies it (1.35.0 is the approved set until
-  then). Against 1.35.0 it moves only Praxis 3.24.0 -> 3.25.0 (the
-  requirement catalog compiler) and Dokimos 0.10.0 -> 0.11.0
-  (manifest-driven requirement verification); Praxis is a `conditor.json`
-  component, so the preset moves to 3.25.0. It installs Praxis 3.25.0, which
+  The kickoff set is echelon-current 1.37.0, once the Registry owner
+  approves it after Conditor qualifies it (1.36.0 is the approved set until
+  then). Against 1.36.0 it moves only Dokimos 0.11.0 -> 0.11.1 (a patch
+  release: `dokimos verification requirements` accepts the url-input
+  requirement component); Dokimos is not a `conditor.json` component, so the
+  preset is unchanged. It installs Praxis 3.25.0, which
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`), records process evidence in the work
   event log (`praxis work evidence`), adds owner-authorized autonomous
@@ -33,7 +33,7 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   and per obligation acceptance contract, and records opt-in decision events
   (`ordo.decision-event/1`: `ordo ecir recognize --events FILE` or
   `ORDO_DECISION_EVENTS`, and `ordo events record-execution`,
-  `record-verification` and `summarize`); and Dokimos 0.11.0, which attested
+  `record-verification` and `summarize`); and Dokimos 0.11.1, which attested
   verified completion with Praxis 3.17.0 and later needs, which adds evidence
   reuse (`dokimos evidence plan`), whose release checkpoint refuses reuse
   (`--checkpoint release`, mandatory final verification), and which turns
@@ -41,7 +41,9 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   obligations are verified for a candidate SHA (`dokimos verification
   compile`, `scaffold`, `coverage` and `probe`), and which judges every
   obligation of a verification manifest from browser observations and
-  executed test results (`dokimos verification requirements`). It also
+  executed test results (`dokimos verification requirements`, which matches
+  the url-input component to an `<input>` of type url, text or no type). It
+  also
   installs the
   Percepta semantic CLI 0.4.0 (`percepta`), which produces the UI completion
   evidence, checks a served application (`percepta verify-app`) and finds

@@ -75,3 +75,4 @@
 | WI-0066 | Qualify echelon-current 1.34.0: Ordo 1.20.0 (decision events, integrity-only gate) and Forma 0.13.0; request 0.10.19 | complete | release, qualification | high |
 | WI-0067 | Qualify echelon-current 1.35.0 kickoff set: Dokimos 0.10.0 and percepta-semantic 0.4.0 (no Conditor descriptor, no release) | complete | release,qualification | high |
 | WI-0068 | Qualify echelon-current 1.36.0 (Praxis 3.25.0, Dokimos 0.11.0) and request Conditor 0.10.20 | complete |  | high |
+| WI-0069 | Qualify echelon-current 1.37.0 kickoff set: Dokimos 0.11.0 -> 0.11.1 (no Conditor descriptor, no release) | ready | release,qualification | high |
