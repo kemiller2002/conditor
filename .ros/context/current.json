@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-03T21:04:55Z",
+  "updatedAt": "2026-11-05T01:06:57.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3256,6 +3256,59 @@
         }
       },
       "completedAt": "2026-11-03T21:04:55Z"
+    },
+    {
+      "id": "WI-0069",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".github/workflows/ci.yml"
+        },
+        {
+          "type": "implementation",
+          "path": "tests/fixtures/registry/echelon-current-1.37.0-linux-x64.json"
+        },
+        {
+          "type": "implementation",
+          "path": "docs/indy-day-of.md"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/EchelonCurrent.fs"
+        }
+      ],
+      "updatedAt": "2026-11-05T01:06:57.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261105T010400613Z-c6f129bc"
+      ],
+      "latestCheckpoint": {
+        "id": "140823e65fb0359f7ff247a9",
+        "recordedAt": "2026-11-05T01:06:52.000Z",
+        "executionId": "EXE-20261105T010400613Z-c6f129bc",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.37.0",
+        "commit": "eca5ce0d00a646d7856665a01d00bbe5dbacd01a",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.37.0",
+        "remoteCommit": "eca5ce0d00a646d7856665a01d00bbe5dbacd01a",
+        "summary": "echelon-current 1.37.0 qualified: set vendored (sha256 bba3594a), runKickoffSet137, CI kickoff job, docs; 1512 checks pass; job script passes against the real releases; no Conditor release",
+        "nextAction": "Owner reviews the draft PR; Registry approval of 1.37.0 (OD-INDY-8) follows separately",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-05T01:06:57.000Z"
     }
   ]
 }
