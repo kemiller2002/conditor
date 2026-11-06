@@ -96,7 +96,7 @@ Authorized adoption does not invoke component `init` or rewrite component-owned 
 
 Conditor refuses unknown or ambiguous versions, mismatched Registry identities, unhealthy components, changed authority bytes, stale authorization digests, and repositories that already contain Conditor governance.
 
-Application-package bindings such as Forma, Folio, Limen, and Aegis are reported but not inferred automatically because Conditor will not guess their project/scaffold target.
+Application-package bindings such as Forma, Forma workflow, Folio, Limen, and Aegis are reported but not inferred automatically because Conditor will not guess their project/scaffold target.
 
 Once declared, the npm-distributed web packages (Limen, Forma, Folio) follow the Registry current selection through `conditor upgrade --current`: Conditor proves the exact source and target releases and their digests, changes exact pins only through npm, and refuses unpinned, drifted or unlocked bindings. See `docs/web-package-upgrade-contract.md`.
 

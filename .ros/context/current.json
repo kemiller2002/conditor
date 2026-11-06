@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-05T01:06:57.000Z",
+  "updatedAt": "2026-11-06T22:00:21.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3309,6 +3309,56 @@
         }
       },
       "completedAt": "2026-11-05T01:06:57.000Z"
+    },
+    {
+      "id": "WI-0070",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/forma-workflow.component.json"
+        },
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/Compatibility.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/FormaWorkflowComponentTests.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/Program.fs"
+        }
+      ],
+      "updatedAt": "2026-11-06T22:00:21.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261106T215234943Z-b9829759"
+      ],
+      "latestCheckpoint": {
+        "id": "ec9219fe5223a3cee5b47c90",
+        "recordedAt": "2026-11-06T22:00:10.000Z",
+        "executionId": "EXE-20261106T215234943Z-b9829759",
+        "repository": "conditor",
+        "branch": "claude/forma-workflow-component",
+        "commit": "8313de7094d6b308da7820a85003a1f387a758c4",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/forma-workflow-component",
+        "remoteCommit": "8313de7094d6b308da7820a85003a1f387a758c4",
+        "summary": "forma-workflow 1.2.0 descriptor, Forma peer constraint, tests (1546 PASS, 0 FAIL), CI inventory assertion and docs pushed on claude/forma-workflow-component",
+        "nextAction": "Owner reviews and merges the PR, then releases Conditor 0.10.21 and re-pins the Indy-init toolchain lock",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-06T22:00:21.000Z",
+      "conclusion": "forma-workflow 1.2.0 is a built-in npm application binding; conditor components lists it; the lock includes it when conditor.json declares it."
     }
   ]
 }

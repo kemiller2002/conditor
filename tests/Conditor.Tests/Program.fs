@@ -1097,10 +1097,11 @@ match ComponentDescriptors.loadAll () with
               "limen"
               "forma"
               "folio"
+              "forma-workflow"
               "aegis"
               "tutela" ]
 
-    check "embedded component descriptor count" (descriptors.Length = 10)
+    check "embedded component descriptor count" (descriptors.Length = 11)
     check "embedded component descriptor ids" (ids = expected)
     check "registry is projected from component descriptors" (Registry.all.Length = descriptors.Length)
 
@@ -1205,6 +1206,7 @@ DeclaredWebBindingTests.run check
 PinConsistencyTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
+FormaWorkflowComponentTests.run check
 ComponentSchemaTests.run check
 ComponentSchemaTests.runStalenessPolicy check
 DriftTests.run check ComponentSchemaTests.validateDriftReport

@@ -19,6 +19,7 @@
     <Compile Include="PinConsistencyTests.fs" />
     <Compile Include="RegistryAuthorityBindingTests.fs" />
     <Compile Include="LimenPackageIdentityTests.fs" />
+    <Compile Include="FormaWorkflowComponentTests.fs" />
     <Compile Include="ComponentSchemaTests.fs" />
     <Compile Include="DriftTests.fs" />
     <Compile Include="VerificationGateTests.fs" />

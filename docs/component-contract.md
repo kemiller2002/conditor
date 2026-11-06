@@ -91,6 +91,7 @@ Application packages use a different contract because installation requires a bi
 Examples:
 
 - Forma: npm dependency
+- Forma workflow (`forma-workflow`, `@echelon-foundry/forma-workflow`): npm dependency
 - Folio: npm dependency
 - Aegis: NuGet dependency
 
@@ -101,6 +102,12 @@ Conditor must first know which generated application/project owns the dependency
 Qualified component versions now come from the descriptors. Conditor also maintains orchestration-level dependency rules that are not owned by any single component, such as `fsharp-limen-web -> limen` and `execution:enabled -> praxis`.
 
 Planning rejects an unqualified version or missing required capability before mutation. Future descriptor revisions should carry component-owned compatibility constraints such as minimum runtime or peer-capability versions.
+
+Until then, a peer constraint a qualified component release publishes is recorded in `Compatibility.fs` (`peerMinimums`, listed by `conditor compatibility` as a requirement) and enforced by the same validation. Forma workflow 1.2.0 (npm registry tarball `forma-workflow-1.2.0.tgz`, integrity `sha512-6xopcnEOFN/3n9ItU6V+YLFdWzekDGlKjDxFdyGe4mJz15ZId3G505zNWY2gv+MwAuixZZRUHVQW13mvSAUERw==`, PolyForm-Noncommercial-1.0.0) declares the peer dependency `@echelon-foundry/design-system >=0.4.0`, so a manifest declaring `forma-workflow` must declare `forma` 0.4.1 or later; it has no runtime dependencies and no Limen constraint.
+
+### Adding an embedded npm binding to an established repository
+
+`upgrade` (version-only) refuses a membership change, and `upgrade --current` opts in only components the Registry resolved set selects. An embedded npm binding the Registry does not select yet (Forma workflow 1.2.0 is not in echelon-current 1.37.0) is added by declaring it in `conditor.json` and re-establishing the lock with `conditor plan --target .` (review) then `conditor init --target .`. On an established scaffold `init` neither recreates nor compares scaffold files, so the application's own `package.json` and npm lockfile must already pin the release; `init` re-runs the lifecycle `init`/`verify` commands, re-materializes the pinned requirements and rewrites `.conditor/lock.json` only after everything succeeds. `conditor status` and `conditor verify` then report the lock current.
 
 
 ## Adoption discovery contract
