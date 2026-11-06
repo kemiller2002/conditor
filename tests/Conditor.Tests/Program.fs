@@ -647,10 +647,25 @@ match Presets.resolve "indy-init" with
         // than the frozen Indy Init 0.1.0 set (Praxis 3.6.0, Ordo 1.4.0).
         let channel = EchelonCurrent.selections |> Map.ofList
 
+        // Owner exemption (Indy Init competition decision ODR-COMP-P14, route A, 2026-11-06): forma-workflow is
+        // not yet an echelon-current selection; the preset pins it at the one version Conditor qualifies. Every
+        // other component still follows the channel; the exemption names exactly this component and version.
+        let ownerExempt = Map.ofList [ "forma-workflow", "1.2.0" ]
+
         for request in manifest.Components do
             check
-                $"the Indy preset pins {request.Id} at its echelon-current selection"
-                (request.Version.IsSome && Map.tryFind request.Id channel = request.Version)
+                $"the Indy preset pins {request.Id} at its echelon-current selection (or its owner-exempt version)"
+                (request.Version.IsSome
+                 && (Map.tryFind request.Id channel = request.Version
+                     || (not (channel.ContainsKey request.Id) && Map.tryFind request.Id ownerExempt = request.Version)))
+
+        check
+            "the owner exemption covers only components outside the echelon-current channel"
+            (ownerExempt |> Map.forall (fun id _ -> not (channel.ContainsKey id)))
+
+        check
+            "the Indy preset declares forma-workflow 1.2.0"
+            (manifest.Components |> List.exists (fun c -> c.Id = "forma-workflow" && c.Version = Some "1.2.0"))
 
         check
             "the Indy preset validates against the Conditor compatibility graph"
