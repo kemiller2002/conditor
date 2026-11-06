@@ -30,6 +30,10 @@
     {
       "id": "folio",
       "version": "0.4.1"
+    },
+    {
+      "id": "forma-workflow",
+      "version": "1.2.0"
     }
   ],
   "requirements": [
