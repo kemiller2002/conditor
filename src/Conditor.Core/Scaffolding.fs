@@ -1817,7 +1817,21 @@ jobs:
         with:
           node-version: "22"
 @@NPM_INSTALL@@
+      # Test data connection (Indy-init ODR-COMP-P13 / ODR-R10-36, an owner-approved
+      # exception for a TEST deployment only). This build alone receives four
+      # optional repository secrets; with CAUSA_DEPLOY_CONNECTION=1 the build writes
+      # dist/deploy-connection.json so the deployed app connects to
+      # REPO_OWNER/DATA_SOURCE on branch CAUSA_BRANCH with DATA_ACCESS_KEY_CAUSA.
+      # The site is public: anyone can read that key from it. Use a least-privilege,
+      # revocable key for a test repository only. Unset secrets are empty, and a
+      # build that ignores CAUSA_DEPLOY_CONNECTION is unchanged. See DEPLOYMENT.md.
       - name: Build the site
+        env:
+          CAUSA_DEPLOY_CONNECTION: "1"
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          DATA_SOURCE: ${{ secrets.DATA_SOURCE }}
+          CAUSA_BRANCH: ${{ secrets.CAUSA_BRANCH }}
+          DATA_ACCESS_KEY_CAUSA: ${{ secrets.DATA_ACCESS_KEY_CAUSA }}
         run: npm run build
 
       - name: Require the site bundle
@@ -1826,6 +1840,36 @@ jobs:
             echo "::error::npm run build must write the deployable site, including dist/index.html. See DEPLOYMENT.md."
             exit 1
           fi
+
+      # The credential scan of what is published: any GitHub token literal fails,
+      # except the one deploy key, and that only in dist/deploy-connection.json. A
+      # build without the key may ship no connection. Findings name the file, never
+      # the value.
+      - name: Scan the site for credentials
+        env:
+          DATA_ACCESS_KEY_CAUSA: ${{ secrets.DATA_ACCESS_KEY_CAUSA }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          pattern='gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}'
+          config=dist/deploy-connection.json
+          status=0
+          for f in $(grep -rlaE "$pattern" dist | grep -vxF "$config"); do
+            echo "::error file=$f::a GitHub token literal is in the published site"; status=1
+          done
+          if [ -n "${DATA_ACCESS_KEY_CAUSA:-}" ]; then
+            for f in $(grep -rlaF -- "$DATA_ACCESS_KEY_CAUSA" dist | grep -vxF "$config"); do
+              echo "::error file=$f::the deploy key is outside $config"; status=1
+            done
+            if [ -f "$config" ]; then
+              others=$(grep -oaE "$pattern" "$config" | grep -vxF -- "$DATA_ACCESS_KEY_CAUSA" | wc -l)
+              if [ "$others" -ne 0 ]; then echo "::error file=$config::a credential other than the deploy key"; status=1; fi
+            fi
+          elif [ -f "$config" ] && grep -q '"connection"' "$config"; then
+            echo "::error file=$config::a connection in a build without the deploy key"; status=1
+          fi
+          if [ "$status" -eq 0 ]; then echo "Credential scan: PASS"; fi
+          exit "$status"
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -1865,6 +1909,37 @@ needs a backend, which this workflow does not provide.
   `dist/index.html`. The scaffold defines no `build` script; add one with the
   first bundling decision.
 - Every push to `main` deploys `dist/` once the workflow is enabled.
+- Before publishing, the workflow scans `dist/` for GitHub token literals and
+  fails on any, except the one test deploy key below, and that only in
+  `dist/deploy-connection.json`.
+
+## Test data connection (test deployments only)
+
+Indy-init owner decision ODR-COMP-P13 (ODR-R10-36 for Rehearsal 010) allows one
+exception to "credentials are never bundled", for a test deployment that holds
+no secret data. The deploy build receives four optional repository secrets:
+
+| Secret | Meaning |
+|---|---|
+| `REPO_OWNER` | owner of the designated test data repository |
+| `DATA_SOURCE` | that repository's name |
+| `CAUSA_BRANCH` | the branch the app reads and writes |
+| `DATA_ACCESS_KEY_CAUSA` | a fine-grained key: contents read and write on that one repository only, short expiry, revocable |
+
+With `CAUSA_DEPLOY_CONNECTION=1` (set only in this workflow's build step) the
+application's `npm run build` writes `dist/deploy-connection.json`:
+
+```
+{"schema": "causa.deploy-connection/1",
+ "connection": {"owner": "...", "repository": "...", "branch": "...", "key": "..."}}
+```
+
+and the app connects with it at load, without the user typing the key. With no
+secret set the file holds only the schema and the app shows its Connect form.
+The key is never committed, logged, put in a URL, error text, localStorage,
+events, reports or Praxis state. **The site is public: anyone can read the key
+from it.** Revoke it when the test ends. Without the owner decision, leave the
+four secrets unset.
 
 ## Enable GitHub Pages
 

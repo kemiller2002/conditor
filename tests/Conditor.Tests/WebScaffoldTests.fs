@@ -226,6 +226,24 @@ let run (check: string -> bool -> unit) =
                  && has "uses: actions/upload-pages-artifact@v3" deploy
                  && has "uses: actions/deploy-pages@v4" deploy)
 
+            // Indy-init ODR-COMP-P13: the test deploy connection and the artifact credential scan.
+            check "only the deploy build receives the test connection secrets, opted in explicitly"
+                (has "CAUSA_DEPLOY_CONNECTION: \"1\"" deploy
+                 && has "DATA_ACCESS_KEY_CAUSA: ${{ secrets.DATA_ACCESS_KEY_CAUSA }}" deploy
+                 && has "REPO_OWNER: ${{ secrets.REPO_OWNER }}" deploy
+                 && has "DATA_SOURCE: ${{ secrets.DATA_SOURCE }}" deploy
+                 && has "CAUSA_BRANCH: ${{ secrets.CAUSA_BRANCH }}" deploy
+                 && not (has "secrets." build)
+                 && not (has "secrets." ".github/workflows/candidate-acceptance.yml"))
+
+            check "the published site is scanned for credentials before upload, allowing only the deploy key file"
+                (has "- name: Scan the site for credentials" deploy
+                 && has "config=dist/deploy-connection.json" deploy
+                 && deploy |> fun p -> (files[p]).IndexOf("Scan the site for credentials", StringComparison.Ordinal) < (files[p]).IndexOf("upload-pages-artifact", StringComparison.Ordinal))
+
+            check "the deployment guide states the test key exception and that the key is public"
+                (has "ODR-COMP-P13" "DEPLOYMENT.md" && has "anyone can read the key" "DEPLOYMENT.md")
+
             check "only the deploy job may write Pages"
                 (has "permissions:\n  contents: read" deploy && has "    permissions:\n      pages: write\n      id-token: write" deploy)
 
