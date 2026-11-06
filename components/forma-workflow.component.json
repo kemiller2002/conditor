@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "forma-workflow",
+  "displayName": "Forma Workflow",
+  "distribution": "npm",
+  "package": "@echelon-foundry/forma-workflow",
+  "defaultVersion": "1.2.0",
+  "qualifiedVersions": [
+    "1.2.0"
+  ],
+  "qualifiedRange": ">=1.2.0 <2.0.0",
+  "applicationBinding": "npm",
+  "initArguments": [],
+  "verifyArguments": [],
+  "doctorArguments": [],
+  "upgradeArguments": []
+}
