@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-09T12:42:04.000Z",
+  "updatedAt": "2026-11-09T20:32:31.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3441,6 +3441,37 @@
         }
       },
       "completedAt": "2026-11-09T12:42:04.000Z"
+    },
+    {
+      "id": "WI-0073",
+      "type": "task",
+      "state": "active",
+      "semanticState": "active",
+      "evidence": [],
+      "updatedAt": "2026-11-09T20:32:31.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261109T203232178Z-feb464a9"
+      ],
+      "latestCheckpoint": {
+        "id": "2ade5daabbc4af5436870b29",
+        "recordedAt": "2026-11-09T20:58:16.000Z",
+        "executionId": "EXE-20261109T203232178Z-feb464a9",
+        "repository": "conditor",
+        "branch": "claude/echelon-current-1.38.0",
+        "commit": "624dac6754035ea9078d84a22cfb094fb5b4aa28",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/echelon-current-1.38.0",
+        "remoteCommit": "624dac6754035ea9078d84a22cfb094fb5b4aa28",
+        "summary": "Qualified echelon-current 1.38.0 (Forma 1.0.1, echelon-theme 1.0.0, forma-workflow 2.0.0); release trigger 0.10.24 committed; PR #137 open",
+        "nextAction": "CI green on #137, merge, verify the Conditor 0.10.24 release artifact",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      }
     }
   ]
 }
