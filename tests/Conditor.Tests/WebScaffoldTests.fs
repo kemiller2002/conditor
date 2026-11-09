@@ -1543,6 +1543,102 @@ let runKickoffSet1371 (check: string -> bool -> unit) =
                      dependencies.Count = 3
                      && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
 
+
+/// The Rehearsal 3 bootstrap manifest moved to the 1.37.2 selections.
+let private kickoffComponents1372 =
+    kickoffComponents136.Replace("""{"id":"forma","version":"0.13.0"}""", """{"id":"forma","version":"0.14.0"}""")
+
+let private FormaAsset0140 =
+    "https://github.com/kemiller2002/forma/releases/download/v0.14.0/echelon-foundry-design-system-0.14.0.tgz"
+
+/// echelon-current 1.37.2 (linux-x64), byte for byte what the Registry's own
+/// tools resolve for the proposed cut (echelon-registry#111, sha256
+/// 3902cb89...): the approved 1.37.1 with only Forma 0.13.1 -> 0.14.0 (a
+/// minor release, AIS-001, forma#181: application identity, a pre-runtime
+/// start-up screen and pending actions, all additive). Forma is a REG-RU-007
+/// declared component, so the set needs the Conditor release that qualifies
+/// 0.14.0.
+/// OD-INDY-8 approves it only after this Conditor qualification
+/// (DF-CON-2026-A007).
+let private echelonCurrent1372 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.37.2-linux-x64.json")
+
+let runKickoffSet1372 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.37.2 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent1372
+
+        check "the vendored echelon-current 1.37.2 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "3902cb89380f0a63e6987607bb5a69a7309b69e4dfaf2792ef1614d371937d86")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let selected systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+            |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "praxis"; "dokimos"; "percepta-semantic"; "ordo"; "forma"; "arca"; "limen"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.37.2 selects Forma 0.14.0, and keeps Praxis 3.25.0, Dokimos 0.11.1, percepta-semantic 0.4.0, Ordo 1.20.0, Arca 0.7.0, Limen 0.9.1, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "3.25.0"; Some "0.11.1"; Some "0.4.0"; Some "1.20.0"; Some "0.14.0"; Some "0.7.0"; Some "0.9.1"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.37.2 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent1372 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.37.2: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            let publishes version tag assetName sha256 (c: Workstation.ProfileComponent) =
+                c.Version = version
+                && c.Tag = tag
+                && c.Assets
+                   |> Map.tryFind "linux-x64"
+                   |> Option.exists (fun asset -> asset.Name = assetName && asset.Sha256 = sha256)
+
+            check "the workstation keeps Dokimos 0.11.1 from 1.37.2 with the published linux-x64 asset digest"
+                (installed "dokimos"
+                 |> Option.exists (
+                     publishes "0.11.1" "dokimos-v0.11.1" "dokimos-linux-x64.tar.gz"
+                         "31578ce40622823c323cd2d9699aebd08c98503c59122d61b4bc98e6f06dc337"
+                 ))
+
+            check "the workstation keeps Praxis 3.25.0 from 1.37.2 with the published linux-x64 asset digest"
+                (installed "praxis"
+                 |> Option.exists (
+                     publishes "3.25.0" "v3.25.0" "praxis-linux-x64.tar.gz"
+                         "98e2ecaccac3f0502d755569bf2dddef852947b43a7989c570fcfff25f82d0c8"
+                 ))
+
+            check "the workstation keeps percepta-semantic 0.4.0 and Ordo 1.20.0 from 1.37.2"
+                (installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.4.0" && c.Tag = "percepta-semantic-v0.4.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.20.0" && c.Tag = "v1.20.0"))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents1372 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.37.2: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: under 1.37.2, Forma 0.14.0 and Folio 0.4.1 are pinned to their Registry release assets"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset0140
+                     && dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.37.2, Limen 0.9.1 keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.1")
+
+                check "under 1.37.2 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 3
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true
