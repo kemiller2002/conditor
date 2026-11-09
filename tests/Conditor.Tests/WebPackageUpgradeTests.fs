@@ -972,6 +972,71 @@ let private echelonCurrent1380 check =
                     "Forma 1.0.1 upgrade records the Registry versions"
                     (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "1.0.1"; "folio", Some "0.4.1" ]))
 
+/// Indy/Causa projects migrate to Forma 1.x gradually (owner, 2026-11-09):
+/// a project on the 1.37.2 selections that also declares forma-workflow 1.2.0
+/// (the indy-init preset's owner exemption, ODR-COMP-P14) keeps Forma 0.14.0
+/// and forma-workflow 1.2.0 when it is offered the 1.38.0 set. No Registry
+/// set selects forma-workflow, so --current refuses before any change, and
+/// the pair it keeps stays valid in the compatibility graph.
+let private indyProjectStaysOnFormaZero check =
+    let f = registeredStepRepository check ("0.14.0", "0.4.1") "1.0.1" "0.4.1"
+
+    let declared =
+        """{
+  "schemaVersion": 1,
+  "name": "chrona-shaped",
+  "components": [
+    { "id": "forma", "version": "0.14.0", "required": false },
+    { "id": "folio", "version": "0.4.1", "required": false },
+    { "id": "forma-workflow", "version": "1.2.0", "required": false }
+  ],
+  "requirements": [],
+  "execution": { "enabled": false }
+}
+"""
+
+    File.WriteAllText(f.ManifestPath, declared)
+
+    LockFile.write
+        f.Target
+        f.ManifestPath
+        { ProjectName = "chrona-shaped"
+          Operation = Init
+          Components =
+            [ for id, version, package in
+                  [ "forma", "0.14.0", FormaPackage
+                    "folio", "0.4.1", FolioPackage
+                    "forma-workflow", "1.2.0", "@echelon-foundry/forma-workflow" ] ->
+                  { Id = id
+                    Version = version
+                    Distribution = NpmPackage
+                    Package = package
+                    SourceReference = Some $"npm:{package}@{version}" } ]
+          Actions = [] }
+    |> ignore
+
+    let before = [ f.ManifestPath; Path.Combine(f.Target, "package.json"); Path.Combine(f.Target, "package-lock.json") ] |> List.map File.ReadAllBytes
+
+    withPath f.Bin (fun () ->
+        let refusals = refusalsOf f
+
+        check
+            "an Indy-shaped project (Forma 0.14.0, forma-workflow 1.2.0) offered echelon-current 1.38.0 is refused, never moved to Forma 1.x"
+            (refusals |> List.exists (fun refusal -> refusal.Contains "'forma-workflow'"))
+
+        check "refusing the Indy-shaped project runs no package manager" (not (File.Exists f.Log) || File.ReadAllLines f.Log |> Array.isEmpty))
+
+    check
+        "the refused Indy-shaped project's conditor.json, package.json and lockfile are unchanged"
+        ([ f.ManifestPath; Path.Combine(f.Target, "package.json"); Path.Combine(f.Target, "package-lock.json") ]
+         |> List.map File.ReadAllBytes = before)
+
+    match Manifest.load f.ManifestPath with
+    | Error errors -> check $"the Indy-shaped manifest parses: {joined errors}" false
+    | Ok manifest ->
+        check "Forma 0.14.0 with forma-workflow 1.2.0 stays a valid pair for projects that remain on 1.37.2"
+            (Compatibility.validate manifest |> List.isEmpty)
+
 /// The breaking release boundaries, as a pure function of the move.
 let private breakingBoundaries check =
     let crosses id fromVersion toVersion =
@@ -1151,6 +1216,7 @@ let run (check: string -> bool -> unit) =
         echelonCurrent1371 check
         echelonCurrent1372 check
         echelonCurrent1380 check
+        indyProjectStaysOnFormaZero check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"

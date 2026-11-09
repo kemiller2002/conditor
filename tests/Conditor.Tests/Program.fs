@@ -651,7 +651,11 @@ match Presets.resolve "indy-init" with
         // not yet an echelon-current selection; the preset pins it at the one version Conditor qualifies for the
         // channel's Forma. Every other component still follows the channel; the exemption names exactly this
         // component and version. Forma 1.0 (echelon-current 1.38.0) renamed the ef- namespace that
-        // forma-workflow 1.2.0 emits, so the exempt version follows Forma to 2.0.0, the Forma 1.x release.
+        // forma-workflow 1.2.0 emits, so the exempt version follows the preset's Forma major to 2.0.0, the
+        // Forma 1.x release: the same owner exemption carried to the new major (owner, 2026-11-09), not a new
+        // decision. It travels only with the preset's Forma major; existing Indy projects keep their own
+        // conditor.json (Forma 0.14.0 with forma-workflow 1.2.0) and are never moved by this preset
+        // (WebPackageUpgradeTests.indyProjectStaysOnFormaZero).
         let ownerExempt = Map.ofList [ "forma-workflow", "2.0.0" ]
 
         for request in manifest.Components do
