@@ -1620,6 +1620,71 @@ jobs:
           test "$rc" = 2
           jq -e '.Code == "invalid-arguments" and (.Message | startswith("usage: dokimos verification requirements --manifest F"))' <<< "$verification"
           for sub in requirements compile scaffold coverage probe; do grep -F "dokimos verification $sub" <<< "$verification"; done
+  # Indy-init OD-INDY-8: echelon-current 1.37.1 is proposed as the next kickoff
+  # set, approved only after this qualification. Against 1.37.0 its only
+  # change is Forma 0.13.0 -> 0.13.1 (a patch release: the record header's
+  # type label below 24em, forma#179), a web-package binding, so the native
+  # host tools are 1.37.0's. The workstation installs every native host tool
+  # of the set from the real published release bytes and verifies each
+  # receipt.
+  echelon-current-1-37-1-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_1371_PATH: tests/fixtures/registry/echelon-current-1.37.1-linux-x64.json
+      SET_1371_SHA256: 98220b45709ad15edc5be2b820598eb8fc9e498a2cfa9af696f2a83fa5f944fd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.37.1 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_1371_SHA256  $SET_1371_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_1371_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_1371_PATH" --resolved-set-sha256 "$SET_1371_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.25.0"
+          rc=0; autonomy=$("$home/.local/bin/praxis" autonomy 2>&1) || rc=$?
+          grep -F "autonomy policy check --policy FILE" <<< "$autonomy"
+          rc=0; usage=$("$home/.local/bin/praxis" inbox 2>&1) || rc=$?
+          grep -F "inbox admit-plan CLAIM-ID" <<< "$usage"
+          rc=0; gate=$("$home/.local/bin/praxis" requirements preservation verify 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements preservation verify requires --baseline FILE" <<< "$gate"
+          # Praxis 3.25.0 (unchanged from 1.36.0) carries the requirement
+          # catalog compiler.
+          rc=0; manifest=$("$home/.local/bin/praxis" requirements manifest compile 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements manifest compile requires --catalog FILE and --source-commit SHA" <<< "$manifest"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.20.0"
+          "$home/.local/bin/ordo" verification --help | grep -F -- "--reuse-context FILE"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          percepta_commit=$(jq -r '.components[] | select(.systemId == "percepta-semantic") | .commit' "$SET_1371_PATH")
+          "$home/.local/bin/percepta" version | tee "$RUNNER_TEMP/percepta-version.txt"
+          grep -Fx "percepta 0.4.0+$percepta_commit" "$RUNNER_TEMP/percepta-version.txt"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_1371_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.11.1" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
+          rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
+          grep -F -- "--checkpoint incremental|release" <<< "$dokimos_usage"
+          # Dokimos 0.11.1 keeps 0.11.0's manifest-driven requirement
+          # verification: bare `dokimos verification` (exit 2) names
+          # requirements first, then the 0.10.0 subcommands.
+          rc=0; verification=$("$home/.local/bin/dokimos" verification 2>&1) || rc=$?
+          test "$rc" = 2
+          jq -e '.Code == "invalid-arguments" and (.Message | startswith("usage: dokimos verification requirements --manifest F"))' <<< "$verification"
+          for sub in requirements compile scaffold coverage probe; do grep -F "dokimos verification $sub" <<< "$verification"; done
 
   host-tool-upgrade-boundary:
     needs: build-test
