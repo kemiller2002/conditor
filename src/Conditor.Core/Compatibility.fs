@@ -21,9 +21,10 @@ module Compatibility =
               "visual-engineering", "Qualified Registry-package lifecycle release. 1.0.1 is the Registry echelon-current selection and the default; 1.0.0 stays qualified as its upgrade source. 1.0.0 -> 1.0.1 is a planned upgrade --current transition: VE upgrade rewrites its managed .gitignore region to !.visual-engineering/, then verify --strict must pass."
               "communication-engineering", "Pinned immutable-source lifecycle release."
               "limen", "Qualified project-bound WASM/browser package used by the current web scaffold; Conditor does not run a package-manager lifecycle for it. 0.7.0, 0.7.1, 0.9.0 (the default; it adds the routing / URL-state module) and 0.9.1 (echelon-current 1.31.0; it stamps the package version into the browser-kernel build and ships the limen wasm-check command, with no change to the source, the protocol or the routing module) are distributed as @echelon-foundry/limen; 0.6.1 and 0.6.2 stay qualified under their original @echelon-foundry/typescript-wasm-kernel name, and the Indy Init 0.1.0 freeze pins 0.6.2."
-              "forma", "Qualified application binding. 0.10.0 (echelon-current 1.30.0; LCE-001 layout constraint enforcement), 0.11.0 (echelon-current 1.32.0; opt-in typography roles for application, dense and accessible type scales, with the package exports, files, bin and license unchanged from 0.10.0), 0.12.0 (echelon-current 1.33.0; stricter workflow-diagram validation, A11Y-NONTEXT-CONTRAST, and the additive token:status-* workflow colour tokens, with the package exports, files, bin and license unchanged from 0.11.0), 0.13.0 (echelon-current 1.34.0; layout reliability, LRP-001: an unbreakable token now wraps inside Forma containers, and the package ships the F# design-token validator source, tools/TokenValidator, with the package exports, bin and license unchanged from 0.12.0), 0.13.1 (echelon-current 1.37.1; a patch release: below 24em the record header's type label no longer collapses onto the title, forma#179, and marketing components contain long tokens, with the package exports, bin and license unchanged from 0.13.0) and 0.14.0 (echelon-current 1.37.2, which the indy-init preset follows; a minor release, AIS-001, forma#181: application identity, a pre-runtime start-up screen and pending actions, all additive, with the package exports, files, bin and license unchanged from 0.13.1) are exact GitHub release-asset pins; the default stays 0.5.0."
+              "forma", "Qualified application binding. 0.10.0 (echelon-current 1.30.0; LCE-001 layout constraint enforcement), 0.11.0 (echelon-current 1.32.0; opt-in typography roles for application, dense and accessible type scales, with the package exports, files, bin and license unchanged from 0.10.0), 0.12.0 (echelon-current 1.33.0; stricter workflow-diagram validation, A11Y-NONTEXT-CONTRAST, and the additive token:status-* workflow colour tokens, with the package exports, files, bin and license unchanged from 0.11.0), 0.13.0 (echelon-current 1.34.0; layout reliability, LRP-001: an unbreakable token now wraps inside Forma containers, and the package ships the F# design-token validator source, tools/TokenValidator, with the package exports, bin and license unchanged from 0.12.0), 0.13.1 (echelon-current 1.37.1; a patch release: below 24em the record header's type label no longer collapses onto the title, forma#179, and marketing components contain long tokens, with the package exports, bin and license unchanged from 0.13.0), 0.14.0 (echelon-current 1.37.2; a minor release, AIS-001, forma#181: application identity, a pre-runtime start-up screen and pending actions, all additive, with the package exports, files, bin and license unchanged from 0.13.1) and 1.0.1 (echelon-current 1.38.0, which the indy-init preset follows; the major release line of forma#182 with the codemod fixes of forma#183: Forma is brand-neutral, BNR-001 and EDS-ADR-002, and its ef- namespace is renamed forma-, FORMA-NS-001: every .ef-* class, --ef-* property, data-ef-* attribute and <ef-*> tag, data-ef-brand becoming data-forma-brand; dist/brands/echelon.css and the Echelon marketing bundles are removed and the Echelon brand is the echelon-theme component; consumers migrate with the shipped F# codemod tools/NamespaceMigrator, and a current upgrade that crosses 1.0.0 discloses that boundary in its plan and digest) are exact GitHub release-asset pins; 1.0.0 is not qualified (its codemod misses names that 1.0.1 migrates); the default stays 0.5.0."
               "folio", "Qualified application binding. 0.4.1 (echelon-current 1.28.0) adds print styles and the Forma icon-print tools to 0.4.0 and declares no runtime dependencies; 0.4.0 stays qualified as its upgrade source."
-              "forma-workflow", "Qualified application binding. 1.2.0 is the npm registry release @echelon-foundry/forma-workflow@1.2.0 (tarball https://registry.npmjs.org/@echelon-foundry/forma-workflow/-/forma-workflow-1.2.0.tgz, integrity sha512-6xopcnEOFN/3n9ItU6V+YLFdWzekDGlKjDxFdyGe4mJz15ZId3G505zNWY2gv+MwAuixZZRUHVQW13mvSAUERw==, license PolyForm-Noncommercial-1.0.0, published from kemiller2002/forma packages/workflow), the Forma workflow layout engine; it declares no runtime dependencies and the peer dependency @echelon-foundry/design-system >=0.4.0, so a manifest that declares it must declare Forma 0.4.1 or later. It does not depend on Limen."
+              "forma-workflow", "Qualified application binding. 1.2.0 is the npm registry release @echelon-foundry/forma-workflow@1.2.0 (tarball https://registry.npmjs.org/@echelon-foundry/forma-workflow/-/forma-workflow-1.2.0.tgz, integrity sha512-6xopcnEOFN/3n9ItU6V+YLFdWzekDGlKjDxFdyGe4mJz15ZId3G505zNWY2gv+MwAuixZZRUHVQW13mvSAUERw==, license PolyForm-Noncommercial-1.0.0, published from kemiller2002/forma packages/workflow), the Forma workflow layout engine; it declares no runtime dependencies and the peer dependency @echelon-foundry/design-system >=0.4.0, so a manifest that declares it must declare Forma 0.4.1 or later. It does not depend on Limen. 2.0.0 is the npm registry release @echelon-foundry/forma-workflow@2.0.0 (tarball https://registry.npmjs.org/@echelon-foundry/forma-workflow/-/forma-workflow-2.0.0.tgz, integrity sha512-2MFROdc7ox/4/RFCx99M8CM83px+IzNCUBdUzf85gkjbftVeYFlzCYgJz5tPxxtHbB1MrorrUMFzKQX4VvHuZw==, license PolyForm-Noncommercial-1.0.0, published with npm provenance from kemiller2002/forma 97ea2206, Forma 1.0.0), the Forma 1.x workflow engine: its editor classes are forma-workflow-editor* and it declares the peer dependency @echelon-foundry/design-system >=1.0.0. 1.2.0 emits the ef- names Forma 1.0 renamed, so it is refused with Forma 1.0.0 or later."
+              "echelon-theme", "Qualified application binding, optional: an application installs it only by declaring it in conditor.json (Echelon applications do; other Forma consumers need not). 1.0.0 is the exact GitHub release asset https://github.com/kemiller2002/echelon-design-system/releases/download/v1.0.0/echelon-foundry-echelon-theme-1.0.0.tgz (sha256 5d981420cfd4f7a835564a204938eb5db1f1d35350477a755df98daa37ec8394, tag v1.0.0 at 296a0305, verified against the release's checksums.txt; license UNLICENSED), the Echelon brand that EDS-ADR-002 moved out of Forma: dist/echelon.css, dist/echelon-marketing.css, the approved Echelon Foundry marks and an integrity manifest, built against Forma 1.0.0. It requires Forma 1.0.0 or later, loads after Forma's CSS and applies only under data-forma-brand=\"echelon\" on <html>. It never enters .echelon/foundations.json."
               "aegis", "Qualified NuGet application binding."
               "tutela", "Qualified pinned immutable-source lifecycle release." ]
 
@@ -39,21 +40,60 @@ module Compatibility =
                 |> Map.tryFind id
                 |> Option.defaultValue "Qualified by the embedded Conditor component descriptor." })
 
+    /// The versions of a required component that a qualified component
+    /// version works with: at least `Minimum`, and below `Below` when the
+    /// required component's later line breaks it.
+    type private PeerBound =
+        { Requires: string
+          Minimum: string
+          Below: string option
+          Reason: string }
+
     /// Peer constraints a qualified component version places on another
-    /// declared component: (component, version) -> (required component,
-    /// minimum version, reason). Taken from the package's own published
-    /// peerDependencies; checked before any mutation.
-    let private peerMinimums =
+    /// declared component, keyed by (component, version). Taken from the
+    /// package's own published peerDependencies, or from the namespace a
+    /// release line emits; checked before any mutation.
+    let private peerBounds =
         Map.ofList
             [ ("forma-workflow", "1.2.0"),
-              ("forma",
-               "0.4.0",
-               "@echelon-foundry/forma-workflow 1.2.0 declares the peer dependency @echelon-foundry/design-system >=0.4.0.") ]
+              { Requires = "forma"
+                Minimum = "0.4.0"
+                Below = Some "1.0.0"
+                Reason =
+                  "@echelon-foundry/forma-workflow 1.2.0 declares the peer dependency @echelon-foundry/design-system >=0.4.0 and emits the ef- names that Forma 1.0.0 renamed to forma- (FORMA-NS-001); forma-workflow 2.0.0 is the Forma 1.x release." }
+              ("forma-workflow", "2.0.0"),
+              { Requires = "forma"
+                Minimum = "1.0.0"
+                Below = None
+                Reason = "@echelon-foundry/forma-workflow 2.0.0 declares the peer dependency @echelon-foundry/design-system >=1.0.0." }
+              ("echelon-theme", "1.0.0"),
+              { Requires = "forma"
+                Minimum = "1.0.0"
+                Below = None
+                Reason =
+                  "@echelon-foundry/echelon-theme 1.0.0 is built against Forma 1.0.0 and applies only under data-forma-brand and --forma-* (EDS-ADR-002)." } ]
+
+    let private admits (bound: PeerBound) (declared: SemanticVersion) =
+        let atLeast floor =
+            SemanticVersion.tryParse floor |> Option.exists (fun floor -> declared >= floor)
+
+        let below ceiling =
+            SemanticVersion.tryParse ceiling |> Option.exists (fun ceiling -> declared < ceiling)
+
+        atLeast bound.Minimum && (bound.Below |> Option.forall below)
+
+    let private describeBound (bound: PeerBound) =
+        match bound.Below with
+        | None -> $"at version {bound.Minimum} or later"
+        | Some ceiling -> $"at version {bound.Minimum} or later and below {ceiling}"
 
     let requirements =
         [ { Subject = "component:forma-workflow"
             Requires = "forma"
-            Reason = "@echelon-foundry/forma-workflow 1.2.0 declares the peer dependency @echelon-foundry/design-system >=0.4.0, so Forma 0.4.1 or later must be declared with it." }
+            Reason = "@echelon-foundry/forma-workflow 1.2.0 declares the peer dependency @echelon-foundry/design-system >=0.4.0 and emits ef- names, so Forma 0.4.1 or later and below 1.0.0 must be declared with it; forma-workflow 2.0.0 declares >=1.0.0, so Forma 1.0.1 or later must be declared with it." }
+          { Subject = "component:echelon-theme"
+            Requires = "forma"
+            Reason = "@echelon-foundry/echelon-theme 1.0.0 themes Forma 1.x (data-forma-brand, --forma-*), so Forma 1.0.1 or later must be declared with it." }
           { Subject = "scaffold:fsharp-limen-web"
             Requires = "limen"
             Reason = "The scaffold's browser boundary is Limen by definition." }
@@ -100,15 +140,16 @@ module Compatibility =
         declaredVersions
         |> Map.toList
         |> List.choose (fun (id, version) ->
-            peerMinimums
+            peerBounds
             |> Map.tryFind (id, version)
-            |> Option.bind (fun (required, minimum, reason) ->
+            |> Option.bind (fun bound ->
+                let required = bound.Requires
+
                 let satisfied =
                     declaredVersions
                     |> Map.tryFind required
                     |> Option.bind SemanticVersion.tryParse
-                    |> Option.exists (fun declared ->
-                        SemanticVersion.tryParse minimum |> Option.exists (fun floor -> declared >= floor))
+                    |> Option.exists (admits bound)
 
                 if satisfied then
                     None
@@ -120,7 +161,7 @@ module Compatibility =
                         |> Option.defaultValue $"does not declare '{required}'"
 
                     Some
-                        $"Component '{id}' {version} requires component '{required}' at version {minimum} or later, but the manifest {found}. {reason}"))
+                        $"Component '{id}' {version} requires component '{required}' {describeBound bound}, but the manifest {found}. {bound.Reason}"))
         |> List.iter errors.Add
 
         match manifest.Scaffold with

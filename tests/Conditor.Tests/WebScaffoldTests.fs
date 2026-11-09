@@ -1639,6 +1639,107 @@ let runKickoffSet1372 (check: string -> bool -> unit) =
                      dependencies.Count = 3
                      && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier)))
 
+/// The Rehearsal 3 bootstrap manifest moved to the 1.38.0 selections: Forma
+/// 1.0.1 and, as an Echelon application, the Echelon theme 1.0.0.
+let private kickoffComponents1380 =
+    kickoffComponents136.Replace(
+        """{"id":"forma","version":"0.13.0"}""",
+        """{"id":"forma","version":"1.0.1"},{"id":"echelon-theme","version":"1.0.0"}"""
+    )
+
+let private FormaAsset101 =
+    "https://github.com/kemiller2002/forma/releases/download/v1.0.1/echelon-foundry-design-system-1.0.1.tgz"
+
+let private EchelonThemeAsset100 =
+    "https://github.com/kemiller2002/echelon-design-system/releases/download/v1.0.0/echelon-foundry-echelon-theme-1.0.0.tgz"
+
+/// echelon-current 1.38.0 (linux-x64), byte for byte what the Registry's own
+/// tools resolve for the proposed cut (echelon-registry#112, sha256
+/// b92b3be8...): the approved 1.37.2 with Forma 0.14.0 -> 1.0.1 (the 1.0
+/// major break: brand-neutral, ef- -> forma-, EDS-ADR-002, FORMA-NS-001) and
+/// the new optional Echelon theme 1.0.0. Forma and the theme are REG-RU-007
+/// declared components, so the set needs the Conditor release that qualifies
+/// them. OD-INDY-8 approves it only after this Conditor qualification
+/// (DF-CON-2026-A007).
+let private echelonCurrent1380 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.38.0-linux-x64.json")
+
+let runKickoffSet1380 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.38.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent1380
+
+        check "the vendored echelon-current 1.38.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "b92b3be81d45ffb75d04b468e7402ec16c0c5e7da03ca659c3dddf9056750fa2")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let entry systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+
+        let selected systemId =
+            entry systemId |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "praxis"; "dokimos"; "percepta-semantic"; "ordo"; "forma"; "echelon-theme"; "arca"; "limen"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.38.0 selects Forma 1.0.1 and the Echelon theme 1.0.0, and keeps Praxis 3.25.0, Dokimos 0.11.1, percepta-semantic 0.4.0, Ordo 1.20.0, Arca 0.7.0, Limen 0.9.1, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "3.25.0"; Some "0.11.1"; Some "0.4.0"; Some "1.20.0"; Some "1.0.1"; Some "1.0.0"; Some "0.7.0"; Some "0.9.1"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.38.0 selects the Echelon theme as an optional web-package project binding"
+            (entry "echelon-theme"
+             |> Option.exists (fun c ->
+                 c.GetProperty("role").GetString() = "project-binding"
+                 && c.GetProperty("distributionClass").GetString() = "web-package"
+                 && not (c.GetProperty("required").GetBoolean())))
+
+        check "1.38.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent1380 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.38.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation keeps Praxis 3.25.0, Dokimos 0.11.1, percepta-semantic 0.4.0 and Ordo 1.20.0 from 1.38.0"
+                (installed "praxis" |> Option.exists (fun c -> c.Version = "3.25.0" && c.Tag = "v3.25.0")
+                 && installed "dokimos" |> Option.exists (fun c -> c.Version = "0.11.1" && c.Tag = "dokimos-v0.11.1")
+                 && installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.4.0" && c.Tag = "percepta-semantic-v0.4.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.20.0" && c.Tag = "v1.20.0"))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents1380 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.38.0: {joined errors}" false
+            | Ok plan ->
+                let dependencies = dependenciesOf plan
+
+                check "SD-1: under 1.38.0, Forma 1.0.1, the Echelon theme 1.0.0 and Folio 0.4.1 are pinned to their Registry release assets"
+                    (dependencies |> Map.tryFind "@echelon-foundry/design-system" = Some FormaAsset101
+                     && dependencies |> Map.tryFind "@echelon-foundry/echelon-theme" = Some EchelonThemeAsset100
+                     && dependencies |> Map.tryFind "@echelon-foundry/print-components" = Some FolioAsset041)
+
+                check "under 1.38.0, Limen 0.9.1 keeps its exact npm version"
+                    (dependencies |> Map.tryFind "@echelon-foundry/limen" = Some "0.9.1")
+
+                check "under 1.38.0 the kickoff scaffold keeps the SD-1 pins its Registry distributions declare"
+                    (let declared = declaredSpecifiers set
+                     dependencies.Count = 4
+                     && dependencies |> Map.forall (fun package specifier -> declared |> Map.tryFind package = Some specifier))
+
+                check "under 1.38.0 the kickoff page uses Forma 1.x markup branded by the Echelon theme"
+                    (scaffoldFiles plan
+                     |> Map.tryFind "src/kernel/index.html"
+                     |> Option.exists (fun text ->
+                         text.Contains "<html lang=\"en\" data-forma-brand=\"echelon\">"
+                         && text.Contains "<forma-button>"
+                         && text.Contains "@echelon-foundry/echelon-theme/dist/echelon.css"
+                         && not (text.Contains "<ef-button>"))))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true

@@ -96,6 +96,34 @@ repository's digest-verified authority.
 (REG-SIG-001..008) and a Conditor release pins its key, every project binding
 stays under exact qualification.
 
+## Breaking release boundaries
+
+npm can move a pin; it cannot migrate what an application authors against
+the package. A transition from below a known breaking release to that release
+or later therefore **crosses a boundary** (`WebPackageBoundary` in
+`src/Conditor.Core/WebPackageBinding.fs`). The plan prints each crossed
+boundary with the migration it requires, and the digest material gains one
+`crosses|<id>|<release>|<migration>` line per boundary, so authorizing the
+plan authorizes that boundary. A transition inside one release line carries
+no such line, and its digest is unchanged.
+
+| Component | Boundary | Migration |
+|---|---|---|
+| Forma | 1.0.0 | The `ef-` namespace is `forma-` (FORMA-NS-001) and Echelon branding left Forma (BNR-001, EDS-ADR-002). Migrate the application's source with the release's codemod, `tools/NamespaceMigrator` (`--check` reports what remains), and declare `echelon-theme` for an Echelon application. |
+
+Conditor does not run the codemod or judge the migration; it names the
+boundary so that it is never crossed silently.
+
+## Optional components
+
+`echelon-theme` (`@echelon-foundry/echelon-theme`) is optional: the Registry
+selects it with `required: false`, and a repository installs it only by
+declaring it in `conditor.json`. The compatibility graph refuses it without
+Forma 1.0.0 or later. A scaffold that declares it with Forma 1.x sets
+`data-forma-brand="echelon"` on `<html>` and loads its `dist/echelon.css`
+after Forma's `dist/all.css`. It never enters `.echelon/foundations.json`. A
+repository that already consumes it declares it through the opt-in below.
+
 ## Repository observation
 
 Every `package.json` below the repository root (excluding `node_modules`,

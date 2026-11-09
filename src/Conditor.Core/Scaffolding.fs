@@ -1394,8 +1394,47 @@ let ``the Aegis configuration validates at startup`` () =
     let private webLimenConfig =
         "{\n  \"configurationVersion\": 1,\n  \"boundary\": {\n    \"engine\": [\n      \"src/engine\"\n    ],\n    \"kernel\": [\n      \"src/kernel\"\n    ]\n  }\n}\n"
 
-    let private webIndexPage =
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/design-system/dist/all.css\">\n  <title>Application</title>\n</head>\n<body>\n  <main>\n    <ef-button><button type=\"button\">Ready</button></ef-button>\n  </main>\n</body>\n</html>\n"
+    /// The first Forma release of the `forma-` namespace (FORMA-NS-001):
+    /// `<ef-*>` tags and `data-ef-*` attributes are `<forma-*>` and
+    /// `data-forma-*` from here on.
+    [<Literal>]
+    let FormaNamespaceRelease = "1.0.0"
+
+    /// The Echelon brand for Forma 1.x (EDS-ADR-002): an optional component
+    /// an Echelon application declares; its CSS loads after Forma's and
+    /// applies under `data-forma-brand="echelon"`.
+    [<Literal>]
+    let EchelonThemeComponent = "echelon-theme"
+
+    /// How the scaffolded page presents Forma: the element namespace the
+    /// declared Forma release styles, and whether the Echelon theme brands it.
+    type private PagePresentation =
+        { Namespace: string
+          EchelonTheme: bool }
+
+    let private pagePresentation (manifest: ProjectManifest) =
+        let formaNamespaced =
+            resolvedVersion "forma" manifest
+            |> Option.bind SemanticVersion.tryParse
+            |> Option.exists (fun version ->
+                SemanticVersion.tryParse FormaNamespaceRelease |> Option.exists (fun first -> version >= first))
+
+        { Namespace = if formaNamespaced then "forma" else "ef"
+          EchelonTheme = formaNamespaced && (requestedComponent EchelonThemeComponent manifest).IsSome }
+
+    let private webIndexPage (manifest: ProjectManifest) =
+        let presentation = pagePresentation manifest
+
+        let htmlAttributes, themeStylesheet =
+            if presentation.EchelonTheme then
+                " data-forma-brand=\"echelon\"",
+                "  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/echelon-theme/dist/echelon.css\">\n"
+            else
+                String.Empty, String.Empty
+
+        let tag = presentation.Namespace + "-button"
+
+        $"<!doctype html>\n<html lang=\"en\"{htmlAttributes}>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/design-system/dist/all.css\">\n{themeStylesheet}  <title>Application</title>\n</head>\n<body>\n  <main>\n    <{tag}><button type=\"button\">Ready</button></{tag}>\n  </main>\n</body>\n</html>\n"
 
     let private webPrintPage =
         "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/print-components/src/styles/print.css\">\n  <script type=\"module\" src=\"../../node_modules/@echelon-foundry/print-components/src/components/register.js\"></script>\n  <title>Printable document</title>\n</head>\n<body>\n  <ef-print-document><main><h1>Printable document</h1></main></ef-print-document>\n</body>\n</html>\n"
@@ -2043,7 +2082,7 @@ same change.
           "tsconfig.json", webTsconfig
           "limen.config.json", webLimenConfig
           "src/kernel/bootstrap.ts", kernelBootstrap limen
-          "src/kernel/index.html", webIndexPage
+          "src/kernel/index.html", webIndexPage manifest
           "src/kernel/print.html", webPrintPage
           yield! playwrightFiles
           "tests/browser/smoke.spec.js", webSmokeSpec

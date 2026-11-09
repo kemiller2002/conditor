@@ -3,9 +3,13 @@ module FormaWorkflowComponentTests
 // Forma workflow (@echelon-foundry/forma-workflow) is the Forma workflow
 // layout engine, an npm application binding like Forma and Folio. Conditor
 // qualifies exactly 1.2.0 (npm registry tarball, integrity
-// sha512-6xopcnEOFN/3n9ItU6V+YLFdWzekDGlKjDxFdyGe4mJz15ZId3G505zNWY2gv+MwAuixZZRUHVQW13mvSAUERw==).
-// Its published peerDependencies require @echelon-foundry/design-system
-// >=0.4.0, so a manifest that declares it must declare Forma 0.4.1 or later.
+// sha512-6xopcnEOFN/3n9ItU6V+YLFdWzekDGlKjDxFdyGe4mJz15ZId3G505zNWY2gv+MwAuixZZRUHVQW13mvSAUERw==)
+// and 2.0.0 (integrity
+// sha512-2MFROdc7ox/4/RFCx99M8CM83px+IzNCUBdUzf85gkjbftVeYFlzCYgJz5tPxxtHbB1MrorrUMFzKQX4VvHuZw==).
+// 1.2.0's published peerDependencies require @echelon-foundry/design-system
+// >=0.4.0, and it emits the ef- names Forma 1.0.0 renamed, so it needs Forma
+// 0.4.1 or later and below 1.0.0. 2.0.0, the Forma 1.x release, requires
+// >=1.0.0.
 
 open System
 open System.IO
@@ -75,13 +79,15 @@ let run (check: string -> bool -> unit) =
              && definition.LifecycleSource.IsNone
              && definition.HistoricalPackages.IsEmpty)
 
-        check "forma-workflow qualifies exactly 1.2.0, its default" (qualified = Set.ofList [ "1.2.0" ] && definition.DefaultVersion = "1.2.0")
+        check "forma-workflow qualifies exactly 1.2.0, its default, and 2.0.0"
+            (qualified = Set.ofList [ "1.2.0"; "2.0.0" ] && definition.DefaultVersion = "1.2.0")
 
-        check "forma-workflow 1.2.0 is distributed through the npm registry, not a release asset"
+        check "forma-workflow 1.2.0 and 2.0.0 are distributed through the npm registry, not a release asset"
             definition.ReleaseArtifacts.IsEmpty
 
-        check "forma-workflow resolves 1.2.0 to @echelon-foundry/forma-workflow"
-            (ComponentDefinition.packageFor "1.2.0" definition = Package)
+        check "forma-workflow resolves 1.2.0 and 2.0.0 to @echelon-foundry/forma-workflow"
+            (ComponentDefinition.packageFor "1.2.0" definition = Package
+             && ComponentDefinition.packageFor "2.0.0" definition = Package)
     | _ -> check "the embedded forma-workflow descriptor is present" false
 
     check "forma-workflow carries a descriptor digest for the lock"
@@ -89,7 +95,7 @@ let run (check: string -> bool -> unit) =
 
     check "forma-workflow's compatibility versions are descriptor-derived"
         (Compatibility.supported
-         |> List.exists (fun item -> item.Id = "forma-workflow" && item.Versions = Set.ofList [ "1.2.0" ]))
+         |> List.exists (fun item -> item.Id = "forma-workflow" && item.Versions = Set.ofList [ "1.2.0"; "2.0.0" ]))
 
     check "the compatibility graph records forma-workflow's Forma peer requirement"
         (Compatibility.requirements
@@ -123,13 +129,13 @@ let run (check: string -> bool -> unit) =
                  |> Option.exists (fun text -> not (text.Contains "forma-workflow"))))
 
     // --- Unqualified versions refused -----------------------------------------
-    for version in [ "1.1.0"; "1.0.0"; "1.3.0"; "2.0.0"; "0.0.0-stage" ] do
+    for version in [ "1.1.0"; "1.0.0"; "1.3.0"; "2.0.1"; "2.1.0"; "3.0.0"; "0.0.0-stage" ] do
         withTarget (fun target ->
             let components = [ "limen", "0.9.1"; "forma", "0.13.0"; "forma-workflow", version ]
 
             check $"forma-workflow {version} is refused as not qualified, before mutation"
                 (planIn target components true
-                 |> refusedWith $"Component 'forma-workflow' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: 1.2.0.")
+                 |> refusedWith $"Component 'forma-workflow' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: 1.2.0, 2.0.0.")
 
             check $"refusing forma-workflow {version} writes nothing" (Directory.EnumerateFileSystemEntries target |> Seq.isEmpty))
 
@@ -137,7 +143,7 @@ let run (check: string -> bool -> unit) =
     withTarget (fun target ->
         check "forma-workflow without Forma is refused"
             (planIn target [ "limen", "0.9.1"; "forma-workflow", "1.2.0" ] true
-             |> refusedWith "Component 'forma-workflow' 1.2.0 requires component 'forma' at version 0.4.0 or later, but the manifest does not declare 'forma'."))
+             |> refusedWith "Component 'forma-workflow' 1.2.0 requires component 'forma' at version 0.4.0 or later and below 1.0.0, but the manifest does not declare 'forma'."))
 
     for forma in [ "0.2.0"; "0.3.0" ] do
         withTarget (fun target ->
@@ -148,6 +154,42 @@ let run (check: string -> bool -> unit) =
     withTarget (fun target ->
         check "forma-workflow with Forma 0.4.1, the lowest qualified Forma in its peer range, is accepted"
             (planIn target [ "limen", "0.9.1"; "forma", "0.4.1"; "forma-workflow", "1.2.0" ] true |> Result.isOk))
+
+    withTarget (fun target ->
+        check "forma-workflow 1.2.0 with Forma 0.14.0, the last Forma of the ef- namespace, is accepted"
+            (planIn target [ "limen", "0.9.1"; "forma", "0.14.0"; "forma-workflow", "1.2.0" ] true |> Result.isOk))
+
+    // Forma 1.0.0 renamed the ef- names forma-workflow 1.2.0 emits (FORMA-NS-001).
+    withTarget (fun target ->
+        check "forma-workflow 1.2.0 with Forma 1.0.1 is refused before mutation: it emits the ef- names Forma 1.0 renamed"
+            (planIn target [ "limen", "0.9.1"; "forma", "1.0.1"; "forma-workflow", "1.2.0" ] true
+             |> refusedWith "Component 'forma-workflow' 1.2.0 requires component 'forma' at version 0.4.0 or later and below 1.0.0, but the manifest declares 'forma' 1.0.1.")
+
+        check "refusing forma-workflow 1.2.0 with Forma 1.0.1 writes nothing" (Directory.EnumerateFileSystemEntries target |> Seq.isEmpty))
+
+    // forma-workflow 2.0.0 is the Forma 1.x release (peer design-system >=1.0.0).
+    for forma in [ "0.14.0"; "0.4.1" ] do
+        withTarget (fun target ->
+            check $"forma-workflow 2.0.0 with Forma {forma} (below its >=1.0.0 peer range) is refused"
+                (planIn target [ "limen", "0.9.1"; "forma", forma; "forma-workflow", "2.0.0" ] true
+                 |> refusedWith $"Component 'forma-workflow' 2.0.0 requires component 'forma' at version 1.0.0 or later, but the manifest declares 'forma' {forma}."))
+
+    withTarget (fun target ->
+        check "forma-workflow 2.0.0 without Forma is refused"
+            (planIn target [ "limen", "0.9.1"; "forma-workflow", "2.0.0" ] true
+             |> refusedWith "Component 'forma-workflow' 2.0.0 requires component 'forma' at version 1.0.0 or later, but the manifest does not declare 'forma'."))
+
+    withTarget (fun target ->
+        match planIn target [ "limen", "0.9.1"; "forma", "1.0.1"; "folio", "0.4.1"; "forma-workflow", "2.0.0" ] true with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"forma-workflow 2.0.0 with Forma 1.0.1 plans: {details}" false
+        | Ok plan ->
+            check "the scaffold pins @echelon-foundry/forma-workflow to exactly 2.0.0 with Forma 1.0.1"
+                (plan.Components
+                 |> List.exists (fun item -> item.Id = "forma-workflow" && item.SourceReference = Some "npm:@echelon-foundry/forma-workflow@2.0.0")
+                 && scaffoldFile "package.json" plan
+                    |> Option.exists (fun text -> text.Contains("\"@echelon-foundry/forma-workflow\": \"2.0.0\""))))
 
     // --- Binding target -------------------------------------------------------
     withTarget (fun target ->

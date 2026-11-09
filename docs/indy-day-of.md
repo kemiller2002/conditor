@@ -17,12 +17,16 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.37.2, once the Registry owner
-  approves it after Conditor qualifies it (1.37.1 is the approved set until
-  then). Against 1.37.1 it moves only Forma 0.13.1 -> 0.14.0 (a minor
-  release, AIS-001, forma#181: application identity, a pre-runtime start-up
-  screen and pending actions, all additive); Forma is a `conditor.json`
-  component, so the preset moves to 0.14.0 and Conditor 0.10.23 qualifies it. It installs Praxis 3.25.0, which
+  The kickoff set is echelon-current 1.38.0, once the Registry owner
+  approves it after Conditor qualifies it (1.37.2 is the approved set until
+  then). Against 1.37.2 it moves Forma 0.14.0 -> 1.0.1, the major release
+  that makes Forma brand-neutral and renames its `ef-` namespace to `forma-`
+  (EDS-ADR-002, FORMA-NS-001; migrate markup with Forma's
+  `tools/NamespaceMigrator`), and adds the optional Echelon theme 1.0.0
+  (`@echelon-foundry/echelon-theme`, the Echelon brand for Forma 1.x). Forma
+  is a `conditor.json` component, so the preset moves to 1.0.1, declares the
+  theme, moves forma-workflow to 2.0.0 (1.2.0 emits `ef-` names), and
+  Conditor 0.10.24 qualifies it. It installs Praxis 3.25.0, which
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`), records process evidence in the work
   event log (`praxis work evidence`), adds owner-authorized autonomous

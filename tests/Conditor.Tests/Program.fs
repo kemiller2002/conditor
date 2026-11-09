@@ -648,9 +648,11 @@ match Presets.resolve "indy-init" with
         let channel = EchelonCurrent.selections |> Map.ofList
 
         // Owner exemption (Indy Init competition decision ODR-COMP-P14, route A, 2026-11-06): forma-workflow is
-        // not yet an echelon-current selection; the preset pins it at the one version Conditor qualifies. Every
-        // other component still follows the channel; the exemption names exactly this component and version.
-        let ownerExempt = Map.ofList [ "forma-workflow", "1.2.0" ]
+        // not yet an echelon-current selection; the preset pins it at the one version Conditor qualifies for the
+        // channel's Forma. Every other component still follows the channel; the exemption names exactly this
+        // component and version. Forma 1.0 (echelon-current 1.38.0) renamed the ef- namespace that
+        // forma-workflow 1.2.0 emits, so the exempt version follows Forma to 2.0.0, the Forma 1.x release.
+        let ownerExempt = Map.ofList [ "forma-workflow", "2.0.0" ]
 
         for request in manifest.Components do
             check
@@ -664,8 +666,13 @@ match Presets.resolve "indy-init" with
             (ownerExempt |> Map.forall (fun id _ -> not (channel.ContainsKey id)))
 
         check
-            "the Indy preset declares forma-workflow 1.2.0"
-            (manifest.Components |> List.exists (fun c -> c.Id = "forma-workflow" && c.Version = Some "1.2.0"))
+            "the Indy preset declares forma-workflow 2.0.0, the Forma 1.x workflow engine"
+            (manifest.Components |> List.exists (fun c -> c.Id = "forma-workflow" && c.Version = Some "2.0.0"))
+
+        check
+            "the Indy preset, an Echelon application, declares the Echelon theme 1.0.0 with Forma 1.0.1"
+            (manifest.Components |> List.exists (fun c -> c.Id = "echelon-theme" && c.Version = Some "1.0.0")
+             && manifest.Components |> List.exists (fun c -> c.Id = "forma" && c.Version = Some "1.0.1"))
 
         check
             "the Indy preset validates against the Conditor compatibility graph"
@@ -1113,10 +1120,11 @@ match ComponentDescriptors.loadAll () with
               "forma"
               "folio"
               "forma-workflow"
+              "echelon-theme"
               "aegis"
               "tutela" ]
 
-    check "embedded component descriptor count" (descriptors.Length = 11)
+    check "embedded component descriptor count" (descriptors.Length = 12)
     check "embedded component descriptor ids" (ids = expected)
     check "registry is projected from component descriptors" (Registry.all.Length = descriptors.Length)
 
@@ -1222,6 +1230,7 @@ PinConsistencyTests.run check
 RegistryAuthorityBindingTests.run check
 LimenPackageIdentityTests.run check
 FormaWorkflowComponentTests.run check
+EchelonThemeComponentTests.run check
 ComponentSchemaTests.run check
 ComponentSchemaTests.runStalenessPolicy check
 DriftTests.run check ComponentSchemaTests.validateDriftReport
@@ -1243,6 +1252,7 @@ WebScaffoldTests.runKickoffSet136 check
 WebScaffoldTests.runKickoffSet137 check
 WebScaffoldTests.runKickoffSet1371 check
 WebScaffoldTests.runKickoffSet1372 check
+WebScaffoldTests.runKickoffSet1380 check
 WebScaffoldTests.runTestEnvironmentOptIn check ComponentSchemaTests.validateTestEnvironmentContract
 TestEnvironmentTests.run check ComponentSchemaTests.validateTestEnvironmentContract ComponentSchemaTests.validateTestEnvironmentReport
 RehearsalTests.run check ComponentSchemaTests.validateRehearsalReceipt

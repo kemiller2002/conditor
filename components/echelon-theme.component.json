@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "echelon-theme",
+  "displayName": "Echelon Theme",
+  "distribution": "npm",
+  "package": "@echelon-foundry/echelon-theme",
+  "defaultVersion": "1.0.0",
+  "qualifiedVersions": [
+    "1.0.0"
+  ],
+  "qualifiedRange": ">=1.0.0 <2.0.0",
+  "releaseArtifacts": [
+    {
+      "version": "1.0.0",
+      "url": "https://github.com/kemiller2002/echelon-design-system/releases/download/v1.0.0/echelon-foundry-echelon-theme-1.0.0.tgz"
+    }
+  ],
+  "applicationBinding": "npm",
+  "initArguments": [],
+  "verifyArguments": [],
+  "doctorArguments": [],
+  "upgradeArguments": []
+}

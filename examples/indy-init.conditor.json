@@ -25,7 +25,11 @@
     },
     {
       "id": "forma",
-      "version": "0.14.0"
+      "version": "1.0.1"
+    },
+    {
+      "id": "echelon-theme",
+      "version": "1.0.0"
     },
     {
       "id": "folio",
@@ -33,7 +37,7 @@
     },
     {
       "id": "forma-workflow",
-      "version": "1.2.0"
+      "version": "2.0.0"
     }
   ],
   "requirements": [
