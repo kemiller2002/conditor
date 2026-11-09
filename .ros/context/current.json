@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-06T22:00:21.000Z",
+  "updatedAt": "2026-11-09T01:36:37.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3359,6 +3359,47 @@
       },
       "completedAt": "2026-11-06T22:00:21.000Z",
       "conclusion": "forma-workflow 1.2.0 is a built-in npm application binding; conditor components lists it; the lock includes it when conditor.json declares it."
+    },
+    {
+      "id": "WI-0071",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/forma.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebPackageUpgradeTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-09T01:36:37.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261109T013332369Z-14a681c1"
+      ],
+      "latestCheckpoint": {
+        "id": "ccb7ae99b5ef0f03747e4118",
+        "recordedAt": "2026-11-09T01:36:35.000Z",
+        "executionId": "EXE-20261109T013332369Z-14a681c1",
+        "repository": "conditor",
+        "branch": "claude/qualify-echelon-current-1.37.1",
+        "commit": "683ab333f538be5ff686ea2ea7b244559c1da4ea",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/qualify-echelon-current-1.37.1",
+        "remoteCommit": "683ab333f538be5ff686ea2ea7b244559c1da4ea",
+        "summary": "Qualified echelon-current 1.37.1 (Forma 0.13.1); release 0.10.22 requested",
+        "nextAction": "Merge after CI; verify the v0.10.22 release; then the registry PR #110 gate",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-09T01:36:37.000Z"
     }
   ]
 }

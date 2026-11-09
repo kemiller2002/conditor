@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 71,
+  "nextSeq": 72,
   "items": [
     {
       "id": "WI-0001",
@@ -1634,6 +1634,27 @@
       "attachments": [],
       "createdAt": "2026-11-06T21:52:29.717Z",
       "updatedAt": "2026-11-06T22:00:21.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0071",
+      "title": "Qualify echelon-current 1.37.1 (Forma 0.13.1) and release Conditor 0.10.22",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-09T01:33:26.920Z",
+      "updatedAt": "2026-11-09T01:36:37.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
