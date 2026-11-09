@@ -78,3 +78,4 @@
 | WI-0069 | Qualify echelon-current 1.37.0 kickoff set: Dokimos 0.11.0 -> 0.11.1 (no Conditor descriptor, no release) | complete | release,qualification | high |
 | WI-0070 | Add forma-workflow (@echelon-foundry/forma-workflow 1.2.0) as a built-in npm application-binding component | complete |  | high |
 | WI-0071 | Qualify echelon-current 1.37.1 (Forma 0.13.1) and release Conditor 0.10.22 | complete |  | medium |
+| WI-0072 | Qualify echelon-current 1.37.2 (Forma 0.14.0) and release Conditor 0.10.23 | complete |  | medium |
