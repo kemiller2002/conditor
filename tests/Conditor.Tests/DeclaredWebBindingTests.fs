@@ -967,6 +967,10 @@ let private attested check =
     // the next major line, 2.x, is outside it and needs a Conditor build.
     refusedWith "an attested release outside the qualified range" trusted "2.0.0" (Some("registry-test-1", sign key "2.0.0" contract, contract)) "outside its qualified range"
 
+    // Forma 1.0.0 is inside the range but denied: its codemod misses names
+    // that 1.0.1 migrates (forma#183), so even a valid attestation is refused.
+    refusedWith "an attested but denied release (Forma 1.0.0)" trusted "1.0.0" (Some("registry-test-1", sign key "1.0.0" contract, contract)) "version 1.0.0 is denied by this Conditor build"
+
     // Sources are gated exactly like targets (CON-346). Forma 0.4.0 is in the
     // qualified range but never exactly qualified: it is an acceptable source
     // only when the repository's recorded authority selects it with a trusted
