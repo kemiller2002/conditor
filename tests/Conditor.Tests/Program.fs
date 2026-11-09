@@ -655,7 +655,7 @@ match Presets.resolve "indy-init" with
         // Forma 1.x release: the same owner exemption carried to the new major (owner, 2026-11-09), not a new
         // decision. It travels only with the preset's Forma major; existing Indy projects keep their own
         // conditor.json (Forma 0.14.0 with forma-workflow 1.2.0) and are never moved by this preset
-        // (WebPackageUpgradeTests.indyProjectStaysOnFormaZero).
+        // (WebPackageUpgradeTests.formaWorkflowProjectIsRefusedByCurrent).
         let ownerExempt = Map.ofList [ "forma-workflow", "2.0.0" ]
 
         for request in manifest.Components do

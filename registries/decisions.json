@@ -315,5 +315,52 @@
     "title": "The Percepta semantic CLI is pinned by the Registry authority and installed by the workstation, not declared as a conditor.json component",
     "updated": "2026-10-25",
     "version": "1.0.0"
+  },
+  {
+    "confidence": "high",
+    "created": "2026-11-09",
+    "decision_type": "architecture",
+    "id": "DF-CON-2026-A008",
+    "owners": [
+      "conditor"
+    ],
+    "path": "research/decisions/DF-CON-2026-A008--forma-1-line-echelon-theme-and-gradual-migration.md",
+    "provenance": {
+      "contributions": {
+        "EXE-20261109T203232178Z-feb464a9": {
+          "actor": {
+            "id": "anthropic/claude-code",
+            "kind": "agent",
+            "model": "unknown",
+            "provider": "anthropic",
+            "runtime": "claude-code"
+          },
+          "at": "2026-11-09T21:12:03.000Z",
+          "operations": [
+            "created"
+          ],
+          "reason": "Record the Forma 1.x qualification, the Echelon theme as an optional component, the Forma 1.0 boundary disclosure and the gradual-migration constraint (EDS-ADR-002)"
+        }
+      }
+    },
+    "related_documents": [
+      ".praxis/inbox/documents/2026-11-09-EDS-ADR-002-forma-1-echelon-theme-qualification.md",
+      "research/decisions/DF-CON-2026-A004--project-binding-qualification-and-declared-web-bindings.md",
+      "docs/web-package-upgrade-contract.md",
+      "docs/indy-day-of.md"
+    ],
+    "research_area": "web-package-bindings",
+    "status": "accepted",
+    "tags": [
+      "decision",
+      "forma",
+      "echelon-theme",
+      "forma-workflow",
+      "indy-init",
+      "eds-adr-002"
+    ],
+    "title": "Conditor qualifies the Forma 1.x line and the optional Echelon theme, discloses the Forma 1.0 boundary, and leaves existing projects to migrate gradually",
+    "updated": "2026-11-09",
+    "version": "1.0.0"
   }
 ]

@@ -253,3 +253,95 @@ let run (check: string -> bool -> unit) =
             check "the re-established lock matches the manifest and every resolved identity"
                 (LockFile.verifyManifest target manifestPath |> Result.isOk
                  && LockFile.verifyResolvedComponents target plan.Components |> Result.isOk))
+
+    // --- A lock written by an earlier Conditor (0.10.21-0.10.23) ---------------
+    // The lock records each descriptor's digest. This build edits the forma and
+    // forma-workflow descriptors (Forma 1.0.1, forma-workflow 2.0.0), so a lock
+    // an earlier Conditor wrote for an unchanged Indy project no longer matches
+    // and Conditor refuses to substitute silently. Running `conditor init`
+    // once re-locks it: same versions, packages and sources, current digests
+    // (docs/indy-day-of.md).
+    withTarget (fun target ->
+        writePackageJson target [ "@echelon-foundry/design-system", "0.14.0"; Package, "1.2.0" ]
+        let manifestPath = Path.Combine(target, "conditor.json")
+        let lockPath = Path.Combine(target, ".conditor", "lock.json")
+        File.WriteAllText(manifestPath, manifestText [ "forma", "0.14.0"; "forma-workflow", "1.2.0" ] false)
+
+        // The descriptor digests Conditor 0.10.23 (b58fff0) embeds and locks.
+        let previousDigests =
+            Map.ofList
+                [ "forma", "5ecc08f7f5aa812ddaee857d1d0053cb5adc624152f6166da62019022bd56242"
+                  "forma-workflow", "77f1fafc24d0b5708a48a0e8ad87111f2847e6f2e0e50375292dc46ac6519a77" ]
+
+        let lockedIdentities () =
+            use document = JsonDocument.Parse(File.ReadAllText lockPath)
+
+            document.RootElement.GetProperty("components").EnumerateArray()
+            |> Seq.map (fun item ->
+                item.GetProperty("id").GetString(),
+                (item.GetProperty("version").GetString(), item.GetProperty("package").GetString(), item.GetProperty("sourceReference").GetString()))
+            |> Map.ofSeq
+
+        let lockedDigest id =
+            use document = JsonDocument.Parse(File.ReadAllText lockPath)
+
+            document.RootElement.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun item -> item.GetProperty("id").GetString() = id)
+            |> Option.map (fun item -> item.GetProperty("descriptorSha256").GetString())
+
+        let initialize () =
+            Manifest.load manifestPath
+            |> Result.bind (Planner.create target Init)
+            |> Result.map (fun plan ->
+                LockFile.write target manifestPath plan |> ignore
+                plan)
+
+        match initialize () with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"an Indy-shaped project (Forma 0.14.0, forma-workflow 1.2.0) initializes: {details}" false
+        | Ok plan ->
+            check "this build's forma and forma-workflow descriptors differ from Conditor 0.10.23's"
+                (previousDigests |> Map.forall (fun id previous -> Registry.descriptorSha256 id <> Some previous))
+
+            let identities = lockedIdentities ()
+
+            // Rewrite only the descriptor digests to 0.10.23's: the lock that
+            // release wrote for the same project.
+            let text = File.ReadAllText lockPath
+
+            let previousLock =
+                previousDigests
+                |> Map.fold
+                    (fun (lock: string) id previous ->
+                        match Registry.descriptorSha256 id with
+                        | Some current -> lock.Replace(current, previous)
+                        | None -> lock)
+                    text
+
+            File.WriteAllText(lockPath, previousLock)
+
+            check "a lock from Conditor 0.10.23 is refused after the descriptors change, without substituting anything"
+                (match LockFile.verifyResolvedComponents target plan.Components with
+                 | Error errors ->
+                     errors |> List.exists (fun error -> error.Contains "Resolved identity for component 'forma-workflow' differs from the Conditor lock")
+                     && errors |> List.exists (fun error -> error.Contains "Resolved identity for component 'forma' differs from the Conditor lock")
+                 | Ok() -> false)
+
+            match initialize () with
+            | Error errors ->
+                let details = String.concat "; " errors
+                check $"re-running init on the unchanged manifest re-locks: {details}" false
+            | Ok replanned ->
+                check "re-running init re-locks with every version, package and source unchanged"
+                    (lockedIdentities () = identities
+                     && lockedIdentities () |> Map.find "forma" = ("0.14.0", "@echelon-foundry/design-system", "npm:@echelon-foundry/design-system@0.14.0")
+                     && lockedIdentities () |> Map.find "forma-workflow" = ("1.2.0", Package, "npm:@echelon-foundry/forma-workflow@1.2.0"))
+
+                check "the re-lock records this build's descriptor digests"
+                    (lockedDigest "forma" = Registry.descriptorSha256 "forma"
+                     && lockedDigest "forma-workflow" = Registry.descriptorSha256 "forma-workflow")
+
+                check "after the re-lock every resolved identity and the manifest verify"
+                    (LockFile.verifyResolvedComponents target replanned.Components |> Result.isOk
+                     && LockFile.verifyManifest target manifestPath |> Result.isOk))

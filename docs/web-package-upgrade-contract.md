@@ -60,8 +60,13 @@ descriptor lists it in `qualifiedVersions`. This is the only rule for
 lifecycle tools.
 
 A project binding's descriptor may also declare `qualifiedRange` (Forma
-`>=0.2.0 <1.0.0`, Folio `>=0.3.0 <1.0.0`, Limen `>=0.6.1 <1.0.0`) and
-`deniedVersions`.
+`>=0.2.0 <2.0.0`, the 0.x line and the 1.x line this build adds; Folio
+`>=0.3.0 <1.0.0`, Limen `>=0.6.1 <1.0.0`; forma-workflow `>=1.2.0 <3.0.0`;
+the Echelon theme `>=1.0.0 <2.0.0`) and `deniedVersions`. A transition
+inside the range that crosses a breaking release still discloses it (see
+"Breaking release boundaries"), and the compatibility graph's peer rules are
+keyed by release line, so an attested version carries its line's peer
+requirement.
 
 A **target** release outside `qualifiedVersions` is qualified **by
 attestation** only when every one of these holds:

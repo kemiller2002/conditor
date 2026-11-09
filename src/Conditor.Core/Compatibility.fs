@@ -44,34 +44,52 @@ module Compatibility =
     /// version works with: at least `Minimum`, and below `Below` when the
     /// required component's later line breaks it.
     type private PeerBound =
-        { Requires: string
+        { /// The component whose release line places the constraint.
+          Component: string
+          /// That release line, as a version range: the constraint holds for
+          /// every version in it, including one Conditor later accepts under
+          /// a verified Registry attestation (CON-341), not only the versions
+          /// qualified today.
+          Line: string
+          Requires: string
           Minimum: string
           Below: string option
           Reason: string }
 
-    /// Peer constraints a qualified component version places on another
-    /// declared component, keyed by (component, version). Taken from the
-    /// package's own published peerDependencies, or from the namespace a
-    /// release line emits; checked before any mutation.
+    /// Peer constraints a component's release line places on another
+    /// declared component. Taken from the package's own published
+    /// peerDependencies, or from the namespace a release line emits; checked
+    /// before any mutation.
     let private peerBounds =
-        Map.ofList
-            [ ("forma-workflow", "1.2.0"),
-              { Requires = "forma"
-                Minimum = "0.4.0"
-                Below = Some "1.0.0"
-                Reason =
-                  "@echelon-foundry/forma-workflow 1.2.0 declares the peer dependency @echelon-foundry/design-system >=0.4.0 and emits the ef- names that Forma 1.0.0 renamed to forma- (FORMA-NS-001); forma-workflow 2.0.0 is the Forma 1.x release." }
-              ("forma-workflow", "2.0.0"),
-              { Requires = "forma"
-                Minimum = "1.0.0"
-                Below = None
-                Reason = "@echelon-foundry/forma-workflow 2.0.0 declares the peer dependency @echelon-foundry/design-system >=1.0.0." }
-              ("echelon-theme", "1.0.0"),
-              { Requires = "forma"
-                Minimum = "1.0.0"
-                Below = None
-                Reason =
-                  "@echelon-foundry/echelon-theme 1.0.0 is built against Forma 1.0.0 and applies only under data-forma-brand and --forma-* (EDS-ADR-002)." } ]
+        [ { Component = "forma-workflow"
+            Line = ">=1.0.0 <2.0.0"
+            Requires = "forma"
+            Minimum = "0.4.0"
+            Below = Some "1.0.0"
+            Reason =
+              "@echelon-foundry/forma-workflow 1.x (1.2.0) declares the peer dependency @echelon-foundry/design-system >=0.4.0 and emits the ef- names that Forma 1.0.0 renamed to forma- (FORMA-NS-001); forma-workflow 2.x is the Forma 1.x line." }
+          { Component = "forma-workflow"
+            Line = ">=2.0.0 <3.0.0"
+            Requires = "forma"
+            Minimum = "1.0.0"
+            Below = None
+            Reason = "@echelon-foundry/forma-workflow 2.x (2.0.0) declares the peer dependency @echelon-foundry/design-system >=1.0.0." }
+          { Component = "echelon-theme"
+            Line = ">=1.0.0 <2.0.0"
+            Requires = "forma"
+            Minimum = "1.0.0"
+            Below = None
+            Reason =
+              "@echelon-foundry/echelon-theme 1.x (1.0.0) is built against Forma 1.0.0 and applies only under data-forma-brand and --forma-* (EDS-ADR-002)." } ]
+
+    /// The peer constraint the release line of `version` places, if any.
+    let private peerBoundFor (id: string) (version: string) =
+        SemanticVersion.tryParse version
+        |> Option.bind (fun parsed ->
+            peerBounds
+            |> List.tryFind (fun bound ->
+                bound.Component = id
+                && VersionRange.tryParse bound.Line |> Option.exists (fun line -> VersionRange.contains line parsed)))
 
     let private admits (bound: PeerBound) (declared: SemanticVersion) =
         let atLeast floor =
@@ -140,8 +158,7 @@ module Compatibility =
         declaredVersions
         |> Map.toList
         |> List.choose (fun (id, version) ->
-            peerBounds
-            |> Map.tryFind (id, version)
+            peerBoundFor id version
             |> Option.bind (fun bound ->
                 let required = bound.Requires
 

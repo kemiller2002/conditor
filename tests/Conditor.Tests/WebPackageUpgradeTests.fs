@@ -972,13 +972,16 @@ let private echelonCurrent1380 check =
                     "Forma 1.0.1 upgrade records the Registry versions"
                     (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "1.0.1"; "folio", Some "0.4.1" ]))
 
-/// Indy/Causa projects migrate to Forma 1.x gradually (owner, 2026-11-09):
-/// a project on the 1.37.2 selections that also declares forma-workflow 1.2.0
-/// (the indy-init preset's owner exemption, ODR-COMP-P14) keeps Forma 0.14.0
-/// and forma-workflow 1.2.0 when it is offered the 1.38.0 set. No Registry
-/// set selects forma-workflow, so --current refuses before any change, and
-/// the pair it keeps stays valid in the compatibility graph.
-let private indyProjectStaysOnFormaZero check =
+/// Indy/Causa projects migrate to Forma 1.x gradually (owner, 2026-11-09).
+/// What this proves is narrow: a project that declares forma-workflow (as the
+/// indy-init preset's Indy projects do, ODR-COMP-P14) is refused by --current
+/// before any change when offered the 1.38.0 set, because no Registry set
+/// selects forma-workflow; that refusal holds under every set, not only
+/// 1.38.0. A project without forma-workflow can move to Forma 1.x, but only
+/// to a set passed explicitly with its digest, and the plan then discloses
+/// the Forma 1.0.0 boundary (echelonCurrent1380). The pair such a project
+/// keeps, Forma 0.14.0 with forma-workflow 1.2.0, stays valid.
+let private formaWorkflowProjectIsRefusedByCurrent check =
     let f = registeredStepRepository check ("0.14.0", "0.4.1") "1.0.1" "0.4.1"
 
     let declared =
@@ -1216,7 +1219,7 @@ let run (check: string -> bool -> unit) =
         echelonCurrent1371 check
         echelonCurrent1372 check
         echelonCurrent1380 check
-        indyProjectStaysOnFormaZero check
+        formaWorkflowProjectIsRefusedByCurrent check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"

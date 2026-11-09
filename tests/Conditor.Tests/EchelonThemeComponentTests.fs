@@ -106,6 +106,38 @@ let run (check: string -> bool -> unit) =
 
             check $"refusing the Echelon theme with Forma {forma} writes nothing" (Directory.EnumerateFileSystemEntries target |> Seq.isEmpty))
 
+    // --- Peer rules follow the release line, not one version -------------------
+    // A later release of the line that a verified Registry attestation
+    // qualifies (CON-341) carries its line's Forma requirement too.
+    let attestedErrors (attested: (string * string) list) (components: (string * string) list) =
+        match manifestText components |> Manifest.parseText with
+        | Error errors -> errors
+        | Ok manifest -> Compatibility.validateWithAttested Set.empty (Set.ofList attested) manifest
+
+    check "an attested Echelon theme 1.0.1 with Forma 0.14.0 still requires Forma 1.0.0 or later"
+        (attestedErrors [ "echelon-theme", "1.0.1" ] [ "limen", "0.9.1"; "forma", "0.14.0"; "echelon-theme", "1.0.1" ]
+         |> List.exists (fun error ->
+             error.Contains "Component 'echelon-theme' 1.0.1 requires component 'forma' at version 1.0.0 or later, but the manifest declares 'forma' 0.14.0."))
+
+    check "an attested Echelon theme 1.0.1 with Forma 1.0.1 is accepted"
+        (attestedErrors [ "echelon-theme", "1.0.1" ] (formaOne @ [ "echelon-theme", "1.0.1" ]) |> List.isEmpty)
+
+    check "an attested forma-workflow 2.1.0 with Forma 0.14.0 still requires Forma 1.0.0 or later"
+        (attestedErrors [ "forma-workflow", "2.1.0" ] [ "limen", "0.9.1"; "forma", "0.14.0"; "forma-workflow", "2.1.0" ]
+         |> List.exists (fun error -> error.Contains "Component 'forma-workflow' 2.1.0 requires component 'forma' at version 1.0.0 or later"))
+
+    check "an attested forma-workflow 1.3.0 (the ef- line) with Forma 1.0.1 is refused"
+        (attestedErrors [ "forma-workflow", "1.3.0" ] (formaOne @ [ "forma-workflow", "1.3.0" ])
+         |> List.exists (fun error ->
+             error.Contains "Component 'forma-workflow' 1.3.0 requires component 'forma' at version 0.4.0 or later and below 1.0.0, but the manifest declares 'forma' 1.0.1."))
+
+    check "the descriptors' qualified ranges cover the versions they qualify (Forma 1.0.1, forma-workflow 2.0.0, the theme 1.0.0)"
+        ([ "forma", "1.0.1"; "forma-workflow", "2.0.0"; "echelon-theme", "1.0.0" ]
+         |> List.forall (fun (id, version) ->
+             match Registry.attestedQualification id, SemanticVersion.tryParse version with
+             | Some(range, _), Some parsed -> VersionRange.tryParse range |> Option.exists (fun line -> VersionRange.contains line parsed)
+             | _ -> false))
+
     for version in [ "0.9.0"; "1.0.1"; "2.0.0" ] do
         withTarget (fun target ->
             check $"echelon-theme {version} is refused as not qualified"

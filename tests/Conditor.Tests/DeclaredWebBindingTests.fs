@@ -929,7 +929,7 @@ let private attested check =
         check
             "the plan discloses the attested qualification, its range and key (CON-344)"
             (plan.WebPackageTransitions
-             |> List.exists (fun transition -> transition.Qualification = "attested:>=0.2.0 <1.0.0:registry-test-1"))
+             |> List.exists (fun transition -> transition.Qualification = "attested:>=0.2.0 <2.0.0:registry-test-1"))
 
         npmProduces repo "0.7.0"
 
@@ -963,7 +963,9 @@ let private attested check =
         (Some("registry-test-1", sign key "0.7.0" [ "echelon.other/v1" ], [ "echelon.other/v1" ]))
         "does not claim"
 
-    refusedWith "an attested release outside the qualified range" trusted "1.0.0" (Some("registry-test-1", sign key "1.0.0" contract, contract)) "outside its qualified range"
+    // Forma's qualified range spans the 0.x and 1.x lines (>=0.2.0 <2.0.0);
+    // the next major line, 2.x, is outside it and needs a Conditor build.
+    refusedWith "an attested release outside the qualified range" trusted "2.0.0" (Some("registry-test-1", sign key "2.0.0" contract, contract)) "outside its qualified range"
 
     // Sources are gated exactly like targets (CON-346). Forma 0.4.0 is in the
     // qualified range but never exactly qualified: it is an acceptable source
