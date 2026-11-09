@@ -60,8 +60,13 @@ descriptor lists it in `qualifiedVersions`. This is the only rule for
 lifecycle tools.
 
 A project binding's descriptor may also declare `qualifiedRange` (Forma
-`>=0.2.0 <1.0.0`, Folio `>=0.3.0 <1.0.0`, Limen `>=0.6.1 <1.0.0`) and
-`deniedVersions`.
+`>=0.2.0 <2.0.0`, the 0.x line and the 1.x line this build adds; Folio
+`>=0.3.0 <1.0.0`, Limen `>=0.6.1 <1.0.0`; forma-workflow `>=1.2.0 <3.0.0`;
+the Echelon theme `>=1.0.0 <2.0.0`) and `deniedVersions`. A transition
+inside the range that crosses a breaking release still discloses it (see
+"Breaking release boundaries"), and the compatibility graph's peer rules are
+keyed by release line, so an attested version carries its line's peer
+requirement.
 
 A **target** release outside `qualifiedVersions` is qualified **by
 attestation** only when every one of these holds:
@@ -95,6 +100,34 @@ repository's digest-verified authority.
 **This build pins no key.** Until the Registry signs release attestations
 (REG-SIG-001..008) and a Conditor release pins its key, every project binding
 stays under exact qualification.
+
+## Breaking release boundaries
+
+npm can move a pin; it cannot migrate what an application authors against
+the package. A transition from below a known breaking release to that release
+or later therefore **crosses a boundary** (`WebPackageBoundary` in
+`src/Conditor.Core/WebPackageBinding.fs`). The plan prints each crossed
+boundary with the migration it requires, and the digest material gains one
+`crosses|<id>|<release>|<migration>` line per boundary, so authorizing the
+plan authorizes that boundary. A transition inside one release line carries
+no such line, and its digest is unchanged.
+
+| Component | Boundary | Migration |
+|---|---|---|
+| Forma | 1.0.0 | The `ef-` namespace is `forma-` (FORMA-NS-001) and Echelon branding left Forma (BNR-001, EDS-ADR-002). Migrate the application's source with the release's codemod, `tools/NamespaceMigrator` (`--check` reports what remains), and declare `echelon-theme` for an Echelon application. |
+
+Conditor does not run the codemod or judge the migration; it names the
+boundary so that it is never crossed silently.
+
+## Optional components
+
+`echelon-theme` (`@echelon-foundry/echelon-theme`) is optional: the Registry
+selects it with `required: false`, and a repository installs it only by
+declaring it in `conditor.json`. The compatibility graph refuses it without
+Forma 1.0.0 or later. A scaffold that declares it with Forma 1.x sets
+`data-forma-brand="echelon"` on `<html>` and loads its `dist/echelon.css`
+after Forma's `dist/all.css`. It never enters `.echelon/foundations.json`. A
+repository that already consumes it declares it through the opt-in below.
 
 ## Repository observation
 

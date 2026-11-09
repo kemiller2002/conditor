@@ -43,6 +43,16 @@ type FoundationsEdit =
       FromVersion: string
       ToVersion: string }
 
+/// A release at which a web package breaks what applications author
+/// against it. A transition from below `Release` to it or later crosses the
+/// boundary: npm moves the pin, but only the application can migrate its own
+/// source, so the plan names the migration and binds it into the digest
+/// rather than moving the pin silently.
+type WebPackageBoundary =
+    { Id: string
+      Release: string
+      Migration: string }
+
 type WebPackageTransition =
     { Id: string
       FromVersion: string
@@ -58,7 +68,11 @@ type WebPackageTransition =
       /// How the target release is qualified (CON-344): `exact` (this build's
       /// qualifiedVersions) or `attested:<range>:<keyId>` (a verified Registry
       /// release attestation inside the descriptor's qualifiedRange).
-      Qualification: string }
+      Qualification: string
+      /// The breaking release boundaries this transition crosses, each with
+      /// what the application must migrate (see WebPackageBoundary). Empty
+      /// for a transition inside one release line.
+      Boundaries: WebPackageBoundary list }
 
 module DependencySection =
     let all = [ Dependencies; DevDependencies; OptionalDependencies; PeerDependencies ]
@@ -125,10 +139,37 @@ module WebPackageTransition =
         let qualification =
             if transition.Qualification = "exact" then [] else [ $"  qualification|{transition.Qualification}" ]
 
+        // Only a transition that crosses a breaking boundary carries these
+        // lines, so every other plan's digest is unchanged.
+        let boundaries =
+            transition.Boundaries
+            |> List.map (fun boundary -> $"  crosses|{boundary.Id}|{boundary.Release}|{boundary.Migration}")
+
         transition.Bindings
         |> List.map (fun binding ->
             $"  {binding.PackageJsonPath}|{DependencySection.jsonName binding.Section}|{binding.Package}|{binding.Specifier}|sha256:{binding.PackageJsonSha256}|{binding.LockPath}|sha256:{binding.LockSha256}")
-        |> fun lines -> String.concat "\n" (header :: lines @ foundations @ optIn @ qualification)
+        |> fun lines -> String.concat "\n" (header :: lines @ foundations @ optIn @ qualification @ boundaries)
+
+module WebPackageBoundary =
+    /// Every breaking boundary Conditor knows of, by component.
+    let all: WebPackageBoundary list =
+        [ { Id = "forma"
+            Release = "1.0.0"
+            Migration =
+              "Forma 1.0.0 renames its ef- namespace to forma- (FORMA-NS-001: every .ef-* class, --ef-* property, data-ef-* attribute and <ef-*> tag; data-ef-brand is data-forma-brand) and removes Echelon branding (BNR-001, EDS-ADR-002: dist/brands/echelon.css and the Echelon marketing bundles are gone). Before authorizing, migrate the application's source with the target release's codemod (dotnet run --project <package>/tools/NamespaceMigrator/NamespaceMigrator.fsproj -- <paths>, then --check), and declare echelon-theme for an Echelon application." } ]
+
+    /// The boundaries a move of `id` from `fromVersion` to `toVersion`
+    /// crosses. Unparseable versions cross nothing; the transition's own
+    /// qualification refuses them.
+    let crossed (id: string) (fromVersion: string) (toVersion: string) =
+        match SemanticVersion.tryParse fromVersion, SemanticVersion.tryParse toVersion with
+        | Some source, Some target ->
+            all
+            |> List.filter (fun boundary ->
+                boundary.Id = id
+                && SemanticVersion.tryParse boundary.Release
+                   |> Option.exists (fun release -> source < release && target >= release))
+        | _ -> []
 
 module WebPackageBinding =
     [<Literal>]
@@ -658,7 +699,8 @@ module WebPackageBinding =
                                   Bindings = bindings
                                   Foundations = foundations
                                   OptIn = optIn
-                                  Qualification = targetQualification |> Result.defaultValue "exact" }))
+                                  Qualification = targetQualification |> Result.defaultValue "exact"
+                                  Boundaries = WebPackageBoundary.crossed request.Id fromVersion release.Version }))
 
     /// Plans the move of a declared web-package binding to the target set's
     /// selection.

@@ -915,6 +915,148 @@ let private echelonCurrent1372 check =
                     "Forma 0.14.0 upgrade records the Registry versions"
                     (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "0.14.0"; "folio", Some "0.4.1" ]))
 
+// ---- echelon-current 1.38.0: Forma 1.0.1 -----------------------------------
+// echelon-current 1.38.0 moves Forma 0.14.0 -> 1.0.1, the major release that
+// makes Forma brand-neutral (BNR-001, EDS-ADR-002) and renames its ef-
+// namespace to forma- (FORMA-NS-001), with 1.0.1's codemod fixes, and keeps
+// Folio 0.4.1. npm moves the pin, but only the application can migrate its
+// own markup, so the transition names the boundary and its codemod in the
+// plan and binds it into the authorization digest.
+let private echelonCurrent1380 check =
+    let f = registeredStepRepository check ("0.14.0", "0.4.1") "1.0.1" "0.4.1"
+
+    withPath f.Bin (fun () ->
+        match preview f with
+        | Error errors -> check $"echelon-current 1.38.0 web plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                "current upgrade moves only Forma 0.14.0 -> 1.0.1, as a package-manager binding transition"
+                (plan.Refusals.IsEmpty
+                 && plan.Transitions
+                    |> List.map (fun transition -> transition.Id, transition.FromVersion, transition.ToVersion, transition.Mode) = [ "forma", "0.14.0", "1.0.1", "web-package-binding" ])
+
+            let forma = plan.WebPackageTransitions |> List.tryFind (fun transition -> transition.Id = "forma")
+
+            check
+                "Forma 0.14.0 -> 1.0.1 crosses exactly the Forma 1.0.0 namespace and brand boundary, naming its codemod"
+                (forma
+                 |> Option.exists (fun transition ->
+                     match transition.Boundaries with
+                     | [ boundary ] ->
+                         boundary.Id = "forma"
+                         && boundary.Release = "1.0.0"
+                         && boundary.Migration.Contains "FORMA-NS-001"
+                         && boundary.Migration.Contains "EDS-ADR-002"
+                         && boundary.Migration.Contains "tools/NamespaceMigrator/NamespaceMigrator.fsproj"
+                         && boundary.Migration.Contains "echelon-theme"
+                     | _ -> false))
+
+            check
+                "the Forma 1.0.0 boundary is bound into the authorization digest material"
+                (forma
+                 |> Option.exists (fun transition ->
+                     (WebPackageTransition.digestMaterial transition).Contains "\n  crosses|forma|1.0.0|Forma 1.0.0 renames its ef- namespace"))
+
+            match apply f plan.Digest with
+            | Error errors -> check $"authorized Forma 1.0.1 upgrade succeeds: {joined errors}" false
+            | Ok result ->
+                check
+                    "Forma 1.0.1 is installed as the exact GitHub release-asset pin, and Folio is not reinstalled"
+                    (File.ReadAllLines f.Log
+                     |> Array.toList = [ let asset = releaseAsset "forma" FormaStem "1.0.1"
+                                         $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {FormaPackage}@{asset}" ])
+
+                check "Forma 1.0.1 upgrade leaves no version drift" result.NoRemainingVersionChanges
+
+                check
+                    "Forma 1.0.1 upgrade records the Registry versions"
+                    (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "1.0.1"; "folio", Some "0.4.1" ]))
+
+/// Indy/Causa projects migrate to Forma 1.x gradually (owner, 2026-11-09).
+/// What this proves is narrow: a project that declares forma-workflow (as the
+/// indy-init preset's Indy projects do, ODR-COMP-P14) is refused by --current
+/// before any change when offered the 1.38.0 set, because no Registry set
+/// selects forma-workflow; that refusal holds under every set, not only
+/// 1.38.0. A project without forma-workflow can move to Forma 1.x, but only
+/// to a set passed explicitly with its digest, and the plan then discloses
+/// the Forma 1.0.0 boundary (echelonCurrent1380). The pair such a project
+/// keeps, Forma 0.14.0 with forma-workflow 1.2.0, stays valid.
+let private formaWorkflowProjectIsRefusedByCurrent check =
+    let f = registeredStepRepository check ("0.14.0", "0.4.1") "1.0.1" "0.4.1"
+
+    let declared =
+        """{
+  "schemaVersion": 1,
+  "name": "chrona-shaped",
+  "components": [
+    { "id": "forma", "version": "0.14.0", "required": false },
+    { "id": "folio", "version": "0.4.1", "required": false },
+    { "id": "forma-workflow", "version": "1.2.0", "required": false }
+  ],
+  "requirements": [],
+  "execution": { "enabled": false }
+}
+"""
+
+    File.WriteAllText(f.ManifestPath, declared)
+
+    LockFile.write
+        f.Target
+        f.ManifestPath
+        { ProjectName = "chrona-shaped"
+          Operation = Init
+          Components =
+            [ for id, version, package in
+                  [ "forma", "0.14.0", FormaPackage
+                    "folio", "0.4.1", FolioPackage
+                    "forma-workflow", "1.2.0", "@echelon-foundry/forma-workflow" ] ->
+                  { Id = id
+                    Version = version
+                    Distribution = NpmPackage
+                    Package = package
+                    SourceReference = Some $"npm:{package}@{version}" } ]
+          Actions = [] }
+    |> ignore
+
+    let before = [ f.ManifestPath; Path.Combine(f.Target, "package.json"); Path.Combine(f.Target, "package-lock.json") ] |> List.map File.ReadAllBytes
+
+    withPath f.Bin (fun () ->
+        let refusals = refusalsOf f
+
+        check
+            "an Indy-shaped project (Forma 0.14.0, forma-workflow 1.2.0) offered echelon-current 1.38.0 is refused, never moved to Forma 1.x"
+            (refusals |> List.exists (fun refusal -> refusal.Contains "'forma-workflow'"))
+
+        check "refusing the Indy-shaped project runs no package manager" (not (File.Exists f.Log) || File.ReadAllLines f.Log |> Array.isEmpty))
+
+    check
+        "the refused Indy-shaped project's conditor.json, package.json and lockfile are unchanged"
+        ([ f.ManifestPath; Path.Combine(f.Target, "package.json"); Path.Combine(f.Target, "package-lock.json") ]
+         |> List.map File.ReadAllBytes = before)
+
+    match Manifest.load f.ManifestPath with
+    | Error errors -> check $"the Indy-shaped manifest parses: {joined errors}" false
+    | Ok manifest ->
+        check "Forma 0.14.0 with forma-workflow 1.2.0 stays a valid pair for projects that remain on 1.37.2"
+            (Compatibility.validate manifest |> List.isEmpty)
+
+/// The breaking release boundaries, as a pure function of the move.
+let private breakingBoundaries check =
+    let crosses id fromVersion toVersion =
+        WebPackageBoundary.crossed id fromVersion toVersion |> List.map (fun boundary -> boundary.Id, boundary.Release)
+
+    check "Forma 0.14.0 -> 1.0.1 and 0.5.0 -> 1.0.0 cross the Forma 1.0.0 boundary"
+        (crosses "forma" "0.14.0" "1.0.1" = [ "forma", "1.0.0" ] && crosses "forma" "0.5.0" "1.0.0" = [ "forma", "1.0.0" ])
+
+    check "moves inside one Forma namespace cross nothing"
+        (crosses "forma" "0.13.1" "0.14.0" = [] && crosses "forma" "1.0.0" "1.0.1" = [] && crosses "forma" "1.0.1" "1.0.1" = [])
+
+    check "the Forma boundary belongs to Forma alone"
+        (crosses "folio" "0.4.1" "1.0.1" = [] && crosses "limen" "0.9.1" "1.0.0" = [])
+
+    check "unparseable versions cross nothing (their qualification refuses them)"
+        (crosses "forma" "next" "1.0.1" = [] && crosses "forma" "0.14.0" "latest" = [])
+
 // ---- echelon-current 1.31.0: Limen 0.9.1 ------------------------------------
 // echelon-current 1.31.0 moves Limen 0.9.0 -> 0.9.1 (limen wasm-check; the
 // browser-kernel build carries its package version), which the Registry
@@ -1055,8 +1197,10 @@ let run (check: string -> bool -> unit) =
     check
         "Conditor qualifies released Forma web-package upgrade boundaries"
         (Registry.qualifiedVersions "forma"
-         |> Option.exists (fun versions -> [ "0.6.1"; "0.9.0"; "0.10.0"; "0.11.0"; "0.12.0"; "0.13.0"; "0.13.1"; "0.14.0" ] |> List.forall (fun version -> Set.contains version versions))
+         |> Option.exists (fun versions -> [ "0.6.1"; "0.9.0"; "0.10.0"; "0.11.0"; "0.12.0"; "0.13.0"; "0.13.1"; "0.14.0"; "1.0.1" ] |> List.forall (fun version -> Set.contains version versions))
          && Registry.qualifiedVersions "folio" |> Option.exists (fun versions -> Set.contains "0.4.0" versions && Set.contains "0.4.1" versions))
+
+    breakingBoundaries check
 
     if OperatingSystem.IsWindows() then
         check "web-package current upgrade fixture is skipped on Windows" true
@@ -1074,6 +1218,8 @@ let run (check: string -> bool -> unit) =
         echelonCurrent134 check
         echelonCurrent1371 check
         echelonCurrent1372 check
+        echelonCurrent1380 check
+        formaWorkflowProjectIsRefusedByCurrent check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"

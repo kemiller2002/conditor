@@ -556,6 +556,9 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
             Console.WriteLine
                 $"    {transition.Id}: {transition.FromVersion} -> {target.Version} [{WebPackageTransition.mode transition}] {target.Package}@{target.Specifier} (package sha256:{target.ArtifactSha256}; qualified {transition.Qualification})"
 
+            for boundary in transition.Boundaries do
+                Console.WriteLine $"      crosses {boundary.Id} {boundary.Release}: {boundary.Migration}"
+
             for directory, arguments in WebPackageTransition.steps transition do
                 let rendered = String.concat " " arguments
                 Console.WriteLine $"      {directory}: npm {rendered}"
