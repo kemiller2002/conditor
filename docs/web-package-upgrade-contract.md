@@ -130,6 +130,11 @@ after Forma's `dist/all.css`; from theme 1.1.0 it then loads
 `dist/echelon-fonts.css` and `dist/echelon-app.css`, the theme's documented
 order. It never enters `.echelon/foundations.json`. A
 repository that already consumes it declares it through the opt-in below.
+Moving an existing repository from theme 1.0.0 to 1.1.0 with
+`upgrade --current` changes only the package pin: an established scaffold's
+page belongs to the application and is never rewritten, so the application
+adds the `<link>` tags for `dist/echelon-fonts.css` and `dist/echelon-app.css`
+itself, after `dist/echelon.css`.
 
 ## Repository observation
 
