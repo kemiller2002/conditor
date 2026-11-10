@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 75,
+  "nextSeq": 76,
   "items": [
     {
       "id": "WI-0001",
@@ -1728,6 +1728,27 @@
       },
       "source": "manual",
       "sourceReference": ".praxis/inbox/documents/2026-11-09-ECHELON-THEME-1.1.0-qualification.md"
+    },
+    {
+      "id": "WI-0075",
+      "title": "Document that a current upgrade to Echelon theme 1.1.0 does not add its stylesheet links to an established scaffold page (review of conditor#138)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-11-10T04:06:33.000Z",
+      "updatedAt": "2026-11-10T04:06:33.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
     }
   ]
 }
