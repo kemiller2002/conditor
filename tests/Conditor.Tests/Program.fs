@@ -674,8 +674,8 @@ match Presets.resolve "indy-init" with
             (manifest.Components |> List.exists (fun c -> c.Id = "forma-workflow" && c.Version = Some "2.0.0"))
 
         check
-            "the Indy preset, an Echelon application, declares the Echelon theme 1.0.0 with Forma 1.0.1"
-            (manifest.Components |> List.exists (fun c -> c.Id = "echelon-theme" && c.Version = Some "1.0.0")
+            "the Indy preset, an Echelon application, declares the Echelon theme 1.1.0 with Forma 1.0.1"
+            (manifest.Components |> List.exists (fun c -> c.Id = "echelon-theme" && c.Version = Some "1.1.0")
              && manifest.Components |> List.exists (fun c -> c.Id = "forma" && c.Version = Some "1.0.1"))
 
         check
@@ -1257,6 +1257,7 @@ WebScaffoldTests.runKickoffSet137 check
 WebScaffoldTests.runKickoffSet1371 check
 WebScaffoldTests.runKickoffSet1372 check
 WebScaffoldTests.runKickoffSet1380 check
+WebScaffoldTests.runKickoffSet1390 check
 WebScaffoldTests.runTestEnvironmentOptIn check ComponentSchemaTests.validateTestEnvironmentContract
 TestEnvironmentTests.run check ComponentSchemaTests.validateTestEnvironmentContract ComponentSchemaTests.validateTestEnvironmentReport
 RehearsalTests.run check ComponentSchemaTests.validateRehearsalReceipt

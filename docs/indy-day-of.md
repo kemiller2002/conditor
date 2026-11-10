@@ -17,23 +17,29 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.38.0, once the Registry owner
-  approves it after Conditor qualifies it (1.37.2 is the approved set until
-  then). Against 1.37.2 it moves Forma 0.14.0 -> 1.0.1, the major release
-  that makes Forma brand-neutral and renames its `ef-` namespace to `forma-`
-  (EDS-ADR-002, FORMA-NS-001; migrate markup with Forma's
-  `tools/NamespaceMigrator`), and adds the optional Echelon theme 1.0.0
-  (`@echelon-foundry/echelon-theme`, the Echelon brand for Forma 1.x). Forma
-  is a `conditor.json` component, so the preset moves to 1.0.1, declares the
-  theme, moves forma-workflow to 2.0.0 (1.2.0 emits `ef-` names), and
-  Conditor 0.10.24 qualifies it. Existing Indy projects are not migrated
-  (gradual migration, owner 2026-11-09): they keep their own
-  `conditor.json` with Forma 0.14.0 and forma-workflow 1.2.0. **After
-  installing Conditor 0.10.24, run `conditor init` once in such a project to
-  re-lock it; versions do not change.** 0.10.24 changes the forma and
-  forma-workflow descriptors, whose digests the lock records, so until then
-  `start`, `status` and `repair` refuse with "Resolved identity for component
-  'forma-workflow' differs from the Conditor lock". It installs Praxis 3.25.0, which
+  The kickoff set is echelon-current 1.39.0, once the Registry owner
+  approves it after Conditor qualifies it (1.38.0 is the approved set until
+  then). Against 1.38.0 it moves only the optional Echelon theme 1.0.0 ->
+  1.1.0, an additive release: the Echelon application layer
+  (`dist/echelon-app.css`) and self-hosted fonts (`dist/echelon-fonts.css`);
+  `dist/echelon.css` is unchanged and it still requires Forma 1.0.0 or later.
+  The preset declares the theme at 1.1.0, and a scaffold on it loads Forma's
+  `all.css`, then `echelon.css`, `echelon-fonts.css` and `echelon-app.css`.
+  Conditor 0.10.25 qualifies it. 1.38.0 moved Forma 0.14.0 -> 1.0.1, the
+  major release that makes Forma brand-neutral and renames its `ef-`
+  namespace to `forma-` (EDS-ADR-002, FORMA-NS-001; migrate markup with
+  Forma's `tools/NamespaceMigrator`), and added the optional Echelon theme
+  (`@echelon-foundry/echelon-theme`, the Echelon brand for Forma 1.x); the
+  preset then moved forma-workflow to 2.0.0 (1.2.0 emits `ef-` names).
+  Existing Indy projects are not migrated (gradual migration, owner
+  2026-11-09): they keep their own `conditor.json` with Forma 0.14.0 and
+  forma-workflow 1.2.0. **After installing a new Conditor release, run
+  `conditor init` once in an existing project to re-lock it; versions do not
+  change.** The lock records each component descriptor's digest, so a release
+  that changes a descriptor the project declares makes `start`, `status` and
+  `repair` refuse with "Resolved identity for component '<id>' differs from
+  the Conditor lock" until then: 0.10.24 changed forma and forma-workflow,
+  and 0.10.25 changes echelon-theme (projects that declare the theme). It installs Praxis 3.25.0, which
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`), records process evidence in the work
   event log (`praxis work evidence`), adds owner-authorized autonomous

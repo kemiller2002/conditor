@@ -126,7 +126,9 @@ selects it with `required: false`, and a repository installs it only by
 declaring it in `conditor.json`. The compatibility graph refuses it without
 Forma 1.0.0 or later. A scaffold that declares it with Forma 1.x sets
 `data-forma-brand="echelon"` on `<html>` and loads its `dist/echelon.css`
-after Forma's `dist/all.css`. It never enters `.echelon/foundations.json`. A
+after Forma's `dist/all.css`; from theme 1.1.0 it then loads
+`dist/echelon-fonts.css` and `dist/echelon-app.css`, the theme's documented
+order. It never enters `.echelon/foundations.json`. A
 repository that already consumes it declares it through the opt-in below.
 
 ## Repository observation

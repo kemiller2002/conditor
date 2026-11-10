@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 74,
+  "nextSeq": 75,
   "items": [
     {
       "id": "WI-0001",
@@ -1707,6 +1707,27 @@
       },
       "source": "manual",
       "sourceReference": ".praxis/inbox/documents/2026-11-09-EDS-ADR-002-forma-1-echelon-theme-qualification.md"
+    },
+    {
+      "id": "WI-0074",
+      "title": "Qualify the Echelon theme 1.1.0 for echelon-current 1.39.0 and release Conditor 0.10.25",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-10T03:41:06.000Z",
+      "updatedAt": "2026-11-10T03:49:41.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": ".praxis/inbox/documents/2026-11-09-ECHELON-THEME-1.1.0-qualification.md"
     }
   ]
 }
