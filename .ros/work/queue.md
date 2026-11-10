@@ -81,4 +81,4 @@
 | WI-0072 | Qualify echelon-current 1.37.2 (Forma 0.14.0) and release Conditor 0.10.23 | complete |  | medium |
 | WI-0073 | Qualify echelon-current 1.38.0 (Forma 1.0.1, Echelon theme 1.0.0) and release Conditor 0.10.24 | complete |  | medium |
 | WI-0074 | Qualify the Echelon theme 1.1.0 for echelon-current 1.39.0 and release Conditor 0.10.25 | complete |  | medium |
-| WI-0075 | Document that a current upgrade to Echelon theme 1.1.0 does not add its stylesheet links to an established scaffold page (review of conditor#138) | ready |  | medium |
+| WI-0075 | Document that a current upgrade to Echelon theme 1.1.0 does not add its stylesheet links to an established scaffold page (review of conditor#138) | complete |  | medium |

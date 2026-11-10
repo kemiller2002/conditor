@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-10T04:06:34.000Z",
+  "updatedAt": "2026-11-10T04:07:24.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3543,10 +3543,19 @@
     {
       "id": "WI-0075",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-11-10T04:06:34.000Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "docs/web-package-upgrade-contract.md"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/LibraryScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-10T04:07:24.000Z",
       "telemetryExecutionIds": [
         "EXE-20261110T040634504Z-fef03ce0"
       ],
@@ -3569,7 +3578,9 @@
           "status": "verified",
           "mechanism": "git-remote-observation"
         }
-      }
+      },
+      "completedAt": "2026-11-10T04:07:24.000Z",
+      "conclusion": "Documentation of existing behaviour: an established scaffold's seed files are never recreated (Scaffolding.plan; LibraryScaffoldTests 'no seed file is compared or recreated once established')"
     }
   ]
 }
