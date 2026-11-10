@@ -520,27 +520,50 @@ let private FolioPackage = "@echelon-foundry/print-components"
 let private FormaStem = "echelon-foundry-design-system"
 let private FolioStem = "echelon-foundry-print-components"
 
-let private registeredStepRepository check (formaSource: string, folioSource: string) (formaTarget: string) (folioTarget: string) =
-    let label = $"forma-{formaSource}-{formaTarget}-folio-{folioSource}-{folioTarget}"
+/// One Registry web-package binding of a stepwise-upgrade fixture: the
+/// component, its package and release-asset stem, and the version the
+/// repository pins (source) and the target set selects (target).
+type private StepBinding =
+    { Id: string
+      Package: string
+      Stem: string
+      Source: string
+      Target: string }
+
+/// A repository that declares and pins `bindings` at their source versions
+/// under a Conditor lock, and a resolved set selecting their targets; the fake
+/// npm leaves the target pins behind.
+let private registeredBindingRepository check (bindings: StepBinding list) =
+    let label =
+        bindings |> List.map (fun b -> $"{b.Id}-{b.Source}-{b.Target}") |> String.concat "-"
+
     let target = temp $"{label}-target"
     let home = temp $"{label}-home"
     let mirror = temp $"{label}-mirror"
     let bin = temp $"{label}-bin"
     let afterInstall = temp $"{label}-after"
-    let formaTargetBytes = Encoding.UTF8.GetBytes $"fixture forma {formaTarget} package tarball"
-    let folioTargetBytes = Encoding.UTF8.GetBytes $"fixture folio {folioTarget} package tarball"
-    File.WriteAllBytes(Path.Combine(mirror, $"{FormaStem}-{formaTarget}.tgz"), formaTargetBytes)
-    File.WriteAllBytes(Path.Combine(mirror, $"{FolioStem}-{folioTarget}.tgz"), folioTargetBytes)
+
+    let targetBytes =
+        bindings
+        |> List.map (fun b -> b.Id, Encoding.UTF8.GetBytes $"fixture {b.Id} {b.Target} package tarball")
+        |> Map.ofList
+
+    for b in bindings do
+        File.WriteAllBytes(Path.Combine(mirror, $"{b.Stem}-{b.Target}.tgz"), targetBytes[b.Id])
 
     let resolvedPath = Path.Combine(mirror, "current.resolved.json")
 
     let resolvedSha =
         resolvedSet
             resolvedPath
-            [ githubRelease "forma" FormaPackage FormaStem formaTarget (sha256Bytes formaTargetBytes)
-              githubRelease "folio" FolioPackage FolioStem folioTarget (sha256Bytes folioTargetBytes) ]
+            (bindings |> List.map (fun b -> githubRelease b.Id b.Package b.Stem b.Target (sha256Bytes targetBytes[b.Id])))
 
     let manifestPath = Path.Combine(target, "conditor.json")
+
+    let declared =
+        bindings
+        |> List.map (fun b -> $"""    {{ "id": "{b.Id}", "version": "{b.Source}", "required": false }}""")
+        |> String.concat ",\n"
 
     File.WriteAllText(
         manifestPath,
@@ -548,8 +571,7 @@ let private registeredStepRepository check (formaSource: string, folioSource: st
   "schemaVersion": 1,
   "name": "chrona-shaped",
   "components": [
-    { "id": "forma", "version": "{{formaSource}}", "required": false },
-    { "id": "folio", "version": "{{folioSource}}", "required": false }
+{{declared}}
   ],
   "requirements": [],
   "execution": { "enabled": false }
@@ -563,67 +585,77 @@ let private registeredStepRepository check (formaSource: string, folioSource: st
         { ProjectName = "chrona-shaped"
           Operation = Init
           Components =
-            [ { Id = "forma"
-                Version = formaSource
-                Distribution = NpmPackage
-                Package = FormaPackage
-                SourceReference = Some $"npm:{FormaPackage}@{formaSource}" }
-              { Id = "folio"
-                Version = folioSource
-                Distribution = NpmPackage
-                Package = FolioPackage
-                SourceReference = Some $"npm:{FolioPackage}@{folioSource}" } ]
+            bindings
+            |> List.map (fun b ->
+                ({ Id = b.Id
+                   Version = b.Source
+                   Distribution = NpmPackage
+                   Package = b.Package
+                   SourceReference = Some $"npm:{b.Package}@{b.Source}" }
+                : ResolvedComponent))
           Actions = [] }
     |> ignore
 
-    let packageJson (forma: string) (folio: string) =
+    let packageJson (version: StepBinding -> string) =
+        let dependencies =
+            bindings
+            |> List.map (fun b -> $"""    "{b.Package}": "{releaseAsset b.Id b.Stem (version b)}" """.TrimEnd())
+            |> String.concat ",\n"
+
         $$"""{
   "name": "chrona-shaped",
   "private": true,
   "dependencies": {
-    "{{FormaPackage}}": "{{releaseAsset "forma" FormaStem forma}}",
-    "{{FolioPackage}}": "{{releaseAsset "folio" FolioStem folio}}"
+{{dependencies}}
   }
 }
 """
 
-    let lockJson (forma: string) (folio: string) (formaIntegrity: string) (folioIntegrity: string) =
+    let lockJson (version: StepBinding -> string) (integrityOf: StepBinding -> string) =
+        let packages =
+            bindings
+            |> List.map (fun b ->
+                $$"""    "node_modules/{{b.Package}}": { "version": "{{version b}}", "resolved": "{{releaseAsset b.Id b.Stem (version b)}}"{{integrityOf b}} }""")
+            |> String.concat ",\n"
+
         $$"""{
   "name": "chrona-shaped",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": { "name": "chrona-shaped" },
-    "node_modules/{{FormaPackage}}": { "version": "{{forma}}", "resolved": "{{releaseAsset "forma" FormaStem forma}}"{{formaIntegrity}} },
-    "node_modules/{{FolioPackage}}": { "version": "{{folio}}", "resolved": "{{releaseAsset "folio" FolioStem folio}}"{{folioIntegrity}} }
+{{packages}}
   }
 }
 """
 
-    File.WriteAllText(Path.Combine(target, "package.json"), packageJson formaSource folioSource)
-    File.WriteAllText(Path.Combine(target, "package-lock.json"), lockJson formaSource folioSource "" "")
-    File.WriteAllText(Path.Combine(afterInstall, "package.json"), packageJson formaTarget folioTarget)
+    File.WriteAllText(Path.Combine(target, "package.json"), packageJson _.Source)
+    File.WriteAllText(Path.Combine(target, "package-lock.json"), lockJson _.Source (fun _ -> ""))
+    File.WriteAllText(Path.Combine(afterInstall, "package.json"), packageJson _.Target)
 
     File.WriteAllText(
         Path.Combine(afterInstall, "package-lock.json"),
-        lockJson
-            formaTarget
-            folioTarget
-            $", \"integrity\": \"{integrity formaTargetBytes}\""
-            $", \"integrity\": \"{integrity folioTargetBytes}\""
+        lockJson _.Target (fun b -> $", \"integrity\": \"{integrity targetBytes[b.Id]}\"")
     )
 
     let log = Path.Combine(bin, "npm.log")
     fakeNpm bin afterInstall log
 
-    { Target = target
-      ManifestPath = manifestPath
-      ResolvedPath = resolvedPath
-      ResolvedSha = resolvedSha
-      Context = context home mirror
-      Bin = bin
-      Log = log
-      AfterInstall = afterInstall }
+    ({ Target = target
+       ManifestPath = manifestPath
+       ResolvedPath = resolvedPath
+       ResolvedSha = resolvedSha
+       Context = context home mirror
+       Bin = bin
+       Log = log
+       AfterInstall = afterInstall }
+    : Fixture)
+
+let private registeredStepRepository check (formaSource: string, folioSource: string) (formaTarget: string) (folioTarget: string) =
+    registeredBindingRepository
+        check
+        [ { Id = "forma"; Package = FormaPackage; Stem = FormaStem; Source = formaSource; Target = formaTarget }
+          { Id = "folio"; Package = FolioPackage; Stem = FolioStem; Source = folioSource; Target = folioTarget } ]
 
 let private echelonCurrent120 check =
     let f = registeredStepRepository check ("0.4.1", "0.3.0") "0.6.1" "0.4.0"
@@ -1040,6 +1072,55 @@ let private formaWorkflowProjectIsRefusedByCurrent check =
         check "Forma 0.14.0 with forma-workflow 1.2.0 stays a valid pair for projects that remain on 1.37.2"
             (Compatibility.validate manifest |> List.isEmpty)
 
+// ---- echelon-current 1.39.0: Echelon theme 1.1.0 ---------------------------
+// echelon-current 1.39.0 moves only the optional Echelon theme 1.0.0 -> 1.1.0
+// (additive: the application layer and self-hosted fonts) and keeps Forma
+// 1.0.1. An application on the 1.38.0 selections that declares the theme
+// moves only the theme, by its exact GitHub release-asset pin, and crosses no
+// breaking boundary.
+let private echelonCurrent1390 check =
+    let themePackage = "@echelon-foundry/echelon-theme"
+    let themeStem = "echelon-foundry-echelon-theme"
+
+    let f =
+        registeredBindingRepository
+            check
+            [ { Id = "forma"; Package = FormaPackage; Stem = FormaStem; Source = "1.0.1"; Target = "1.0.1" }
+              { Id = "echelon-theme"; Package = themePackage; Stem = themeStem; Source = "1.0.0"; Target = "1.1.0" } ]
+
+    withPath f.Bin (fun () ->
+        match preview f with
+        | Error errors -> check $"echelon-current 1.39.0 web plan is produced: {joined errors}" false
+        | Ok plan ->
+            check
+                "current upgrade moves only the Echelon theme 1.0.0 -> 1.1.0, as a package-manager binding transition"
+                (plan.Refusals.IsEmpty
+                 && plan.Transitions
+                    |> List.map (fun transition -> transition.Id, transition.FromVersion, transition.ToVersion, transition.Mode) = [ "echelon-theme", "1.0.0", "1.1.0", "web-package-binding" ])
+
+            check
+                "the Echelon theme 1.0.0 -> 1.1.0 crosses no breaking boundary, so its digest material carries no crosses line"
+                (plan.WebPackageTransitions
+                 |> List.exists (fun transition ->
+                     transition.Id = "echelon-theme"
+                     && transition.Boundaries.IsEmpty
+                     && not ((WebPackageTransition.digestMaterial transition).Contains "crosses|")))
+
+            match apply f plan.Digest with
+            | Error errors -> check $"authorized Echelon theme 1.1.0 upgrade succeeds: {joined errors}" false
+            | Ok result ->
+                check
+                    "the Echelon theme 1.1.0 is installed as the exact GitHub release-asset pin, and Forma is not reinstalled"
+                    (File.ReadAllLines f.Log
+                     |> Array.toList = [ let asset = releaseAsset "echelon-theme" themeStem "1.1.0"
+                                         $"{f.Target}|install --save-exact --save-prod --ignore-scripts --no-audit --no-fund {themePackage}@{asset}" ])
+
+                check "the Echelon theme 1.1.0 upgrade leaves no version drift" result.NoRemainingVersionChanges
+
+                check
+                    "the Echelon theme 1.1.0 upgrade records the Registry versions"
+                    (declaredVersions f.ManifestPath = Map.ofList [ "forma", Some "1.0.1"; "echelon-theme", Some "1.1.0" ]))
+
 /// The breaking release boundaries, as a pure function of the move.
 let private breakingBoundaries check =
     let crosses id fromVersion toVersion =
@@ -1220,6 +1301,7 @@ let run (check: string -> bool -> unit) =
         echelonCurrent1372 check
         echelonCurrent1380 check
         formaWorkflowProjectIsRefusedByCurrent check
+        echelonCurrent1390 check
 
     check
         "Conditor qualifies the Registry-current Praxis 3.7.1 and Ordo 1.4.1 lifecycle releases"

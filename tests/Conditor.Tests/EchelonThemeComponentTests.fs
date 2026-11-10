@@ -4,7 +4,11 @@ module EchelonThemeComponentTests
 // EDS-ADR-002 moved out of Forma: brand CSS, marketing theme and approved
 // marks for Forma 1.x. Conditor qualifies exactly 1.0.0, the GitHub release
 // asset of kemiller2002/echelon-design-system v1.0.0 (sha256
-// 5d981420cfd4f7a835564a204938eb5db1f1d35350477a755df98daa37ec8394). It is
+// 5d981420cfd4f7a835564a204938eb5db1f1d35350477a755df98daa37ec8394), and
+// 1.1.0, v1.1.0 (sha256
+// e9360d743ad9e9a62abb3cf22d29bc8a26a4f9fd2b4980dd1d050c27937ec6bd), which
+// adds the application layer (dist/echelon-app.css) and self-hosted fonts
+// (dist/echelon-fonts.css), loaded after dist/echelon.css. It is
 // optional: only a repository that declares it installs it (Echelon
 // applications do). It requires Forma 1.0.0 or later, loads after Forma's CSS
 // and applies under data-forma-brand="echelon" on <html>.
@@ -17,6 +21,9 @@ open Conditor.Core
 let private Package = "@echelon-foundry/echelon-theme"
 
 [<Literal>]
+let private ReleaseAsset110 =
+    "https://github.com/kemiller2002/echelon-design-system/releases/download/v1.1.0/echelon-foundry-echelon-theme-1.1.0.tgz"
+
 let private ReleaseAsset =
     "https://github.com/kemiller2002/echelon-design-system/releases/download/v1.0.0/echelon-foundry-echelon-theme-1.0.0.tgz"
 
@@ -79,10 +86,11 @@ let run (check: string -> bool -> unit) =
              && definition.LifecycleSource.IsNone
              && definition.HistoricalPackages.IsEmpty)
 
-        check "echelon-theme qualifies exactly 1.0.0, its default" (qualified = Set.ofList [ "1.0.0" ] && definition.DefaultVersion = "1.0.0")
+        check "echelon-theme qualifies exactly 1.0.0, its default, and 1.1.0"
+            (qualified = Set.ofList [ "1.0.0"; "1.1.0" ] && definition.DefaultVersion = "1.0.0")
 
         check "echelon-theme 1.0.0 is distributed as its GitHub release asset, not through the npm registry"
-            (definition.ReleaseArtifacts = Map.ofList [ "1.0.0", ReleaseAsset ])
+            (definition.ReleaseArtifacts = Map.ofList [ "1.0.0", ReleaseAsset; "1.1.0", ReleaseAsset110 ])
     | _ -> check "the embedded echelon-theme descriptor is present" false
 
     check "echelon-theme carries a descriptor digest for the lock"
@@ -138,11 +146,18 @@ let run (check: string -> bool -> unit) =
              | Some(range, _), Some parsed -> VersionRange.tryParse range |> Option.exists (fun line -> VersionRange.contains line parsed)
              | _ -> false))
 
-    for version in [ "0.9.0"; "1.0.1"; "2.0.0" ] do
+    // The theme 1.x rule covers 1.1.0, which Conditor qualifies exactly.
+    for forma in [ "0.14.0"; "0.5.0" ] do
+        withTarget (fun target ->
+            check $"the Echelon theme 1.1.0 with Forma {forma} is refused before mutation (the theme 1.x rule)"
+                (planIn target [ "limen", "0.9.1"; "forma", forma; "echelon-theme", "1.1.0" ]
+                 |> refusedWith $"Component 'echelon-theme' 1.1.0 requires component 'forma' at version 1.0.0 or later, but the manifest declares 'forma' {forma}."))
+
+    for version in [ "0.9.0"; "1.0.1"; "1.1.1"; "1.2.0"; "2.0.0" ] do
         withTarget (fun target ->
             check $"echelon-theme {version} is refused as not qualified"
                 (planIn target (formaOne @ [ "echelon-theme", version ])
-                 |> refusedWith $"Component 'echelon-theme' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: 1.0.0."))
+                 |> refusedWith $"Component 'echelon-theme' version '{version}' is not qualified by this Conditor compatibility graph. Qualified versions: 1.0.0, 1.1.0."))
 
     // --- Forma 1.x scaffold without the theme (optional) ----------------------
     withTarget (fun target ->
@@ -190,6 +205,102 @@ let run (check: string -> bool -> unit) =
             check "the scaffold foundations do not gain an echelon-theme capability (Praxis' foundations schema forbids it)"
                 (scaffoldFile ".echelon/foundations.json" plan
                  |> Option.exists (fun text -> not (text.Contains "echelon-theme")))))
+
+    // --- Theme 1.1.0: fonts and the application layer -----------------------------
+    let themePage (version: string) =
+        let files =
+            if version = "1.0.0" then
+                [ "echelon.css" ]
+            else
+                [ "echelon.css"; "echelon-fonts.css"; "echelon-app.css" ]
+
+        let links =
+            files
+            |> List.map (fun file -> $"  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/echelon-theme/dist/{file}\">\n")
+            |> String.concat ""
+
+        "<!doctype html>\n<html lang=\"en\" data-forma-brand=\"echelon\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/design-system/dist/all.css\">\n"
+        + links
+        + "  <title>Application</title>\n</head>\n<body>\n  <main>\n    <forma-button><button type=\"button\">Ready</button></forma-button>\n  </main>\n</body>\n</html>\n"
+
+    withTarget (fun target ->
+        planned check "a Forma 1.0.1 scaffold with the Echelon theme 1.1.0" target (formaOne @ [ "echelon-theme", "1.1.0" ]) (fun plan ->
+            check "the scaffold pins the Echelon theme 1.1.0 to its exact GitHub release asset"
+                (scaffoldFile "package.json" plan
+                 |> Option.exists (fun text -> text.Contains $"\"{Package}\": \"{ReleaseAsset110}\""))
+
+            check "under the theme 1.1.0 the page loads Forma's all.css, then echelon.css, echelon-fonts.css and echelon-app.css, in that order"
+                (scaffoldFile "src/kernel/index.html" plan = Some(themePage "1.1.0"))))
+
+    withTarget (fun target ->
+        planned check "a Forma 1.0.1 scaffold with the Echelon theme 1.0.0" target (formaOne @ [ "echelon-theme", "1.0.0" ]) (fun plan ->
+            check "under the theme 1.0.0, which ships neither fonts nor the application layer, the page loads echelon.css only, byte for byte as before"
+                (scaffoldFile "src/kernel/index.html" plan = Some(themePage "1.0.0"))))
+
+    // --- A lock written by Conditor 0.10.24 ----------------------------------------
+    // This build adds 1.1.0 to the theme descriptor, so a lock 0.10.24 wrote for
+    // a project that declares the theme records the previous descriptor digest
+    // and is refused until `conditor init` re-locks it, with no version change
+    // (docs/indy-day-of.md).
+    withTarget (fun target ->
+        File.WriteAllText(
+            Path.Combine(target, "package.json"),
+            $"{{\"name\":\"app\",\"private\":true,\"dependencies\":{{\"@echelon-foundry/design-system\":\"1.0.1\",\"{Package}\":\"{ReleaseAsset}\"}}}}"
+        )
+
+        let manifestPath = Path.Combine(target, "conditor.json")
+        let lockPath = Path.Combine(target, ".conditor", "lock.json")
+
+        File.WriteAllText(
+            manifestPath,
+            """{"schemaVersion":1,"name":"theme-demo","components":[{"id":"forma","version":"1.0.1"},{"id":"echelon-theme","version":"1.0.0"}]}"""
+        )
+
+        // The theme descriptor digest Conditor 0.10.24 (4fb01c2) embeds and locks.
+        let previousDigest = "7b8f581cb1b4eb3e6a6af139b14b8910aded5e458ca63161851573d03cee7536"
+
+        let initialize () =
+            Manifest.load manifestPath
+            |> Result.bind (Planner.create target Init)
+            |> Result.map (fun plan ->
+                LockFile.write target manifestPath plan |> ignore
+                plan)
+
+        let lockedTheme () =
+            use document = Text.Json.JsonDocument.Parse(File.ReadAllText lockPath)
+
+            document.RootElement.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun item -> item.GetProperty("id").GetString() = "echelon-theme")
+            |> Option.map (fun item ->
+                item.GetProperty("version").GetString(),
+                item.GetProperty("sourceReference").GetString(),
+                item.GetProperty("descriptorSha256").GetString())
+
+        match initialize () with
+        | Error errors ->
+            let details = String.concat "; " errors
+            check $"a project declaring the theme 1.0.0 initializes: {details}" false
+        | Ok plan ->
+            let current = Registry.descriptorSha256 "echelon-theme"
+
+            check "this build's theme descriptor differs from Conditor 0.10.24's" (current <> Some previousDigest)
+
+            current
+            |> Option.iter (fun digest -> File.WriteAllText(lockPath, File.ReadAllText(lockPath).Replace(digest, previousDigest)))
+
+            check "a lock from Conditor 0.10.24 is refused after the theme descriptor changes, without substituting anything"
+                (match LockFile.verifyResolvedComponents target plan.Components with
+                 | Error errors -> errors |> List.exists (fun error -> error.Contains "Resolved identity for component 'echelon-theme' differs from the Conditor lock")
+                 | Ok() -> false)
+
+            match initialize () with
+            | Error errors ->
+                let details = String.concat "; " errors
+                check $"re-running init on the unchanged manifest re-locks: {details}" false
+            | Ok replanned ->
+                check "re-running init re-locks the theme at 1.0.0 with its source unchanged and this build's descriptor digest"
+                    (lockedTheme () = (current |> Option.map (fun digest -> "1.0.0", "npm:@echelon-foundry/echelon-theme@1.0.0", digest))
+                     && LockFile.verifyResolvedComponents target replanned.Components |> Result.isOk))
 
     // --- The ef- namespace scaffold is unchanged ---------------------------------
     withTarget (fun target ->

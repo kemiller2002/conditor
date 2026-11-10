@@ -1406,35 +1406,56 @@ let ``the Aegis configuration validates at startup`` () =
     [<Literal>]
     let EchelonThemeComponent = "echelon-theme"
 
+    /// The first Echelon theme release that ships the self-hosted fonts
+    /// (`dist/echelon-fonts.css`) and the application layer
+    /// (`dist/echelon-app.css`).
+    [<Literal>]
+    let EchelonThemeApplicationRelease = "1.1.0"
+
     /// How the scaffolded page presents Forma: the element namespace the
-    /// declared Forma release styles, and whether the Echelon theme brands it.
+    /// declared Forma release styles, and the Echelon theme stylesheets that
+    /// brand it, in the theme's documented load order (empty without the
+    /// theme).
     type private PagePresentation =
         { Namespace: string
-          EchelonTheme: bool }
+          ThemeStylesheets: string list }
+
+    let private atLeast (release: string) (version: string option) =
+        version
+        |> Option.bind SemanticVersion.tryParse
+        |> Option.exists (fun version -> SemanticVersion.tryParse release |> Option.exists (fun first -> version >= first))
 
     let private pagePresentation (manifest: ProjectManifest) =
-        let formaNamespaced =
-            resolvedVersion "forma" manifest
-            |> Option.bind SemanticVersion.tryParse
-            |> Option.exists (fun version ->
-                SemanticVersion.tryParse FormaNamespaceRelease |> Option.exists (fun first -> version >= first))
+        let formaNamespaced = resolvedVersion "forma" manifest |> atLeast FormaNamespaceRelease
+
+        let themeVersion = resolvedVersion EchelonThemeComponent manifest
+
+        let themeStylesheets =
+            match formaNamespaced, themeVersion with
+            | false, _
+            | _, None -> []
+            | true, Some _ when themeVersion |> atLeast EchelonThemeApplicationRelease ->
+                [ "echelon.css"; "echelon-fonts.css"; "echelon-app.css" ]
+            | true, Some _ -> [ "echelon.css" ]
 
         { Namespace = if formaNamespaced then "forma" else "ef"
-          EchelonTheme = formaNamespaced && (requestedComponent EchelonThemeComponent manifest).IsSome }
+          ThemeStylesheets = themeStylesheets }
 
     let private webIndexPage (manifest: ProjectManifest) =
         let presentation = pagePresentation manifest
 
-        let htmlAttributes, themeStylesheet =
-            if presentation.EchelonTheme then
-                " data-forma-brand=\"echelon\"",
-                "  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/echelon-theme/dist/echelon.css\">\n"
-            else
-                String.Empty, String.Empty
+        let htmlAttributes =
+            if presentation.ThemeStylesheets.IsEmpty then String.Empty else " data-forma-brand=\"echelon\""
+
+        let themeStylesheets =
+            presentation.ThemeStylesheets
+            |> List.map (fun file ->
+                $"  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/echelon-theme/dist/{file}\">\n")
+            |> String.concat String.Empty
 
         let tag = presentation.Namespace + "-button"
 
-        $"<!doctype html>\n<html lang=\"en\"{htmlAttributes}>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/design-system/dist/all.css\">\n{themeStylesheet}  <title>Application</title>\n</head>\n<body>\n  <main>\n    <{tag}><button type=\"button\">Ready</button></{tag}>\n  </main>\n</body>\n</html>\n"
+        $"<!doctype html>\n<html lang=\"en\"{htmlAttributes}>\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/design-system/dist/all.css\">\n{themeStylesheets}  <title>Application</title>\n</head>\n<body>\n  <main>\n    <{tag}><button type=\"button\">Ready</button></{tag}>\n  </main>\n</body>\n</html>\n"
 
     let private webPrintPage =
         "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <link rel=\"stylesheet\" href=\"../../node_modules/@echelon-foundry/print-components/src/styles/print.css\">\n  <script type=\"module\" src=\"../../node_modules/@echelon-foundry/print-components/src/components/register.js\"></script>\n  <title>Printable document</title>\n</head>\n<body>\n  <ef-print-document><main><h1>Printable document</h1></main></ef-print-document>\n</body>\n</html>\n"
