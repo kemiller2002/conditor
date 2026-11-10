@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-10T03:49:41.000Z",
+  "updatedAt": "2026-11-10T04:07:24.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3539,6 +3539,48 @@
         }
       },
       "completedAt": "2026-11-10T03:49:41.000Z"
+    },
+    {
+      "id": "WI-0075",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "docs/web-package-upgrade-contract.md"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/LibraryScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-10T04:07:24.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261110T040634504Z-fef03ce0"
+      ],
+      "latestCheckpoint": {
+        "id": "d1f01386951259bd2492609d",
+        "recordedAt": "2026-11-10T04:06:50.000Z",
+        "executionId": "EXE-20261110T040634504Z-fef03ce0",
+        "repository": "conditor",
+        "branch": "claude/theme-1.1.0-established-page-note",
+        "commit": "92a0e5bc981b1e04582cc098d802e77d69ea8175",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/theme-1.1.0-established-page-note",
+        "remoteCommit": "92a0e5bc981b1e04582cc098d802e77d69ea8175",
+        "summary": "Documented that a theme 1.1.0 upgrade changes only the pin; the application adds the two links",
+        "nextAction": "Independent review and merge",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-10T04:07:24.000Z",
+      "conclusion": "Documentation of existing behaviour: an established scaffold's seed files are never recreated (Scaffolding.plan; LibraryScaffoldTests 'no seed file is compared or recreated once established')"
     }
   ]
 }
