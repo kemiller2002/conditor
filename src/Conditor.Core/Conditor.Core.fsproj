@@ -16,6 +16,7 @@
     <Compile Include="Workstation/Model.fs" />
     <Compile Include="RegistryAuthorityBinding.fs" />
     <Compile Include="NugetFeed.fs" />
+    <Compile Include="NugetBinding.fs" />
     <Compile Include="Compatibility.fs" />
     <Compile Include="SourceCache.fs" />
     <Compile Include="Requirements.fs" />

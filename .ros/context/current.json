@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-25T04:52:08.000Z",
+  "updatedAt": "2026-11-25T12:13:36.000Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3663,6 +3663,47 @@
         }
       },
       "completedAt": "2026-11-25T04:52:08.000Z"
+    },
+    {
+      "id": "WI-0077",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "src/Conditor.Core/NugetBinding.fs"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/NugetBindingTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-25T12:13:36.000Z",
+      "telemetryExecutionIds": [
+        "EXE-20261125T121311374Z-9b6255bd"
+      ],
+      "latestCheckpoint": {
+        "id": "3b39ed381b595263959db615",
+        "recordedAt": "2026-11-25T12:13:35.000Z",
+        "executionId": "EXE-20261125T121311374Z-9b6255bd",
+        "repository": "conditor",
+        "branch": "claude/vigila-implementation-jdeps1",
+        "commit": "81f886505f7febc6b2395b48fc4969fb6d878c6e",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/vigila-implementation-jdeps1",
+        "remoteCommit": "81f886505f7febc6b2395b48fc4969fb6d878c6e",
+        "summary": "NuGet binding upgrade path implemented and pushed; 1714 checks pass",
+        "nextAction": "Complete WI-0077, request Conditor 0.10.27, open PR",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-25T12:13:36.000Z"
     }
   ]
 }

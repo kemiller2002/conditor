@@ -23,9 +23,11 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   release (no public signature removed; license MIT -> PolyForm
   Noncommercial 1.0.0). The preset declares Aegis 2.0.0 and a scaffold's
   engine project references `EchelonFoundry.Aegis.Core` 2.0.0; Conditor
-  0.10.26 qualifies it. `conditor upgrade --current` has no transition for a
-  nuget.org-distributed binding, so an existing project that declares Aegis
-  1.0.0 is refused rather than moved and stays on its set until it migrates.
+  0.10.26 qualifies it. From Conditor 0.10.27 an existing project that
+  declares Aegis 1.0.0 moves with `conditor upgrade` (change the declared
+  version first) or `conditor upgrade --current`: the declaration and every
+  exact `EchelonFoundry.Aegis.*` pin move together
+  (`docs/nuget-binding-upgrade.md`). Build and test the project afterwards.
   1.39.0 moved the optional Echelon theme 1.0.0 -> 1.1.0, an additive release: the Echelon application layer
   (`dist/echelon-app.css`) and self-hosted fonts (`dist/echelon-fonts.css`);
   `dist/echelon.css` is unchanged and it still requires Forma 1.0.0 or later.

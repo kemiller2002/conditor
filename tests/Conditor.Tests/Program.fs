@@ -1240,6 +1240,7 @@ ComponentSchemaTests.runStalenessPolicy check
 DriftTests.run check ComponentSchemaTests.validateDriftReport
 VerificationGateTests.run check
 NugetFeedTests.run check
+NugetBindingTests.run check
 LibraryScaffoldTests.run check
 WebScaffoldTests.run check
 WebScaffoldTests.runLimenRouting check

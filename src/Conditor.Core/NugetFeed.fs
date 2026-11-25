@@ -366,6 +366,13 @@ module NugetFeed =
 
     let private versionAttribute = Regex("""(?<prefix><(?:PackageVersion|PackageReference)\b[^>]*?\bInclude\s*=\s*"(?<id>[^"]+)"[^>]*?\bVersion\s*=\s*")(?<version>[^"]*)(?<suffix>")""", RegexOptions.CultureInvariant ||| RegexOptions.IgnoreCase)
 
+    /// Every PackageReference or PackageVersion pin in one MSBuild file's
+    /// text, as (package id, version attribute) in document order.
+    let pins (text: string) : (string * string) list =
+        versionAttribute.Matches text
+        |> Seq.map (fun m -> m.Groups["id"].Value, m.Groups["version"].Value)
+        |> List.ofSeq
+
     /// Moves exact pins of the package ids from `fromVersion` to `toVersion`
     /// in one MSBuild file's text (PackageVersion or PackageReference
     /// `Version` attributes). Returns the new text and how many pins moved. A
@@ -465,7 +472,9 @@ module NugetFeed =
           else
               yield! checkConfiguration (File.ReadAllText config) (release.Packages |> List.map _.PackageId) ]
 
-    let private projectFiles (target: string) =
+    /// Every MSBuild project or props/targets file in a repository, outside
+    /// build output, vendored and Conditor-owned directories.
+    let projectFiles (target: string) =
         let excluded = set [ "bin"; "obj"; ".git"; "node_modules"; ".conditor"; "vendor" ]
 
         let rec walk (directory: string) =
