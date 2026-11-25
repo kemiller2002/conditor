@@ -733,7 +733,7 @@ module Engine =
                 else
                     let target = m.Groups["target"].Value
                     let versionDir = Path.GetDirectoryName target |> Option.ofObj |> Option.defaultValue ""
-                    let version = Path.GetFileName versionDir |> Option.ofObj |> Option.defaultValue ""
+                    let version = PathText.fileNameOr "" versionDir
 
                     if not (String.Equals(Path.GetDirectoryName versionDir |> Option.ofObj |> Option.defaultValue "", installRoot, StringComparison.Ordinal)) || Path.GetFileName target <> "praxis" then
                         Error $"{display} points outside Conditor's praxis install directory"
@@ -1308,8 +1308,7 @@ module Downgrade =
                 Directory.EnumerateDirectories toolRoot
                 |> Seq.filter (fun directory -> File.Exists(Path.Combine(directory, tool.Executable)))
                 |> Seq.choose (fun directory ->
-                    Path.GetFileName directory
-                    |> Option.ofObj
+                    PathText.tryFileName directory
                     |> Option.bind SemanticVersion.tryParse
                     |> Option.map (fun version -> version, display directory))
                 |> Seq.toList

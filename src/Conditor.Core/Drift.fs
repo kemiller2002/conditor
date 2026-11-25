@@ -260,7 +260,7 @@ module Drift =
         | _ -> []
 
     let private fileName (path: string) =
-        Path.GetFileName path |> Option.ofObj |> Option.defaultValue path
+        PathText.fileNameOr path path
 
     let private relative (root: string) (path: string) =
         Path.GetRelativePath(root, path).Replace('\\', '/')

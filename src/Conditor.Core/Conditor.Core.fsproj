@@ -3,6 +3,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="PathText.fs" />
     <Compile Include="Domain.fs" />
     <Compile Include="Versions.fs" />
     <Compile Include="Presets.fs" />

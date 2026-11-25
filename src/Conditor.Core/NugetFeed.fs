@@ -471,7 +471,7 @@ module NugetFeed =
         let rec walk (directory: string) =
             seq {
                 for file in Directory.EnumerateFiles directory do
-                    let name: string = Path.GetFileName file |> Option.ofObj |> Option.defaultValue ""
+                    let name: string = PathText.fileNameOr "" file
 
                     if name.EndsWith(".fsproj", StringComparison.OrdinalIgnoreCase)
                        || name.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)

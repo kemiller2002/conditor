@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 76,
+  "nextSeq": 79,
   "items": [
     {
       "id": "WI-0001",
@@ -1739,6 +1739,69 @@
       "attachments": [],
       "createdAt": "2026-11-10T04:06:33.000Z",
       "updatedAt": "2026-11-10T04:07:24.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0076",
+      "title": "Qualify Aegis 2.0.0 for echelon-current 1.40.0 (echelon-registry#115)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-25T04:42:53.486Z",
+      "updatedAt": "2026-11-25T04:46:28.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0077",
+      "title": "upgrade --current transition for nuget.org-distributed application bindings (Aegis 1.0.0 -> 2.0.0 is refused today; rewrite PackageReference/PackageVersion with conditor.json)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "captured",
+      "attachments": [],
+      "createdAt": "2026-11-25T04:45:56.871Z",
+      "updatedAt": "2026-11-25T04:45:56.871Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0078",
+      "title": "Build cleanly on the .NET 11 SDK: FS3262 on Option.ofObj over Path.GetFileName (runner image ubuntu-26.04)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-25T04:50:49.168Z",
+      "updatedAt": "2026-11-25T04:52:08.000Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

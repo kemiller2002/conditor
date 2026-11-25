@@ -82,3 +82,6 @@
 | WI-0073 | Qualify echelon-current 1.38.0 (Forma 1.0.1, Echelon theme 1.0.0) and release Conditor 0.10.24 | complete |  | medium |
 | WI-0074 | Qualify the Echelon theme 1.1.0 for echelon-current 1.39.0 and release Conditor 0.10.25 | complete |  | medium |
 | WI-0075 | Document that a current upgrade to Echelon theme 1.1.0 does not add its stylesheet links to an established scaffold page (review of conditor#138) | complete |  | medium |
+| WI-0076 | Qualify Aegis 2.0.0 for echelon-current 1.40.0 (echelon-registry#115) | complete |  | medium |
+| WI-0077 | upgrade --current transition for nuget.org-distributed application bindings (Aegis 1.0.0 -> 2.0.0 is refused today; rewrite PackageReference/PackageVersion with conditor.json) | captured |  | medium |
+| WI-0078 | Build cleanly on the .NET 11 SDK: FS3262 on Option.ofObj over Path.GetFileName (runner image ubuntu-26.04) | complete |  | medium |
