@@ -1,0 +1,12 @@
+{
+  "schema": "praxis.instance/1",
+  "instanceId": "pxi-a40aad1e90aa4deaa0a9dc736f06ddba",
+  "createdAt": "2026-11-25T17:58:39.948Z",
+  "createdWith": "3.25.0",
+  "repository": {
+    "provider": "github",
+    "repositoryId": null,
+    "repository": "kemiller2002/conditor"
+  },
+  "predecessors": []
+}

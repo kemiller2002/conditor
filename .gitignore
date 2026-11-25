@@ -9,3 +9,9 @@ obj/
 
 # Praxis transient locks
 .ros/locks/
+
+# BEGIN echelon:visual-engineering
+# Installed Visual Engineering context. It is required and must be committed.
+# Refresh it with: npx @echelon-foundry/visual-engineering upgrade
+!.visual-engineering/
+# END echelon:visual-engineering
