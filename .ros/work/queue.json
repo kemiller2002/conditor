@@ -1882,10 +1882,10 @@
       "description": null,
       "tags": [],
       "priority": "medium",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-11-25T17:57:19.046Z",
-      "updatedAt": "2026-11-25T17:57:27.783Z",
+      "updatedAt": "2026-11-25T18:30:07.132Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
