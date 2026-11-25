@@ -181,6 +181,33 @@ let private versionOnlyUpgrade (check: string -> bool -> unit) =
     finally
         Directory.Delete(target, true)
 
+/// Aegis 2.0.0 -> 2.0.1: the patch that lowers 2.0.0's FSharp.Core floor.
+/// Every repository that moved to 2.0.0 takes this transition.
+let private patchMove (check: string -> bool -> unit) =
+    let target = temp "patch"
+
+    try
+        let engine = write target "src/engine/App.Engine.fsproj" (engineProject "2.0.0" "2.0.0")
+
+        match NugetBinding.plan target aegis "2.0.0" "2.0.1" with
+        | Error errors -> check $"Aegis 2.0.0 -> 2.0.1 plans: {joined errors}" false
+        | Ok binding ->
+            check "the 2.0.0 -> 2.0.1 plan names the engine project" (binding.Rewrites |> List.map _.Path = [ "src/engine/App.Engine.fsproj" ])
+
+            match NugetBinding.apply target binding with
+            | Error errors -> check $"Aegis 2.0.0 -> 2.0.1 applies: {joined errors}" false
+            | Ok _ ->
+                let moved = File.ReadAllText engine
+
+                check
+                    "Aegis pins move to 2.0.1 and FSharp.Core is untouched"
+                    (moved.Contains "\"EchelonFoundry.Aegis.Core\" Version=\"2.0.1\""
+                     && moved.Contains "\"EchelonFoundry.Aegis.Integration.GitHub\" Version=\"2.0.1\""
+                     && moved.Contains "\"FSharp.Core\" Version=\"10.0.100\""
+                     && not (moved.Contains "Version=\"2.0.0\""))
+    finally
+        Directory.Delete(target, true)
+
 let private aegisComponent (version: string) =
     $$"""
     {
@@ -338,4 +365,5 @@ let run (check: string -> bool -> unit) =
     else
         planning check
         versionOnlyUpgrade check
+        patchMove check
         currentUpgrade check

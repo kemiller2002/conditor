@@ -85,3 +85,5 @@
 | WI-0076 | Qualify Aegis 2.0.0 for echelon-current 1.40.0 (echelon-registry#115) | complete |  | medium |
 | WI-0077 | upgrade --current transition for nuget.org-distributed application bindings (Aegis 1.0.0 -> 2.0.0 is refused today; rewrite PackageReference/PackageVersion with conditor.json) | complete |  | medium |
 | WI-0078 | Build cleanly on the .NET 11 SDK: FS3262 on Option.ofObj over Path.GetFileName (runner image ubuntu-26.04) | complete |  | medium |
+| WI-0079 | Upgrade Conditor's own Aegis dependency 1.0.0 -> 2.0.0 (echelon-current 1.40.0) | complete |  | medium |
+| WI-0080 | Qualify Aegis 2.0.1 and echelon-current 1.41.0, release Conditor 0.10.28 | complete |  | medium |

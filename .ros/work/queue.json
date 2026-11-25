@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 79,
+  "nextSeq": 81,
   "items": [
     {
       "id": "WI-0001",
@@ -1802,6 +1802,48 @@
       "attachments": [],
       "createdAt": "2026-11-25T04:50:49.168Z",
       "updatedAt": "2026-11-25T04:52:08.000Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0079",
+      "title": "Upgrade Conditor's own Aegis dependency 1.0.0 -> 2.0.0 (echelon-current 1.40.0)",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-25T12:25:17.984Z",
+      "updatedAt": "2026-11-25T12:50:43Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0080",
+      "title": "Qualify Aegis 2.0.1 and echelon-current 1.41.0, release Conditor 0.10.28",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "complete",
+      "attachments": [],
+      "createdAt": "2026-11-25T12:50:20.661Z",
+      "updatedAt": "2026-11-25T12:50:43Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

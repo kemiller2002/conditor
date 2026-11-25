@@ -1885,7 +1885,8 @@ let runKickoffSet1400 (check: string -> bool -> unit) =
                  && c.GetProperty("distribution").GetProperty("package").GetString() = "EchelonFoundry.Aegis.Core"))
 
         check "Conditor qualifies Aegis 2.0.0 and keeps 1.0.0 qualified as its upgrade source"
-            (Registry.qualifiedVersions "aegis" = Some(Set.ofList [ "1.0.0"; "2.0.0" ]))
+            (Registry.qualifiedVersions "aegis"
+             |> Option.exists (fun versions -> Set.isSubset (Set.ofList [ "1.0.0"; "2.0.0" ]) versions))
 
         check "1.40.0 records the verified-completion-attested pairing as enabled"
             (root.GetProperty("capabilities").EnumerateArray()
@@ -1915,6 +1916,67 @@ let runKickoffSet1400 (check: string -> bool -> unit) =
                      |> Option.exists (fun text ->
                          text.Contains "<PackageReference Include=\"EchelonFoundry.Aegis.Core\" Version=\"2.0.0\" />"
                          && not (text.Contains "Version=\"1.0.0\""))))
+
+/// The kickoff manifest moved to the 1.41.0 selections: Aegis 2.0.1.
+let private kickoffComponents1410 =
+    kickoffComponents1400.Replace("""{"id":"aegis","version":"2.0.0"}""", """{"id":"aegis","version":"2.0.1"}""")
+
+/// echelon-current 1.41.0 (linux-x64), byte for byte what the Registry's own
+/// tools resolve for the proposed cut (sha256 daa69508...): the approved
+/// 1.40.0 with only Aegis 2.0.0 -> 2.0.1, a patch with no source change that
+/// lowers the declared FSharp.Core floor from 11.0.101 to 10.1.400, so a
+/// project on the .NET 10 SDK restores it.
+let private echelonCurrent1410 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.41.0-linux-x64.json")
+
+let runKickoffSet1410 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.41.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent1410
+
+        check "the vendored echelon-current 1.41.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "daa69508d7509ee422023e12f213eebbd4842f5f6968f2f27890c5244b53050b")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let entry systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+
+        let selected systemId =
+            entry systemId |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "aegis"; "praxis"; "dokimos"; "percepta-semantic"; "ordo"; "forma"; "echelon-theme"; "arca"; "limen"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.41.0 selects Aegis 2.0.1 and keeps every other selection of 1.40.0"
+            (selections = [ Some "2.0.1"; Some "3.25.0"; Some "0.11.1"; Some "0.4.0"; Some "1.20.0"; Some "1.0.1"; Some "1.1.0"; Some "0.7.0"; Some "0.9.1"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.41.0 selects Aegis 2.0.1 from nuget.org at its re-hashed package digest"
+            (entry "aegis"
+             |> Option.exists (fun c ->
+                 c.GetProperty("role").GetString() = "project-binding"
+                 && c.GetProperty("distributionClass").GetString() = "nuget-library"
+                 && c.GetProperty("required").GetBoolean()
+                 && c.GetProperty("artifacts").EnumerateArray()
+                    |> Seq.exists (fun a -> a.GetProperty("sha256").GetString() = "f578f3426d2b9863edadb139ab0430dc51ca4e8c3d2b980fbbe88d5f3613fb56")))
+
+        check "Conditor qualifies Aegis 2.0.1 and keeps 1.0.0 and 2.0.0 qualified as its upgrade sources"
+            (Registry.qualifiedVersions "aegis" = Some(Set.ofList [ "1.0.0"; "2.0.0"; "2.0.1" ]))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents1410 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.41.0: {joined errors}" false
+            | Ok plan ->
+                check "under 1.41.0 the kickoff engine project references Aegis 2.0.1"
+                    (scaffoldFiles plan
+                     |> Map.tryFind "src/engine/App.Engine.fsproj"
+                     |> Option.exists (fun text ->
+                         text.Contains "<PackageReference Include=\"EchelonFoundry.Aegis.Core\" Version=\"2.0.1\" />"
+                         && not (text.Contains "Version=\"2.0.0\""))))
 
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
