@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-25T12:50:43Z",
+  "updatedAt": "2026-11-25T15:38:19Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3786,6 +3786,47 @@
         }
       },
       "completedAt": "2026-11-25T12:50:43Z"
+    },
+    {
+      "id": "WI-0081",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/aegis.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-25T15:38:19Z",
+      "telemetryExecutionIds": [
+        "EXE-20261125T153636867Z-8246d8f3"
+      ],
+      "latestCheckpoint": {
+        "id": "a58c760348f0df22f94bcb25",
+        "recordedAt": "2026-11-25T15:38:19Z",
+        "executionId": "EXE-20261125T153636867Z-8246d8f3",
+        "repository": "conditor",
+        "branch": "claude/vigila-implementation-jdeps1",
+        "commit": "9c66afbfab96da1c5a22cae7d0caec605652d4e5",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/vigila-implementation-jdeps1",
+        "remoteCommit": "9c66afbfab96da1c5a22cae7d0caec605652d4e5",
+        "summary": "Aegis 2.0.2 qualified; 1.42.0 kickoff set tested; 1727 checks pass on SDK 10, build clean on SDK 11",
+        "nextAction": "Merge and release Conditor 0.10.29",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-25T15:38:19Z"
     }
   ]
 }

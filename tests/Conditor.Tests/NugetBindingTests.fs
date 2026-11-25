@@ -208,6 +208,27 @@ let private patchMove (check: string -> bool -> unit) =
     finally
         Directory.Delete(target, true)
 
+/// Aegis 2.0.1 -> 2.0.2: the patch whose detached capture makes no blocking
+/// wait. Every repository on 2.0.1 takes this transition.
+let private wasmPatchMove (check: string -> bool -> unit) =
+    let target = temp "wasm-patch"
+
+    try
+        let engine = write target "src/engine/App.Engine.fsproj" (engineProject "2.0.1" "2.0.1")
+
+        match NugetBinding.plan target aegis "2.0.1" "2.0.2" |> Result.bind (NugetBinding.apply target) with
+        | Error errors -> check $"Aegis 2.0.1 -> 2.0.2 plans and applies: {joined errors}" false
+        | Ok _ ->
+            let moved = File.ReadAllText engine
+
+            check
+                "Aegis pins move from 2.0.1 to 2.0.2"
+                (moved.Contains "\"EchelonFoundry.Aegis.Core\" Version=\"2.0.2\""
+                 && moved.Contains "\"EchelonFoundry.Aegis.Integration.GitHub\" Version=\"2.0.2\""
+                 && not (moved.Contains "Version=\"2.0.1\""))
+    finally
+        Directory.Delete(target, true)
+
 let private aegisComponent (version: string) =
     $$"""
     {
@@ -366,4 +387,5 @@ let run (check: string -> bool -> unit) =
         planning check
         versionOnlyUpgrade check
         patchMove check
+        wasmPatchMove check
         currentUpgrade check
