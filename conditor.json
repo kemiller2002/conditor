@@ -3,12 +3,29 @@
   "schemaVersion": 1,
   "name": "conditor",
   "components": [
-    { "id": "praxis", "version": "3.1.4" },
-    { "id": "ordo", "version": "1.5.0" },
-    { "id": "visual-engineering", "version": "1.0.0" },
-    { "id": "communication-engineering", "version": "1.0.0" }
+    {
+      "id": "praxis",
+      "version": "3.25.0"
+    },
+    {
+      "id": "ordo",
+      "version": "1.20.0"
+    },
+    {
+      "id": "visual-engineering",
+      "version": "1.0.1"
+    },
+    {
+      "id": "communication-engineering",
+      "version": "1.0.0"
+    }
   ],
   "execution": {
     "enabled": false
+  },
+  "registryAuthority": {
+    "kind": "resolved-release-set",
+    "path": ".conditor/authority/resolved-release-set.json",
+    "sha256": "6be3bc97fbdd314abc4c712c2b1b47c1a18487995d9e1b9db445b4d141a8ee8a"
   }
 }
