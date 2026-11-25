@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "repository": "conditor",
-  "nextSeq": 83,
+  "nextSeq": 84,
   "items": [
     {
       "id": "WI-0001",
@@ -1886,6 +1886,27 @@
       "attachments": [],
       "createdAt": "2026-11-25T17:57:19.046Z",
       "updatedAt": "2026-11-25T18:30:07.132Z",
+      "createdBy": "unknown",
+      "createdByActor": {
+        "kind": "agent",
+        "id": "anthropic/claude-code",
+        "provider": "anthropic",
+        "model": "unknown",
+        "runtime": "claude-code"
+      },
+      "source": "manual",
+      "sourceReference": null
+    },
+    {
+      "id": "WI-0083",
+      "title": "Qualify Praxis 3.26.0 and echelon-current 1.43.0 (Arca 0.7.1); request Conditor 0.10.30",
+      "description": null,
+      "tags": [],
+      "priority": "medium",
+      "status": "ready",
+      "attachments": [],
+      "createdAt": "2026-11-25T23:34:37.067Z",
+      "updatedAt": "2026-11-25T23:34:39Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",

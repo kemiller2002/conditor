@@ -2036,6 +2036,104 @@ let runKickoffSet1420 (check: string -> bool -> unit) =
                          text.Contains "<PackageReference Include=\"EchelonFoundry.Aegis.Core\" Version=\"2.0.2\" />"
                          && not (text.Contains "Version=\"2.0.1\""))))
 
+/// The kickoff manifest moved to the 1.43.0 selections: Praxis 3.26.0.
+let private kickoffComponents1430 =
+    kickoffComponents1420.Replace("""{"id":"praxis","version":"3.25.0"}""", """{"id":"praxis","version":"3.26.0"}""")
+
+/// echelon-current 1.43.0 (linux-x64), byte for byte what the Registry's own
+/// tools resolve for the proposed cut (sha256 4851c24d...): the approved
+/// 1.42.0 with only Praxis 3.25.0 -> 3.26.0 (web and hub pages on Forma 1.0.1
+/// and the Echelon theme 1.1.0; foundations verify recognises forma- markup)
+/// and Arca 0.7.0 -> 0.7.1 (rebuilt against Aegis 2.0.2, public API
+/// unchanged). Arca has no Conditor descriptor; Conditor installs it from the
+/// release-asset NuGet feed on Registry authority.
+let private echelonCurrent1430 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.43.0-linux-x64.json")
+
+let runKickoffSet1430 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.43.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent1430
+
+        check "the vendored echelon-current 1.43.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "4851c24d52cf3a7ef6dd2ccec26ef7a97c769dd06076b51dfede387c5a8cf8c9")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let entry systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+
+        let selected systemId =
+            entry systemId |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "aegis"; "praxis"; "dokimos"; "percepta-semantic"; "ordo"; "forma"; "echelon-theme"; "arca"; "limen"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.43.0 selects Praxis 3.26.0 and Arca 0.7.1 and keeps every other selection of 1.42.0"
+            (selections = [ Some "2.0.2"; Some "3.26.0"; Some "0.11.1"; Some "0.4.0"; Some "1.20.0"; Some "1.0.1"; Some "1.1.0"; Some "0.7.1"; Some "0.9.1"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.43.0 selects the three Arca 0.7.1 packages at their release-asset digests"
+            (entry "arca"
+             |> Option.exists (fun c ->
+                 let digests =
+                     c.GetProperty("artifacts").EnumerateArray()
+                     |> Seq.map (fun a -> a.GetProperty("name").GetString(), a.GetProperty("sha256").GetString())
+                     |> Map.ofSeq
+
+                 c.GetProperty("distributionClass").GetString() = "nuget-library"
+                 && digests |> Map.tryFind "EchelonFoundry.Arca.Core.0.7.1.nupkg" = Some "25f88d29d38b33cb46f50478e73db76906dc9e7cf7fbf74233efb2e6f24ce81b"
+                 && digests |> Map.tryFind "EchelonFoundry.Arca.GitHub.0.7.1.nupkg" = Some "3cfbff0479925a76f449b97af933a8fe75d8a815c86ec44e818ac1d3732efb6f"
+                 && digests |> Map.tryFind "EchelonFoundry.Arca.Limen.0.7.1.nupkg" = Some "9253b88c80f350e3f87ca7585c95211489ea8af6029a25b2bf04e0a47bc2bdbf"))
+
+        check "Conditor qualifies Praxis 3.26.0 and keeps 3.25.0 qualified as its upgrade source"
+            (Registry.qualifiedVersions "praxis"
+             |> Option.exists (Set.isSubset (Set.ofList [ "3.25.0"; "3.26.0" ])))
+
+        check "1.43.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent1430 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.43.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation installs Praxis 3.26.0 from 1.43.0 with the published linux-x64 asset digest"
+                (installed "praxis"
+                 |> Option.exists (fun c ->
+                     c.Version = "3.26.0"
+                     && c.Tag = "v3.26.0"
+                     && c.Assets
+                        |> Map.tryFind "linux-x64"
+                        |> Option.exists (fun asset ->
+                            asset.Name = "praxis-linux-x64.tar.gz"
+                            && asset.Sha256 = "d417b99188d56d4d47eb672154fc53de7a0e7e53df2180c7fc1de3f5bece7fdb")))
+
+            check "the workstation keeps Dokimos 0.11.1, percepta-semantic 0.4.0 and Ordo 1.20.0 from 1.43.0"
+                (installed "dokimos" |> Option.exists (fun c -> c.Version = "0.11.1" && c.Tag = "dokimos-v0.11.1")
+                 && installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.4.0" && c.Tag = "percepta-semantic-v0.4.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.20.0" && c.Tag = "v1.20.0"))
+
+            check "the workstation installs no native tool for Arca, a NuGet library"
+                (installed "arca" |> Option.isNone)
+
+        check "the 1.43.0 kickoff manifest declares Praxis 3.26.0 and no other Praxis version"
+            (kickoffComponents1430.Contains """{"id":"praxis","version":"3.26.0"}"""
+             && not (kickoffComponents1430.Contains """{"id":"praxis","version":"3.25.0"}"""))
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents1430 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.43.0: {joined errors}" false
+            | Ok plan ->
+                check "under 1.43.0 the kickoff engine project keeps Aegis 2.0.2"
+                    (scaffoldFiles plan
+                     |> Map.tryFind "src/engine/App.Engine.fsproj"
+                     |> Option.exists (fun text -> text.Contains "<PackageReference Include=\"EchelonFoundry.Aegis.Core\" Version=\"2.0.2\" />")))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true
