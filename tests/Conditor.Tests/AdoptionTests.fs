@@ -172,7 +172,7 @@ let private localLauncherDoesNotShadowHostTool check =
 /// workstation that has used them in another repository. Their verify fails
 /// exactly as the real ones do in a repository where they were never installed.
 let private machineWideEngineeringRunner (installedInRepository: string list) target (executable: string) (arguments: string list) =
-    let name = Path.GetFileName executable |> Option.ofObj |> Option.defaultValue ""
+    let name = Conditor.Core.PathText.fileNameOr "" executable
 
     match name, arguments with
     | "praxis", _ -> healthyPraxisRunner target executable arguments
@@ -236,7 +236,7 @@ let private machineCliDoesNotImplyRepositoryInstallation check =
 /// was last brought to; 1.0.1's strict verify reports a 1.0.0 installation
 /// stale (the managed .gitignore region among others) until VE `upgrade` runs.
 let private echelonCurrentRunner (installedVersion: string) _ (executable: string) (arguments: string list) =
-    let name = Path.GetFileName executable |> Option.ofObj |> Option.defaultValue ""
+    let name = Conditor.Core.PathText.fileNameOr "" executable
 
     match name, arguments with
     | "praxis", [ "--version" ] -> result 0 "praxis 3.7.2" ""

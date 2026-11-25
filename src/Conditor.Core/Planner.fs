@@ -211,7 +211,7 @@ module Planner =
 
             (File.Exists here && declares here)
             || (Directory.EnumerateDirectories directory
-                |> Seq.filter (fun child -> not (ignoredBindingDirectories.Contains(Path.GetFileName child |> Option.ofObj |> Option.defaultValue child)))
+                |> Seq.filter (fun child -> not (ignoredBindingDirectories.Contains(PathText.fileNameOr child child)))
                 |> Seq.filter (fun child -> not (File.GetAttributes(child).HasFlag FileAttributes.ReparsePoint))
                 |> Seq.exists walk)
 

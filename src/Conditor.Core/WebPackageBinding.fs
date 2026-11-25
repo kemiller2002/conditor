@@ -175,7 +175,7 @@ module WebPackageBinding =
     [<Literal>]
     let DistributionClass = WebPackageRelease.DistributionClass
     let private fileName (path: string) =
-        Path.GetFileName path |> Option.ofObj |> Option.defaultValue path
+        PathText.fileNameOr path path
 
     let private ignoredDirectories = set [ "node_modules"; ".git"; "bin"; "obj"; ".conditor" ]
 

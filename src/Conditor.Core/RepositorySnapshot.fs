@@ -32,7 +32,7 @@ module RepositorySnapshot =
                     yield normalize (Path.GetRelativePath(root, file))
 
                 for child in Directory.EnumerateDirectories directory do
-                    if not (excluded.Contains(Path.GetFileName child |> Option.ofObj |> Option.defaultValue "")) then
+                    if not (excluded.Contains(PathText.fileNameOr "" child)) then
                         yield! walk child
             }
 
@@ -42,7 +42,7 @@ module RepositorySnapshot =
         let rec walk (directory: string) =
             seq {
                 for child in Directory.EnumerateDirectories directory do
-                    if not (excluded.Contains(Path.GetFileName child |> Option.ofObj |> Option.defaultValue "")) then
+                    if not (excluded.Contains(PathText.fileNameOr "" child)) then
                         yield normalize (Path.GetRelativePath(root, child))
                         yield! walk child
             }
