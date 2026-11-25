@@ -17,9 +17,12 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.41.0, once the Registry owner
-  approves it after Conditor qualifies it (1.40.0 is the approved set until
-  then). Against 1.40.0 it moves only Aegis 2.0.0 -> 2.0.1, a patch with no
+  The kickoff set is echelon-current 1.42.0, once the Registry owner
+  approves it after Conditor qualifies it (1.41.0 is the approved set until
+  then). Against 1.41.0 it moves only Aegis 2.0.1 -> 2.0.2: a detached
+  capture no longer waits synchronously for the fault record, which froze
+  single-threaded WebAssembly hosts. The preset declares Aegis 2.0.2
+  (Conditor 0.10.29). 1.41.0 moved Aegis 2.0.0 -> 2.0.1, a patch with no
   source change: 2.0.0 declares FSharp.Core >= 11.0.101 and fails restore
   on the .NET 10 SDK (NU1605/NU1109), and 2.0.1 pins the floor at 10.1.400.
   The preset declares Aegis 2.0.1 (Conditor 0.10.28); a project on 1.0.0 or
@@ -52,7 +55,7 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `repair` refuse with "Resolved identity for component '<id>' differs from
   the Conditor lock" until then: 0.10.24 changed forma and forma-workflow,
   0.10.25 changed echelon-theme (projects that declare the theme), and
-  0.10.26 and 0.10.28 change aegis (projects that declare Aegis). It installs Praxis 3.25.0, which
+  0.10.26, 0.10.28 and 0.10.29 change aegis (projects that declare Aegis). It installs Praxis 3.25.0, which
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`), records process evidence in the work
   event log (`praxis work evidence`), adds owner-authorized autonomous
