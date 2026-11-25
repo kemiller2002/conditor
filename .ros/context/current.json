@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-25T23:34:39Z",
+  "updatedAt": "2026-11-25T23:39:02Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3872,13 +3872,43 @@
     {
       "id": "WI-0083",
       "type": "task",
-      "state": "active",
-      "semanticState": "active",
-      "evidence": [],
-      "updatedAt": "2026-11-25T23:34:39Z",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": "components/praxis.component.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests/WebScaffoldTests.fs"
+        }
+      ],
+      "updatedAt": "2026-11-25T23:39:02Z",
       "telemetryExecutionIds": [
         "EXE-20261125T233440419Z-392c3ca5"
-      ]
+      ],
+      "latestCheckpoint": {
+        "id": "d3daf65febca29923340fc7b",
+        "recordedAt": "2026-11-25T23:39:00Z",
+        "executionId": "EXE-20261125T233440419Z-392c3ca5",
+        "repository": "conditor",
+        "branch": "claude/vigila-implementation-jdeps1",
+        "commit": "51987ed0324b4e948eadb1455053b9d0b070789b",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/vigila-implementation-jdeps1",
+        "remoteCommit": "51987ed0324b4e948eadb1455053b9d0b070789b",
+        "summary": "Praxis 3.26.0 qualified; 1.43.0 kickoff test and CI job added; 0.10.30 requested; draft PR #145",
+        "nextAction": "Watch CI on PR #145; the coordinator merges it to release Conditor 0.10.30",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-25T23:39:02Z"
     }
   ]
 }
