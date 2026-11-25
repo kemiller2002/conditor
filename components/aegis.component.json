@@ -6,7 +6,8 @@
   "package": "EchelonFoundry.Aegis.Core",
   "defaultVersion": "1.0.0",
   "qualifiedVersions": [
-    "1.0.0"
+    "1.0.0",
+    "2.0.0"
   ],
   "applicationBinding": "nuget",
   "initArguments": [],

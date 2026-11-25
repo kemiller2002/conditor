@@ -1836,6 +1836,86 @@ let runKickoffSet1390 (check: string -> bool -> unit) =
                          && text.Contains "@echelon-foundry/echelon-theme/dist/echelon-app.css"
                          && not (text.Contains "<ef-button>"))))
 
+/// The Rehearsal 3 bootstrap manifest moved to the 1.40.0 selections: Aegis
+/// 2.0.0.
+let private kickoffComponents1400 =
+    kickoffComponents1390.Replace("""{"id":"aegis","version":"1.0.0"}""", """{"id":"aegis","version":"2.0.0"}""")
+
+/// echelon-current 1.40.0 (linux-x64), byte for byte what the Registry's own
+/// tools resolve for the proposed cut (echelon-registry#115, sha256
+/// 2469c310...): the approved 1.39.0 with only Aegis 1.0.0 -> 2.0.0 (a major
+/// NuGet release from nuget.org; license MIT -> PolyForm Noncommercial 1.0.0).
+/// Aegis is a REG-RU-007 declared component, so the set needs the Conditor
+/// release that qualifies 2.0.0 before it can be approved.
+let private echelonCurrent1400 =
+    Path.Combine(repositoryRoot, "tests", "fixtures", "registry", "echelon-current-1.40.0-linux-x64.json")
+
+let runKickoffSet1400 (check: string -> bool -> unit) =
+    if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
+        check "echelon-current 1.40.0 kickoff-set qualification (linux-x64 set) is skipped on this platform" true
+    else
+        let set = File.ReadAllBytes echelonCurrent1400
+
+        check "the vendored echelon-current 1.40.0 set is the Registry tools' resolution of the proposed cut"
+            (sha256Hex set = "2469c310c72b9e0bdade0eb4a7b491c4a987382109d58725e7c5631c98524253")
+
+        use document = JsonDocument.Parse set
+        let root = document.RootElement
+
+        let entry systemId =
+            root.GetProperty("components").EnumerateArray()
+            |> Seq.tryFind (fun c -> c.GetProperty("systemId").GetString() = systemId)
+
+        let selected systemId =
+            entry systemId |> Option.map (fun c -> c.GetProperty("version").GetString())
+
+        let selections =
+            [ "aegis"; "praxis"; "dokimos"; "percepta-semantic"; "ordo"; "forma"; "echelon-theme"; "arca"; "limen"; "folio"; "limen-fsharp" ]
+            |> List.map selected
+
+        check "1.40.0 selects Aegis 2.0.0, and keeps the Echelon theme 1.1.0, Forma 1.0.1, Praxis 3.25.0, Dokimos 0.11.1, percepta-semantic 0.4.0, Ordo 1.20.0, Arca 0.7.0, Limen 0.9.1, Folio 0.4.1 and limen-fsharp 0.9.0"
+            (selections = [ Some "2.0.0"; Some "3.25.0"; Some "0.11.1"; Some "0.4.0"; Some "1.20.0"; Some "1.0.1"; Some "1.1.0"; Some "0.7.0"; Some "0.9.1"; Some "0.4.1"; Some "0.9.0" ])
+
+        check "1.40.0 selects Aegis 2.0.0 as a required nuget.org project binding"
+            (entry "aegis"
+             |> Option.exists (fun c ->
+                 c.GetProperty("role").GetString() = "project-binding"
+                 && c.GetProperty("distributionClass").GetString() = "nuget-library"
+                 && c.GetProperty("required").GetBoolean()
+                 && c.GetProperty("distribution").GetProperty("package").GetString() = "EchelonFoundry.Aegis.Core"))
+
+        check "Conditor qualifies Aegis 2.0.0 and keeps 1.0.0 qualified as its upgrade source"
+            (Registry.qualifiedVersions "aegis" = Some(Set.ofList [ "1.0.0"; "2.0.0" ]))
+
+        check "1.40.0 records the verified-completion-attested pairing as enabled"
+            (root.GetProperty("capabilities").EnumerateArray()
+             |> Seq.exists (fun c -> c.GetProperty("id").GetString() = "verified-completion-attested" && c.GetProperty("state").GetString() = "enabled"))
+
+        match Workstation.ResolvedReleaseSets.loadFile "linux-x64" echelonCurrent1400 (sha256Hex set) with
+        | Error error -> check $"the workstation loads echelon-current 1.40.0: {error}" false
+        | Ok profile ->
+            let installed id = profile.Components |> List.tryFind (fun c -> c.Id = id)
+
+            check "the workstation keeps Praxis 3.25.0, Dokimos 0.11.1, percepta-semantic 0.4.0 and Ordo 1.20.0 from 1.40.0"
+                (installed "praxis" |> Option.exists (fun c -> c.Version = "3.25.0" && c.Tag = "v3.25.0")
+                 && installed "dokimos" |> Option.exists (fun c -> c.Version = "0.11.1" && c.Tag = "dokimos-v0.11.1")
+                 && installed "percepta-semantic" |> Option.exists (fun c -> c.Version = "0.4.0" && c.Tag = "percepta-semantic-v0.4.0")
+                 && installed "ordo" |> Option.exists (fun c -> c.Version = "1.20.0" && c.Tag = "v1.20.0"))
+
+            check "the workstation installs no native tool for Aegis, a NuGet library"
+                (installed "aegis" |> Option.isNone)
+
+        withTarget (fun target ->
+            match planUnderAuthority target set kickoffComponents1400 with
+            | Error errors -> check $"the kickoff manifest plans under echelon-current 1.40.0: {joined errors}" false
+            | Ok plan ->
+                check "under 1.40.0 the kickoff engine project references Aegis 2.0.0"
+                    (scaffoldFiles plan
+                     |> Map.tryFind "src/engine/App.Engine.fsproj"
+                     |> Option.exists (fun text ->
+                         text.Contains "<PackageReference Include=\"EchelonFoundry.Aegis.Core\" Version=\"2.0.0\" />"
+                         && not (text.Contains "Version=\"1.0.0\""))))
+
 let runRegistryDistribution (check: string -> bool -> unit) =
     if Workstation.Platform.runtimeIdentifier () <> "linux-x64" then
         check "Registry distribution scaffold fixtures (linux-x64 sets) are skipped on this platform" true

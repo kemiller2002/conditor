@@ -1,12 +1,12 @@
 /// The Registry echelon-current channel, as Conditor's tests pin it.
 module EchelonCurrent
 
-/// The linux-x64 selection of echelon-current 1.39.0 (the proposed cut,
+/// The linux-x64 selection of echelon-current 1.40.0 (the proposed cut,
 /// resolved with the Registry's own tools, channels/echelon-current/linux-x64.json,
-/// sha256 b6510138...) for every system that Conditor carries a component
-/// descriptor for. Against 1.38.0 (sha256 b92b3be8...) it moves only the
-/// optional Echelon theme 1.0.0 -> 1.1.0 (the application layer and
-/// self-hosted fonts, additive). Arca, Dokimos,
+/// sha256 2469c310...) for every system that Conditor carries a component
+/// descriptor for. Against 1.39.0 (sha256 b6510138...) it moves only Aegis
+/// 1.0.0 -> 2.0.0 (a major NuGet release; license MIT -> PolyForm
+/// Noncommercial 1.0.0). Arca, Dokimos,
 /// Percepta Semantic, Strata, Fides, Summa Contracts and Limen F# are selected
 /// but have no Conditor descriptor (Conditor installs Arca through the
 /// release-asset NuGet feed on Registry authority). When the channel moves,
@@ -19,7 +19,7 @@ let selections =
       "visual-engineering", "1.0.1"
       "communication-engineering", "1.0.0"
       "tutela", "0.1.0"
-      "aegis", "1.0.0"
+      "aegis", "2.0.0"
       "limen", "0.9.1"
       "forma", "1.0.1"
       "echelon-theme", "1.1.0"
