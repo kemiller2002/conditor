@@ -187,6 +187,16 @@ module Planner =
 
     let private ignoredBindingDirectories = set [ "node_modules"; ".git"; "bin"; "obj"; ".conditor" ]
 
+    /// Whether any MSBuild project or props file under `root` already pins
+    /// `package` (PackageReference or PackageVersion): the NuGet counterpart
+    /// of an existing package.json binding.
+    let private declaresNugetPackage (root: string) (package: string) =
+        Directory.Exists root
+        && NugetFeed.projectFiles root
+           |> List.exists (fun path ->
+               NugetFeed.pins (File.ReadAllText path)
+               |> List.exists (fun (id, _) -> String.Equals(id, package, StringComparison.OrdinalIgnoreCase)))
+
     /// True when some package.json below `root` declares `package` in a
     /// dependency section: an explicit, observed binding target (CON-333).
     let private declaresNpmPackage (root: string) (package: string) =
@@ -491,9 +501,13 @@ module Planner =
                           Package = ComponentDefinition.packageFor version definition
                           SourceReference = bindingReference version definition }
 
+                    let package = ComponentDefinition.packageFor version definition
+
                     let observedBinding =
-                        definition.Distribution = NpmPackage
-                        && declaresNpmPackage (Path.GetFullPath target) (ComponentDefinition.packageFor version definition)
+                        match definition.Distribution with
+                        | NpmPackage -> declaresNpmPackage (Path.GetFullPath target) package
+                        | NugetPackage -> declaresNugetPackage (Path.GetFullPath target) package
+                        | _ -> false
 
                     if request.Required && manifest.Scaffold.IsNone && not observedBinding then
                         errors.Add

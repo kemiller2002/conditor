@@ -49,6 +49,9 @@ type CurrentUpgradePlan =
       /// NuGet release-asset feeds to establish: an opt-in (no previous
       /// version) or a version change (previous version's pins move).
       NugetFeedChanges: (NugetFeedRelease * string option) list
+      /// nuget.org-distributed application bindings (Aegis) whose
+      /// declaration and exact package pins move together.
+      NugetBindingTransitions: NugetBindingTransition list
       /// `.echelon/foundations.json` capability moves of non-web transitions
       /// (CON-350); web-package transitions carry their own.
       FoundationsEdits: FoundationsEdit list
@@ -338,6 +341,7 @@ module CurrentUpgrade =
         let embeddedTransitions = ResizeArray<CurrentUpgradeTransition * ComponentDefinition * ProfileComponent>()
         let webTransitions = ResizeArray<WebPackageTransition>()
         let packageTransitions = ResizeArray<PackageLifecycleTransition>()
+        let bindingTransitions = ResizeArray<NugetBindingTransition>()
 
         for request in manifest.Components do
             match request.Version, entryMap |> Map.tryFind request.Id with
@@ -376,6 +380,17 @@ module CurrentUpgrade =
                     | None when feeds.ContainsKey request.Id ->
                         mode <- NugetFeed.Mode
                         feedChanges.Add(feeds[request.Id], Some fromVersion)
+                    | None when
+                        targetEntry.DistributionClass = NugetFeed.DistributionClass
+                        && Registry.tryFind request.Id |> Option.exists NugetBinding.isBinding
+                        ->
+                        let definition = (Registry.tryFind request.Id).Value
+
+                        match NugetBinding.plan target definition fromVersion targetEntry.Version with
+                        | Ok binding ->
+                            mode <- NugetBinding.Mode
+                            bindingTransitions.Add binding
+                        | Error refusals -> refusals |> List.iter errors.Add
                     | None when targetEntry.DistributionClass = WebPackageBinding.DistributionClass ->
                         let planBinding =
                             if added |> List.exists (fun optIn -> optIn.Id = request.Id) then
@@ -671,6 +686,14 @@ module CurrentUpgrade =
                   |> String.concat "\n"
                   genericInitPlan |> Option.map (fun plan -> $"lifecycleInit={plan.Digest}") |> Option.defaultValue "lifecycleInit=-" ]
 
+        // Only a plan that moves a NuGet application binding carries these
+        // lines, so every other plan's digest is unchanged.
+        let bindingLines =
+            bindingTransitions
+            |> Seq.sortBy _.Id
+            |> Seq.map NugetBinding.digestMaterial
+            |> List.ofSeq
+
         // Only a plan that moves or repairs a foundations capability carries
         // these lines, so every other plan's digest is unchanged.
         let foundationsLines =
@@ -680,7 +703,8 @@ module CurrentUpgrade =
             |> List.map (fun (kind, edit) ->
                 $"{kind}|{edit.Path}|{edit.Capability}|{edit.FromVersion}->{edit.ToVersion}|sha256:{edit.Sha256}")
 
-        let digestMaterial = String.concat "\n" (planLines @ optInLines @ feedLines @ foundationsLines)
+        let digestMaterial =
+            String.concat "\n" (planLines @ optInLines @ feedLines @ bindingLines @ foundationsLines)
 
         targetProfile
         |> Option.map (fun profile ->
@@ -701,6 +725,7 @@ module CurrentUpgrade =
               PackageLifecycleTransitions = packageTransitions |> Seq.toList |> List.sortBy _.Transition.Id
               WebPackageTransitions = webTransitions |> Seq.toList |> List.sortBy _.Id
               NugetFeedChanges = feedChanges |> Seq.toList |> List.sortBy (fun (release, _) -> release.Id)
+              NugetBindingTransitions = bindingTransitions |> Seq.toList |> List.sortBy _.Id
               FoundationsEdits = foundationsEdits
               PinRepairs = pinRepairs
               Refusals = errors |> Seq.distinct |> Seq.toList
@@ -827,7 +852,9 @@ module CurrentUpgrade =
                       | Some edit -> yield edit.Path
                       | None -> ()
                   for edit in plan.FoundationsEdits @ plan.PinRepairs do
-                      yield edit.Path ]
+                      yield edit.Path
+                  for binding in plan.NugetBindingTransitions do
+                      yield! NugetBinding.editedPaths target binding ]
                 |> List.distinct
                 |> List.filter File.Exists
                 |> List.map (fun path -> path, File.ReadAllBytes path)
@@ -921,6 +948,11 @@ module CurrentUpgrade =
                             NugetFeed.ensure (NugetFeed.fetchWith ctx.ArtifactMirror ctx.Offline) target previous release
                             |> Result.mapError (fun errors -> $"NuGet feed {release.Id}@{release.Version} failed:" :: errors)))
                     (Ok()))
+            |> Result.bind (fun () ->
+                // Pins are re-proven against the plan before any file is
+                // written; CON-351 below proves the moved pins again.
+                plan.NugetBindingTransitions
+                |> List.fold (fun state binding -> state |> Result.bind (fun () -> NugetBinding.apply target binding)) (Ok()))
             |> Result.bind (fun () ->
                 // CON-350, CON-352: move or repair foundations capabilities.
                 (plan.FoundationsEdits @ plan.PinRepairs)

@@ -5,7 +5,10 @@ open System
 module Upgrade =
     type UpgradePreview =
         { ChangedComponents: string list
-          Plan: InstallationPlan }
+          Plan: InstallationPlan
+          /// NuGet application bindings whose declaration and exact package
+          /// pins move together (docs/nuget-binding-upgrade.md).
+          NugetBindings: NugetBindingTransition list }
 
     type UpgradeResult =
         { ChangedComponents: string list
@@ -31,6 +34,7 @@ module Upgrade =
     let private analyzeComponents previous current =
         let errors = ResizeArray<string>()
         let changed = ResizeArray<string>()
+        let bindingMoves = ResizeArray<ComponentDefinition * string * string>()
         let oldComponents = componentMap previous
         let newComponents = componentMap current
         let oldIds = oldComponents |> Map.toSeq |> Seq.map fst |> Set.ofSeq
@@ -48,7 +52,7 @@ module Upgrade =
 
             if oldRequest.Version <> newRequest.Version then
                 match oldRequest.Version, newRequest.Version with
-                | Some _, Some _ ->
+                | Some oldVersion, Some newVersion ->
                     match Registry.tryFind id with
                     | None ->
                         errors.Add $"Component '{id}' is unknown to this Conditor version."
@@ -56,6 +60,9 @@ module Upgrade =
                         match definition.Distribution, definition.ApplicationBinding, definition.LifecycleSource with
                         | LifecycleNpm, None, Some RegistryPackage ->
                             changed.Add id
+                        | _, Some NugetReference, _ ->
+                            changed.Add id
+                            bindingMoves.Add(definition, oldVersion, newVersion)
                         | HostTool, _, _ ->
                             errors.Add
                                 $"Component '{id}' is a native host tool; change its version through the integrity-bound workstation resolved set, not a repository-only upgrade."
@@ -66,7 +73,10 @@ module Upgrade =
                     errors.Add
                         $"Component '{id}' must declare both the old and new versions explicitly before Conditor can prove a version-only upgrade."
 
-        if errors.Count > 0 then Error(List.ofSeq errors) else Ok(List.ofSeq changed)
+        if errors.Count > 0 then
+            Error(List.ofSeq errors)
+        else
+            Ok(List.ofSeq changed, List.ofSeq bindingMoves)
 
     let private analyze target currentManifest =
         match LockFile.readManifestSnapshot target with
@@ -123,16 +133,24 @@ module Upgrade =
     let preview target manifest =
         match analyze target manifest with
         | Error errors -> Error errors
-        | Ok changedIds ->
+        | Ok(changedIds, bindingMoves) ->
             match ensureScaffoldAlreadyEstablished target manifest with
             | Error errors -> Error errors
             | Ok() ->
-                match upgradePlan target manifest changedIds with
-                | Error errors -> Error errors
-                | Ok plan ->
-                    Ok
-                        { ChangedComponents = changedIds
-                          Plan = plan }
+                let bindings =
+                    bindingMoves
+                    |> List.map (fun (definition, fromVersion, toVersion) -> NugetBinding.plan target definition fromVersion toVersion)
+
+                match bindings |> List.collect (function Error errors -> errors | Ok _ -> []) with
+                | _ :: _ as errors -> Error errors
+                | [] ->
+                    match upgradePlan target manifest changedIds with
+                    | Error errors -> Error errors
+                    | Ok plan ->
+                        Ok
+                            { ChangedComponents = changedIds
+                              Plan = plan
+                              NugetBindings = bindings |> List.choose (function Ok binding -> Some binding | Error _ -> None) }
 
     let private verifyAfterUpgrade target manifestPath manifest =
         match Requirements.verify target manifest with
@@ -147,7 +165,11 @@ module Upgrade =
         match preview target manifest with
         | Error errors -> Error errors
         | Ok preview ->
-            match Installer.execute target String.Empty preview.Plan with
+            let movedBindings =
+                preview.NugetBindings
+                |> List.fold (fun state binding -> state |> Result.bind (fun () -> NugetBinding.apply target binding)) (Ok())
+
+            match movedBindings |> Result.bind (fun () -> Installer.execute target String.Empty preview.Plan |> Result.map ignore) with
             | Error errors -> Error errors
             | Ok _ ->
                 match verifyAfterUpgrade target manifestPath manifest with

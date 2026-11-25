@@ -34,6 +34,7 @@
     <Compile Include="SupervisorTests.fs" />
     <Compile Include="RequirementsImportTests.fs" />
     <Compile Include="NugetFeedTests.fs" />
+    <Compile Include="NugetBindingTests.fs" />
     <Compile Include="UnattendedReadinessTests.fs" />
     <Compile Include="CiPolicyTests.fs" />
     <Compile Include="Program.fs" />

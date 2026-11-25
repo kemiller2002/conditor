@@ -582,6 +582,12 @@ let private printCurrentUpgradePlan (plan: CurrentUpgradePlan) =
             for package in release.Packages do
                 Console.WriteLine $"      {package.PackageId} {package.Version} (sha256:{package.Sha256})"
 
+    if not plan.NugetBindingTransitions.IsEmpty then
+        Console.WriteLine "  NuGet application bindings (declaration and exact package pins move together):"
+
+        for binding in plan.NugetBindingTransitions do
+            NugetBinding.describe binding |> List.iter (fun line -> Console.WriteLine $"    {line}")
+
     if not plan.FoundationsEdits.IsEmpty then
         Console.WriteLine "  foundations capabilities moved with their transitions:"
 
@@ -791,6 +797,9 @@ let private runUpgrade (args: string array) checkOnly target manifestPath =
 
                 Installer.describe preview.Plan
                 |> List.iter (fun line -> Console.WriteLine $"  {line}")
+
+                for binding in preview.NugetBindings do
+                    NugetBinding.describe binding |> List.iter (fun line -> Console.WriteLine $"  {line}")
 
                 0
         | Ok manifest ->
