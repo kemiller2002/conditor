@@ -8,7 +8,7 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
 
 - Install the Conditor release that contains `conditor requirements import`
   and `conditor supervise` (0.6.0 or later).
-- Install Praxis 3.25.0, Ordo 1.20.0 and percepta-repo 0.1.0 on the day-of
+- Install Praxis 3.26.0, Ordo 1.20.0 and percepta-repo 0.1.0 on the day-of
   host. These are the versions the preset pins.
 - Install the kickoff release set's native host tools from the Registry set
   (Indy-init OD-INDY-8, `DF-CON-2026-A007`). Use the approved kickoff version
@@ -17,9 +17,14 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   `channel.json`:
   `conditor workstation plan --resolved-set <set> --resolved-set-sha256 <sha>`,
   then `conditor workstation apply ... --authorize <digest>`.
-  The kickoff set is echelon-current 1.42.0, once the Registry owner
-  approves it after Conditor qualifies it (1.41.0 is the approved set until
-  then). Against 1.41.0 it moves only Aegis 2.0.1 -> 2.0.2: a detached
+  The kickoff set is echelon-current 1.43.0, once the Registry owner
+  approves it after Conditor qualifies it (1.42.0 is the approved set until
+  then). Against 1.42.0 it moves Praxis 3.25.0 -> 3.26.0 (the web and hub
+  pages are presented with Forma 1.0.1 and the Echelon theme 1.1.0, and
+  `praxis foundations verify` recognises `forma-` markup) and Arca 0.7.0 ->
+  0.7.1 (rebuilt against Aegis 2.0.2, public API unchanged; Arca is not a
+  Conditor component and installs from the release-asset NuGet feed). The
+  preset declares Praxis 3.26.0 (Conditor 0.10.30). 1.42.0 moved only Aegis 2.0.1 -> 2.0.2: a detached
   capture no longer waits synchronously for the fault record, which froze
   single-threaded WebAssembly hosts. The preset declares Aegis 2.0.2
   (Conditor 0.10.29). 1.41.0 moved Aegis 2.0.0 -> 2.0.1, a patch with no
@@ -54,8 +59,10 @@ three steps and does nothing else. Decisions: `DF-CON-2026-A001`
   that changes a descriptor the project declares makes `start`, `status` and
   `repair` refuse with "Resolved identity for component '<id>' differs from
   the Conditor lock" until then: 0.10.24 changed forma and forma-workflow,
-  0.10.25 changed echelon-theme (projects that declare the theme), and
-  0.10.26, 0.10.28 and 0.10.29 change aegis (projects that declare Aegis). It installs Praxis 3.25.0, which
+  0.10.25 changed echelon-theme (projects that declare the theme),
+  0.10.26, 0.10.28 and 0.10.29 change aegis (projects that declare Aegis), and
+  0.10.30 changes praxis (every project). It installs Praxis 3.26.0, which
+  presents its web and hub pages with Forma 1.0.1 and the Echelon theme 1.1.0,
   carries the requirements-preservation gate, admits compiled verification
   plans (`praxis inbox admit-plan`), records process evidence in the work
   event log (`praxis work evidence`), adds owner-authorized autonomous

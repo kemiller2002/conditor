@@ -89,3 +89,4 @@
 | WI-0080 | Qualify Aegis 2.0.1 and echelon-current 1.41.0, release Conditor 0.10.28 | complete |  | medium |
 | WI-0081 | Qualify Aegis 2.0.2 and echelon-current 1.42.0, release Conditor 0.10.29 | complete |  | medium |
 | WI-0082 | Upgrade to echelon-current 1.42.0 (praxis 3.7.2 -> 3.25.0, ordo 1.5.0 -> 1.20.0, visual-engineering 1.0.0 -> 1.0.1) | complete |  | medium |
+| WI-0083 | Qualify Praxis 3.26.0 and echelon-current 1.43.0 (Arca 0.7.1); request Conditor 0.10.30 | complete |  | medium |

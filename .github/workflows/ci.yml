@@ -2080,6 +2080,81 @@ jobs:
           jq -e '.Code == "invalid-arguments" and (.Message | startswith("usage: dokimos verification requirements --manifest F"))' <<< "$verification"
           for sub in requirements compile scaffold coverage probe; do grep -F "dokimos verification $sub" <<< "$verification"; done
 
+  # Indy-init OD-INDY-8: echelon-current 1.43.0 is proposed as the next kickoff
+  # set, approved only after this qualification. Against 1.42.0 it moves
+  # Praxis 3.25.0 -> 3.26.0 (a native host tool, installed here from the real
+  # release bytes) and Arca 0.7.0 -> 0.7.1 (a release-asset NuGet library with
+  # no Conditor descriptor). The workstation installs every native host tool
+  # of the set from the real published release bytes and verifies each receipt.
+  echelon-current-1-43-0-kickoff-set-qualification:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      SET_1430_PATH: tests/fixtures/registry/echelon-current-1.43.0-linux-x64.json
+      SET_1430_SHA256: 4851c24d52cf3a7ef6dd2ccec26ef7a97c769dd06076b51dfede387c5a8cf8c9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore Conditor.slnx
+      - run: dotnet build Conditor.slnx --configuration Release --no-restore
+      - name: Install the 1.43.0 native environment from the published releases and verify every receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          conditor() { dotnet run --project src/Conditor.Cli --configuration Release --no-build -- "$@"; }
+          echo "$SET_1430_SHA256  $SET_1430_PATH" | sha256sum -c -
+          jq -e '.capabilities[] | select(.id == "verified-completion-attested") | .state == "enabled"' "$SET_1430_PATH"
+          home="$RUNNER_TEMP/kickoff-home"; mkdir -p "$home"
+          args=(--resolved-set "$SET_1430_PATH" --resolved-set-sha256 "$SET_1430_SHA256" --home "$home")
+          conditor workstation plan "${args[@]}" --json > "$RUNNER_TEMP/kickoff-plan.json"
+          jq -e '.refusals == []' "$RUNNER_TEMP/kickoff-plan.json"
+          digest=$(jq -r .digest "$RUNNER_TEMP/kickoff-plan.json")
+          conditor workstation apply "${args[@]}" --target-id conditor-ci-kickoff --authorize "$digest" | tee "$RUNNER_TEMP/kickoff-apply.txt"
+          grep -F "Workstation ready." "$RUNNER_TEMP/kickoff-apply.txt"
+          if grep -E "receipt mismatch|FAILED|REFUSED" "$RUNNER_TEMP/kickoff-apply.txt"; then exit 1; fi
+          "$home/.local/bin/praxis" --version | grep -Fx "praxis 3.26.0"
+          rc=0; autonomy=$("$home/.local/bin/praxis" autonomy 2>&1) || rc=$?
+          grep -F "autonomy policy check --policy FILE" <<< "$autonomy"
+          rc=0; usage=$("$home/.local/bin/praxis" inbox 2>&1) || rc=$?
+          grep -F "inbox admit-plan CLAIM-ID" <<< "$usage"
+          rc=0; gate=$("$home/.local/bin/praxis" requirements preservation verify 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements preservation verify requires --baseline FILE" <<< "$gate"
+          # Praxis 3.26.0 keeps 3.25.0's requirement catalog compiler.
+          rc=0; manifest=$("$home/.local/bin/praxis" requirements manifest compile 2>&1) || rc=$?
+          test "$rc" = 2 && grep -F "requirements manifest compile requires --catalog FILE and --source-commit SHA" <<< "$manifest"
+          "$home/.local/bin/ordo" --version | grep -Fx "1.20.0"
+          "$home/.local/bin/ordo" verification --help | grep -F -- "--reuse-context FILE"
+          "$home/.local/bin/percepta-repo" --version | grep -F "0.1.0"
+          percepta_commit=$(jq -r '.components[] | select(.systemId == "percepta-semantic") | .commit' "$SET_1430_PATH")
+          "$home/.local/bin/percepta" version | tee "$RUNNER_TEMP/percepta-version.txt"
+          grep -Fx "percepta 0.4.0+$percepta_commit" "$RUNNER_TEMP/percepta-version.txt"
+          "$home/.local/bin/dokimos" version | tee "$RUNNER_TEMP/dokimos-version.json"
+          jq -e --arg commit "$(jq -r '.components[] | select(.systemId == "dokimos") | .commit' "$SET_1430_PATH")" '
+            (with_entries(.key |= ascii_downcase)) as $v
+            | $v.releaseversion == "0.11.1" and $v.sourcecommit == $commit' "$RUNNER_TEMP/dokimos-version.json"
+          rc=0; dokimos_usage=$("$home/.local/bin/dokimos" evidence 2>&1) || rc=$?
+          grep -F -- "--checkpoint incremental|release" <<< "$dokimos_usage"
+          # Dokimos 0.11.1 keeps 0.11.0's manifest-driven requirement
+          # verification: bare `dokimos verification` (exit 2) names
+          # requirements first, then the 0.10.0 subcommands.
+          rc=0; verification=$("$home/.local/bin/dokimos" verification 2>&1) || rc=$?
+          test "$rc" = 2
+          jq -e '.Code == "invalid-arguments" and (.Message | startswith("usage: dokimos verification requirements --manifest F"))' <<< "$verification"
+          for sub in requirements compile scaffold coverage probe; do grep -F "dokimos verification $sub" <<< "$verification"; done
+          # Praxis 3.26.0: foundations verify recognises forma- markup as Forma
+          # use (Praxis 3.25.0 reports ECHELON-FND-FORMA-003 on this probe).
+          probe="$RUNNER_TEMP/forma-probe"; mkdir -p "$probe/.echelon" "$probe/web"
+          echo '{"schemaVersion":1,"application":"Forma markup probe","capabilities":{"forma":{"required":true,"version":"1.0.1"}}}' > "$probe/.echelon/foundations.json"
+          echo '{"name":"forma-markup-probe","private":true,"dependencies":{"@echelon-foundry/design-system":"https://github.com/kemiller2002/forma/releases/download/v1.0.1/echelon-foundry-design-system-1.0.1.tgz"}}' > "$probe/package.json"
+          printf '<!doctype html>\n<html data-forma-brand="echelon"><body><forma-card>probe</forma-card></body></html>\n' > "$probe/web/index.html"
+          (cd "$probe" && "$home/.local/bin/praxis" foundations verify --json) > "$RUNNER_TEMP/forma-probe.json"
+          jq -e '.passed and (.capabilities[] | select(.name == "forma") | .used and .passed)' "$RUNNER_TEMP/forma-probe.json"
+          # Arca 0.7.1 is a release-asset NuGet library: no native tool.
+          jq -e '.components[] | select(.systemId == "arca") | .version == "0.7.1" and .distributionClass == "nuget-library"' "$SET_1430_PATH"
+          test ! -e "$home/.local/bin/arca"
+
   host-tool-upgrade-boundary:
     needs: build-test
     runs-on: ubuntu-latest
