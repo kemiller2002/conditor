@@ -90,3 +90,4 @@
 | WI-0081 | Qualify Aegis 2.0.2 and echelon-current 1.42.0, release Conditor 0.10.29 | complete |  | medium |
 | WI-0082 | Upgrade to echelon-current 1.42.0 (praxis 3.7.2 -> 3.25.0, ordo 1.5.0 -> 1.20.0, visual-engineering 1.0.0 -> 1.0.1) | complete |  | medium |
 | WI-0083 | Qualify Praxis 3.26.0 and echelon-current 1.43.0 (Arca 0.7.1); request Conditor 0.10.30 | complete |  | medium |
+| WI-0084 | Upgrade Conditor's own toolchain to echelon-current 1.43.0 (Praxis 3.25.0 -> 3.26.0) and re-lock for the 0.10.30 praxis descriptor | ready |  | medium |
