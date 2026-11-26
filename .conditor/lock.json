@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "project": "conditor",
-  "manifestSha256": "1d16a0ec010a819297b76fcef73092d71686c9236b982ba2c46264206d7b160b",
+  "manifestSha256": "2b5c00d5698ec12b87a0aab6f920a6e192e56e63d7cc248aa56985092c316242",
   "manifest": {
     "$schema": "./schemas/conditor.schema.json",
     "schemaVersion": 1,
@@ -9,7 +9,7 @@
     "components": [
       {
         "id": "praxis",
-        "version": "3.25.0"
+        "version": "3.26.0"
       },
       {
         "id": "ordo",
@@ -30,18 +30,18 @@
     "registryAuthority": {
       "kind": "resolved-release-set",
       "path": ".conditor/authority/resolved-release-set.json",
-      "sha256": "6be3bc97fbdd314abc4c712c2b1b47c1a18487995d9e1b9db445b4d141a8ee8a"
+      "sha256": "4851c24d52cf3a7ef6dd2ccec26ef7a97c769dd06076b51dfede387c5a8cf8c9"
     }
   },
   "components": [
     {
       "id": "praxis",
-      "version": "3.25.0",
+      "version": "3.26.0",
       "distribution": "host-tool",
       "package": "praxis",
-      "descriptorSha256": "a6a854d426d865133e7d1440e2ca80245dbf425aecdf1aafdb7ffddf5bd4487a",
+      "descriptorSha256": "5cb1f058f06dde4ff975e0c559b74a564abda5a78aadac1d4d3fd8f6e3eaefa7",
       "authority": "embedded-component-descriptor",
-      "sourceReference": "host:praxis@3.25.0"
+      "sourceReference": "host:praxis@3.26.0"
     },
     {
       "id": "ordo",
@@ -77,15 +77,15 @@
       "component": "ordo",
       "code": "SDE-STRUCT-001",
       "band": "justification-required",
-      "path": "src/Conditor.Core/Scaffolding.fs",
-      "lineCount": 2243
+      "path": "tests/Conditor.Tests/WebScaffoldTests.fs",
+      "lineCount": 2284
     },
     {
       "component": "ordo",
       "code": "SDE-STRUCT-001",
       "band": "justification-required",
-      "path": "tests/Conditor.Tests/WebScaffoldTests.fs",
-      "lineCount": 2186
+      "path": "src/Conditor.Core/Scaffolding.fs",
+      "lineCount": 2243
     },
     {
       "component": "ordo",
@@ -120,7 +120,7 @@
       "code": "SDE-STRUCT-001",
       "band": "strong-review",
       "path": "tests/Conditor.Tests/Program.fs",
-      "lineCount": 1285
+      "lineCount": 1286
     },
     {
       "component": "ordo",
@@ -162,7 +162,7 @@
       "code": "SDE-STRUCT-001",
       "band": "review",
       "path": "tests/Conditor.Tests/CurrentUpgradeTests.fs",
-      "lineCount": 920
+      "lineCount": 921
     },
     {
       "component": "ordo",

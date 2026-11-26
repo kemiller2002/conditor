@@ -4,7 +4,7 @@
   "repository": "conditor",
   "actor": "anthropic/claude-code",
   "startedAt": "2026-10-06T12:18:11.256Z",
-  "updatedAt": "2026-11-25T23:39:02Z",
+  "updatedAt": "2026-11-26T00:32:22Z",
   "baselineDirtyPaths": [],
   "workItems": [
     {
@@ -3909,6 +3909,47 @@
         }
       },
       "completedAt": "2026-11-25T23:39:02Z"
+    },
+    {
+      "id": "WI-0084",
+      "type": "task",
+      "state": "complete",
+      "semanticState": "complete",
+      "evidence": [
+        {
+          "type": "implementation",
+          "path": ".conditor/lock.json"
+        },
+        {
+          "type": "tests",
+          "path": "tests/Conditor.Tests"
+        }
+      ],
+      "updatedAt": "2026-11-26T00:32:22Z",
+      "telemetryExecutionIds": [
+        "EXE-20261126T002416265Z-a58bac62"
+      ],
+      "latestCheckpoint": {
+        "id": "bbf364efa75896bd2e54bb22",
+        "recordedAt": "2026-11-26T00:32:19Z",
+        "executionId": "EXE-20261126T002416265Z-a58bac62",
+        "repository": "conditor",
+        "branch": "claude/vigila-implementation-jdeps1",
+        "commit": "cdbe213486a1f1e40aeb3b7b99ed6e1d87d9f816",
+        "remote": {
+          "name": "origin",
+          "url": "https://github.com/kemiller2002/conditor"
+        },
+        "remoteBranch": "claude/vigila-implementation-jdeps1",
+        "remoteCommit": "cdbe213486a1f1e40aeb3b7b99ed6e1d87d9f816",
+        "summary": "Conditor 0.10.30 upgraded Conditor's own toolchain to echelon-current 1.43.0 (praxis 3.26.0) and re-locked the changed praxis descriptor; conditor status/verify pass; build 0 warnings, 1738 Conditor tests pass; praxis validate and registry check pass",
+        "nextAction": "complete the work item and open a draft PR",
+        "verification": {
+          "status": "verified",
+          "mechanism": "git-remote-observation"
+        }
+      },
+      "completedAt": "2026-11-26T00:32:22Z"
     }
   ]
 }
