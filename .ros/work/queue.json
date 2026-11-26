@@ -1924,10 +1924,10 @@
       "description": null,
       "tags": [],
       "priority": "medium",
-      "status": "ready",
+      "status": "complete",
       "attachments": [],
       "createdAt": "2026-11-26T00:24:09.922Z",
-      "updatedAt": "2026-11-26T00:24:14Z",
+      "updatedAt": "2026-11-26T00:32:22Z",
       "createdBy": "unknown",
       "createdByActor": {
         "kind": "agent",
